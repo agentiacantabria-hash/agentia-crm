@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { I } from './Icons'
 import { Modal, F } from './Modal'
 import { PIPELINE_COLS, STATE_COLORS, eur } from './data'
@@ -306,6 +306,66 @@ function ServicioModal({ servicio, onClose, onSave }) {
   )
 }
 
+const DEFAULT_USUARIOS = [
+  { id:1, n:'Lucía P.',    rol:'Admin',    email:'lucia@agentia.com',  ini:'LP', estado:'activo' },
+  { id:2, n:'Andrés R.',   rol:'Empleado', email:'andres@agentia.com', ini:'AR', estado:'activo' },
+]
+
+const DEFAULT_SERVICIOS = [
+  { id:1, n:'Página web premium',       base:2500, activo:true,  color:'#4F8BFF' },
+  { id:2, n:'Automatización WhatsApp',  base:1800, activo:true,  color:'#9A7BFF' },
+  { id:3, n:'Chatbot de reservas',      base:1600, activo:true,  color:'#3ECF8E' },
+  { id:4, n:'Mantenimiento mensual',    base:120,  activo:true,  color:'#FFB547' },
+  { id:5, n:'Campaña captación',        base:900,  activo:false, color:'#FF5A6A' },
+]
+
+function initials(name) {
+  return (name || '').split(' ').map(w => w[0]).filter(Boolean).join('').slice(0,2).toUpperCase() || '?'
+}
+
+function UsuarioModal({ usuario, onClose, onSave, onDelete }) {
+  const isNew = !usuario?.id
+  const [form, setForm] = useState(usuario || { n:'', rol:'Empleado', email:'', estado:'activo' })
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const [confirmDel, setConfirmDel] = useState(false)
+
+  return (
+    <Modal open title={isNew ? 'Nuevo usuario' : `Editar — ${form.n}`}
+      onClose={onClose} onSave={() => onSave({ ...form, ini: initials(form.n) })}
+      saveLabel={isNew ? 'Crear usuario' : 'Guardar'}>
+      <F label="Nombre completo">
+        <input value={form.n} onChange={e => set('n', e.target.value)} placeholder="Ej: Unai López" autoFocus />
+      </F>
+      <div className="form-2col">
+        <F label="Email">
+          <input value={form.email||''} onChange={e => set('email', e.target.value)} placeholder="unai@agentia.com" />
+        </F>
+        <F label="Rol">
+          <select value={form.rol||'Empleado'} onChange={e => set('rol', e.target.value)}>
+            <option value="Admin">Admin</option>
+            <option value="Empleado">Empleado</option>
+          </select>
+        </F>
+      </div>
+      <F label="Estado">
+        <select value={form.estado||'activo'} onChange={e => set('estado', e.target.value)}>
+          <option value="activo">Activo</option>
+          <option value="inactivo">Inactivo</option>
+        </select>
+      </F>
+      {!isNew && (
+        <div className="modal-danger-zone">
+          <span>Zona peligrosa</span>
+          {confirmDel
+            ? <button className="btn danger sm" onClick={() => { onDelete(form.id); onClose() }}>¿Confirmar eliminación?</button>
+            : <button className="btn sm ghost" onClick={() => setConfirmDel(true)} style={{color:'var(--danger)'}}>Eliminar usuario</button>
+          }
+        </div>
+      )}
+    </Modal>
+  )
+}
+
 export function Ajustes({ role }) {
   if (role !== 'admin') {
     return (
@@ -320,31 +380,36 @@ export function Ajustes({ role }) {
   }
 
   const [tab, setTab] = useState('servicios')
-  const [servicios, setServicios] = useState([
-    { id:1, n:'Página web premium',       base:2500, activo:true,  color:'#4F8BFF' },
-    { id:2, n:'Automatización WhatsApp',  base:1800, activo:true,  color:'#9A7BFF' },
-    { id:3, n:'Chatbot de reservas',      base:1600, activo:true,  color:'#3ECF8E' },
-    { id:4, n:'Mantenimiento mensual',    base:120,  activo:true,  color:'#FFB547' },
-    { id:5, n:'Campaña captación',        base:900,  activo:false, color:'#FF5A6A' },
-  ])
+
+  const [servicios, setServicios] = useState(() => {
+    try { const s = localStorage.getItem('agentia_servicios'); return s ? JSON.parse(s) : DEFAULT_SERVICIOS } catch { return DEFAULT_SERVICIOS }
+  })
+  useEffect(() => { localStorage.setItem('agentia_servicios', JSON.stringify(servicios)) }, [servicios])
+
   const [editingServicio, setEditingServicio] = useState(null)
   const [addingServicio, setAddingServicio] = useState(false)
 
   const toggleServicio = (id) => setServicios(prev => prev.map(s => s.id===id ? {...s, activo:!s.activo} : s))
   const saveServicio = (form) => {
-    if (form.id) {
-      setServicios(prev => prev.map(s => s.id===form.id ? form : s))
-    } else {
-      setServicios(prev => [...prev, { ...form, id: Date.now() }])
-    }
+    if (form.id) setServicios(prev => prev.map(s => s.id===form.id ? form : s))
+    else setServicios(prev => [...prev, { ...form, id: Date.now() }])
     setEditingServicio(null); setAddingServicio(false)
   }
 
-  const usuarios = [
-    { n:'Lucía P.',    rol:'Admin',    email:'lucia@agentia.com',  ini:'LP', estado:'activo' },
-    { n:'Andrés R.',   rol:'Empleado', email:'andres@agentia.com', ini:'AR', estado:'activo' },
-    { n:'Nueva plaza', rol:'—',        email:'—',                  ini:'+',  estado:'vacante' },
-  ]
+  const [usuarios, setUsuarios] = useState(() => {
+    try { const u = localStorage.getItem('agentia_usuarios'); return u ? JSON.parse(u) : DEFAULT_USUARIOS } catch { return DEFAULT_USUARIOS }
+  })
+  useEffect(() => { localStorage.setItem('agentia_usuarios', JSON.stringify(usuarios)) }, [usuarios])
+
+  const [editingUsuario, setEditingUsuario] = useState(null)
+  const [addingUsuario, setAddingUsuario] = useState(false)
+
+  const saveUsuario = (form) => {
+    if (form.id) setUsuarios(prev => prev.map(u => u.id===form.id ? form : u))
+    else setUsuarios(prev => [...prev, { ...form, id: Date.now() }])
+    setEditingUsuario(null); setAddingUsuario(false)
+  }
+  const deleteUsuario = (id) => setUsuarios(prev => prev.filter(u => u.id !== id))
 
   return (
     <div className="fade-in">
@@ -398,17 +463,40 @@ export function Ajustes({ role }) {
 
       {tab === 'usuarios' && (
         <div className="card">
-          <div className="card-head"><h3>Equipo y permisos</h3><div className="right"><button className="btn primary"><I.Plus size={13}/> Invitar usuario</button></div></div>
+          <div className="card-head">
+            <h3>Equipo y permisos</h3>
+            <span className="sub">· {usuarios.length} usuario{usuarios.length!==1?'s':''}</span>
+            <div className="right">
+              <button className="btn primary" onClick={() => setAddingUsuario(true)}><I.Plus size={13}/> Añadir usuario</button>
+            </div>
+          </div>
           <table className="table">
             <thead><tr><th>Usuario</th><th>Email</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
             <tbody>
-              {usuarios.map((u,i)=>(
-                <tr key={i}>
-                  <td><div style={{display:'flex', alignItems:'center', gap:10}}><div className="avatar" style={u.estado==='vacante'?{background:'rgba(255,255,255,0.05)', color:'var(--text-3)'}:{}}>{u.ini}</div><span className="primary">{u.n}</span></div></td>
-                  <td className="muted">{u.email}</td>
-                  <td>{u.rol==='Admin'?<span className="chip blue"><span className="dot"/>Admin</span>:u.rol==='Empleado'?<span className="chip gray"><span className="dot"/>Empleado</span>:<span className="muted small">—</span>}</td>
-                  <td>{u.estado==='activo'?<span className="chip green"><span className="dot"/>Activo</span>:<span className="chip amber"><span className="dot"/>Vacante</span>}</td>
-                  <td style={{textAlign:'right'}}><button className="btn sm ghost">Gestionar</button></td>
+              {usuarios.map(u => (
+                <tr key={u.id}>
+                  <td>
+                    <div style={{display:'flex', alignItems:'center', gap:10}}>
+                      <div className="avatar" style={u.estado==='inactivo'?{background:'rgba(255,255,255,0.05)', color:'var(--text-3)'}:{}}>{u.ini || initials(u.n)}</div>
+                      <span className="primary">{u.n}</span>
+                    </div>
+                  </td>
+                  <td className="muted">{u.email || '—'}</td>
+                  <td>
+                    {u.rol==='Admin'
+                      ? <span className="chip blue"><span className="dot"/>Admin</span>
+                      : <span className="chip gray"><span className="dot"/>Empleado</span>
+                    }
+                  </td>
+                  <td>
+                    {u.estado==='activo'
+                      ? <span className="chip green"><span className="dot"/>Activo</span>
+                      : <span className="chip amber"><span className="dot"/>Inactivo</span>
+                    }
+                  </td>
+                  <td style={{textAlign:'right'}}>
+                    <button className="btn sm ghost" onClick={() => setEditingUsuario(u)}>Editar</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -451,6 +539,15 @@ export function Ajustes({ role }) {
           servicio={editingServicio}
           onClose={() => { setEditingServicio(null); setAddingServicio(false) }}
           onSave={saveServicio}
+        />
+      )}
+
+      {(editingUsuario || addingUsuario) && (
+        <UsuarioModal
+          usuario={editingUsuario}
+          onClose={() => { setEditingUsuario(null); setAddingUsuario(false) }}
+          onSave={saveUsuario}
+          onDelete={deleteUsuario}
         />
       )}
     </div>
