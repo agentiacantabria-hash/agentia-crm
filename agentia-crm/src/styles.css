@@ -76,24 +76,51 @@ input, textarea, select { font-family: inherit; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
 
-/* ---------------- Layout ---------------- */
+/* ---------------- Layout — MOBILE FIRST ---------------- */
 .app {
-  display: grid;
-  grid-template-columns: 248px 1fr;
+  display: block;        /* móvil: bloque */
   min-height: 100vh;
 }
 
-/* Sidebar */
+/* Sidebar — oculta por defecto (móvil) */
 .sidebar {
   background: linear-gradient(180deg, #0A0E17 0%, #080B13 100%);
   border-right: 1px solid var(--line-1);
   padding: 18px 14px 14px;
-  position: sticky;
-  top: 0;
-  height: 100vh;
+  /* mobile: fixed + fuera de pantalla */
+  position: fixed;
+  top: 0; left: 0;
+  width: 75vw; max-width: 280px;
+  height: 100dvh;
+  z-index: 100;
+  transform: translateX(-100%);
+  transition: transform 0.28s cubic-bezier(0.2,0.8,0.2,1);
   display: flex;
   flex-direction: column;
   gap: 4px;
+  overflow-y: auto;
+}
+.sidebar.open {
+  transform: translateX(0);
+  box-shadow: 6px 0 40px rgba(0,0,0,0.6);
+}
+
+/* Desktop: sidebar visible en grid */
+@media (min-width: 769px) {
+  .app {
+    display: grid;
+    grid-template-columns: 248px 1fr;
+  }
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    width: 248px;
+    max-width: none;
+    transform: none;
+    transition: none;
+    box-shadow: none;
+  }
 }
 .sidebar-brand {
   display: flex;
@@ -198,28 +225,44 @@ input, textarea, select { font-family: inherit; }
 .avatar.sm { width: 24px; height: 24px; font-size: 10px; }
 .avatar.xs { width: 20px; height: 20px; font-size: 9px; }
 
-/* Topbar */
-.content { display: flex; flex-direction: column; min-height: 100vh; }
+/* Topbar — mobile first */
+.content { display: flex; flex-direction: column; min-height: 100vh; width: 100%; }
 .topbar {
-  height: 58px;
   border-bottom: 1px solid var(--line-1);
   background: rgba(10,14,23,0.6);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   display: flex;
   align-items: center;
-  padding: 0 24px;
-  gap: 16px;
+  /* móvil: compacto */
+  height: 54px;
+  padding: 0 12px;
+  gap: 8px;
   position: sticky;
   top: 0;
   z-index: 30;
+  overflow: hidden;
+}
+/* escritorio: completo */
+@media (min-width: 769px) {
+  .topbar { height: 58px; padding: 0 24px; gap: 16px; overflow: visible; }
 }
 .crumb {
   color: var(--text-2);
-  font-size: 13px;
+  font-size: 12px;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
+@media (min-width: 769px) { .crumb { font-size: 13px; flex: initial; overflow: visible; white-space: normal; } }
 .crumb b { color: var(--text-0); font-weight: 500; }
-.topbar-search {
+
+/* Ocultar en móvil, mostrar en escritorio */
+.topbar-search { display: none; }
+@media (min-width: 769px) {
+  .topbar-search {
   margin-left: auto;
   display: flex;
   align-items: center;
@@ -243,6 +286,16 @@ input, textarea, select { font-family: inherit; }
   border-radius: 4px;
   color: var(--text-3);
 }
+} /* cierre @media topbar-search */
+
+/* Ocultar segmented de rol y bell en móvil */
+.topbar > .segmented { display: none; }
+.topbar > .icon-btn  { display: none; }
+@media (min-width: 769px) {
+  .topbar > .segmented { display: flex; }
+  .topbar > .icon-btn  { display: inline-flex; }
+}
+
 .icon-btn {
   width: 34px; height: 34px;
   border-radius: 8px;
@@ -1009,9 +1062,11 @@ label.lbl {
    RESPONSIVE — MOBILE (max 768px)
    ============================================================ */
 
-/* Hamburger button — hidden on desktop */
+/* Hamburger — visible on mobile, hidden on desktop */
 .hamburger {
-  display: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   cursor: pointer;
@@ -1022,6 +1077,7 @@ label.lbl {
   flex-shrink: 0;
 }
 .hamburger:hover { background: rgba(255,255,255,0.06); }
+@media (min-width: 769px) { .hamburger { display: none; } }
 
 /* Sidebar overlay backdrop */
 .sidebar-overlay {
@@ -1034,42 +1090,10 @@ label.lbl {
 }
 
 @media (max-width: 768px) {
-  /* Layout — bloque en vez de grid */
-  .app { display: block; }
-
-  /* Sidebar: fijo, oculto fuera de pantalla por defecto */
-  .sidebar {
-    position: fixed;
-    top: 0; left: 0;
-    height: 100dvh;
-    width: 75vw; max-width: 280px;
-    z-index: 100;
-    transform: translateX(-100%);
-    transition: transform 0.28s cubic-bezier(0.2,0.8,0.2,1);
-    box-shadow: none;
-  }
-  .sidebar.open {
-    transform: translateX(0);
-    box-shadow: 6px 0 40px rgba(0,0,0,0.6);
-  }
+  /* Overlay */
   .sidebar-overlay.open { display: block; }
 
-  /* Contenido a pantalla completa */
-  .content { width: 100%; min-height: 100dvh; }
-
-  /* Topbar: solo hamburger + título + botón */
-  .topbar {
-    height: 54px;
-    padding: 0 12px;
-    gap: 8px;
-    flex-wrap: nowrap;
-    overflow: hidden;
-  }
-  .hamburger { display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .topbar-search { display: none; }
-  .crumb { font-size: 12px; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; }
-  .topbar .segmented { display: none; }
-  .topbar .icon-btn { display: none; }
+  /* Topbar botón compacto */
   .topbar .btn.primary { font-size: 12px; padding: 6px 10px; flex-shrink: 0; white-space: nowrap; }
 
   /* Contenido principal */
@@ -1086,7 +1110,7 @@ label.lbl {
   .grid-main-side { grid-template-columns: 1fr !important; }
   .pipe-summary { grid-template-columns: 1fr 1fr !important; }
 
-  /* Tablas: scroll horizontal dentro de la card */
+  /* Tablas: scroll horizontal */
   .card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .card table { min-width: 480px; }
 
@@ -1103,16 +1127,12 @@ label.lbl {
   }
   .drawer.open { transform: translateY(0); }
 
-  /* Modal más pequeño */
-  .modal-panel { max-height: 85dvh; border-radius: 16px; }
+  /* Modal */
+  .modal-panel { max-height: 85dvh; }
   .form-2col { grid-template-columns: 1fr; }
 
   /* Proyectos */
   .project-item { flex-wrap: wrap; gap: 8px; }
-
-  /* Segmented general */
   .segmented { flex-wrap: wrap; }
-
-  /* Fin cards */
   .fin-card { padding: 14px; }
 }
