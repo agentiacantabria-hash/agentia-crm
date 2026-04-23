@@ -199,6 +199,15 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
   })()
 
   const heroSub = (() => {
+    if (role !== 'admin') {
+      // Empleado: solo info operativa, sin finanzas
+      const parts = []
+      const tareasHoy = tasks.filter(t => t.when_group === 'hoy' && !t.done).length
+      if (tareasHoy > 0) parts.push(`${tareasHoy} tarea${tareasHoy!==1?'s':''} para hoy`)
+      if (leadsActivos.length > 0) parts.push(`${leadsActivos.length} lead${leadsActivos.length!==1?'s':''} activo${leadsActivos.length!==1?'s':''}`)
+      return parts.length ? parts.join(' · ') : 'Sin tareas ni leads pendientes.'
+    }
+    // Admin: info financiera completa
     const parts = []
     if (ingresosMes > 0) parts.push(`€${eur(ingresosMes)} cobrados este mes`)
     if (pendientes.length > 0) parts.push(`${pendientes.length} factura${pendientes.length!==1?'s':''} pendiente${pendientes.length!==1?'s':''}`)
