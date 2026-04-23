@@ -6,14 +6,6 @@ import { Leads, Clientes, Pipeline } from './components/LeadsClientesPipeline'
 import { Tareas, Proyectos } from './components/TareasProyectos'
 import { Finanzas, Ajustes } from './components/FinanzasAjustes'
 import { supabase } from './lib/supabase'
-import {
-  LEADS as MOCK_LEADS,
-  CLIENTES as MOCK_CLIENTES,
-  TASKS as MOCK_TASKS,
-  PROYECTOS as MOCK_PROYECTOS,
-  GASTOS as MOCK_GASTOS,
-  COBROS as MOCK_COBROS,
-} from './components/data'
 
 const PAGES = [
   ['dashboard','Inicio'],
@@ -44,12 +36,12 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [hue, setHue]     = useState(225)
 
-  const [leads,     setLeads]     = useState(MOCK_LEADS)
-  const [clientes,  setClientes]  = useState(MOCK_CLIENTES)
-  const [tasks,     setTasks]     = useState(MOCK_TASKS)
-  const [proyectos, setProyectos] = useState(MOCK_PROYECTOS)
-  const [gastos,    setGastos]    = useState(MOCK_GASTOS)
-  const [cobros,    setCobros]    = useState(MOCK_COBROS)
+  const [leads,     setLeads]     = useState([])
+  const [clientes,  setClientes]  = useState([])
+  const [tasks,     setTasks]     = useState([])
+  const [proyectos, setProyectos] = useState([])
+  const [gastos,    setGastos]    = useState([])
+  const [cobros,    setCobros]    = useState([])
 
   useEffect(() => { localStorage.setItem('agentia_page', page) }, [page])
   useEffect(() => { localStorage.setItem('agentia_role', role) }, [role])
@@ -95,19 +87,38 @@ export default function App() {
   }
 
   const updateLead = async (id, updates) => {
+    const lead = leads.find(l => l.id === id)
     try {
-      const { error } = await supabase.from('leads').update(updates).eq('id', id)
-      if (!error) { setLeads(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l)); return }
+      await supabase.from('leads').update(updates).eq('id', id)
     } catch (_) {}
     setLeads(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l))
+
+    // Lead ganado → crear cliente automáticamente si no existe
+    if (updates.estado === 'Ganado' && lead) {
+      const yaExiste = clientes.some(c => c.nombre === lead.empresa)
+      if (!yaExiste) {
+        const mes = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
+        addCliente({
+          nombre: lead.empresa, servicio: lead.servicio || '',
+          importe: lead.monto || 0, estado: 'En curso',
+          pagado: false, ajustes: 0, responsable: lead.responsable || '', since: mes,
+        })
+      }
+    }
   }
 
   const deleteLead = async (id) => {
+    const lead = leads.find(l => l.id === id)
     try {
-      const { error } = await supabase.from('leads').delete().eq('id', id)
-      if (!error) { setLeads(prev => prev.filter(l => l.id !== id)); return }
+      await supabase.from('leads').delete().eq('id', id)
     } catch (_) {}
     setLeads(prev => prev.filter(l => l.id !== id))
+
+    // Cascade: borrar tareas y proyectos del lead solo si no hay cliente activo con ese nombre
+    if (lead && !clientes.some(c => c.nombre === lead.empresa)) {
+      tasks.filter(t => t.cliente === lead.empresa).forEach(t => deleteTask(t.id))
+      proyectos.filter(p => p.cliente === lead.empresa).forEach(p => deleteProyecto(p.id))
+    }
   }
 
   // ── CLIENTES ───────────────────────────────────────────────
@@ -128,11 +139,18 @@ export default function App() {
   }
 
   const deleteCliente = async (id) => {
+    const cliente = clientes.find(c => c.id === id)
     try {
-      const { error } = await supabase.from('clientes').delete().eq('id', id)
-      if (!error) { setClientes(prev => prev.filter(c => c.id !== id)); return }
+      await supabase.from('clientes').delete().eq('id', id)
     } catch (_) {}
     setClientes(prev => prev.filter(c => c.id !== id))
+
+    // Cascade: borrar tareas, proyectos y cobros de este cliente
+    if (cliente) {
+      tasks.filter(t => t.cliente === cliente.nombre).forEach(t => deleteTask(t.id))
+      proyectos.filter(p => p.cliente === cliente.nombre).forEach(p => deleteProyecto(p.id))
+      cobros.filter(c => c.cliente === cliente.nombre).forEach(c => deleteCobro(c.id))
+    }
   }
 
   // ── TAREAS ─────────────────────────────────────────────────
