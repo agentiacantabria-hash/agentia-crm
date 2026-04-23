@@ -143,9 +143,15 @@ export default function App() {
     } catch (_) {}
     setLeads(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l))
 
-    // Lead ganado → crear cliente + cobro pagado si hay monto (solo cuando cambia a Ganado, no en ediciones posteriores)
+    // Lead ganado → crear cliente + cobro pagado
     if (updates.estado === 'Ganado' && lead && lead.estado !== 'Ganado') {
       autoWinLead({ ...lead, ...updates })
+    }
+    // Lead des-ganado → eliminar el cobro automático que se creó
+    if (lead && lead.estado === 'Ganado' && updates.estado && updates.estado !== 'Ganado') {
+      const monto = parseFloat(lead.monto) || 0
+      const cobroAuto = cobros.find(c => c.cliente === lead.empresa && c.monto === monto && c.pagado)
+      if (cobroAuto) deleteCobro(cobroAuto.id)
     }
   }
 
