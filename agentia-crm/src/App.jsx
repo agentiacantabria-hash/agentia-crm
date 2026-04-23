@@ -61,7 +61,6 @@ export default function App() {
     root.setProperty('--brand-glow', `oklch(0.58 0.18 ${hue} / 0.35)`)
   }, [hue])
 
-  // Load from Supabase — falls back to mock data if not configured
   useEffect(() => {
     async function load() {
       try {
@@ -77,21 +76,68 @@ export default function App() {
         if (!t.error && t.data?.length)  setTasks(t.data)
         if (!p.error && p.data?.length)  setProyectos(p.data)
         if (!g.error && g.data?.length)  setGastos(g.data)
-      } catch (_) {
-        // Supabase not configured — running on mock data
-      }
+      } catch (_) {}
     }
     load()
   }, [])
 
-  // Mutations
+  // ── LEADS ──────────────────────────────────────────────────
   const addLead = async (lead) => {
     try {
-      const { data, error } = await supabase.from('leads').insert([lead]).select().single()
-      if (!error && data) { setLeads(prev => [data, ...prev]); return }
+      const { data: d, error } = await supabase.from('leads').insert([lead]).select().single()
+      if (!error && d) { setLeads(prev => [d, ...prev]); return }
     } catch (_) {}
-    // Offline fallback
     setLeads(prev => [{ ...lead, id: `l${Date.now()}` }, ...prev])
+  }
+
+  const updateLead = async (id, updates) => {
+    try {
+      const { error } = await supabase.from('leads').update(updates).eq('id', id)
+      if (!error) { setLeads(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l)); return }
+    } catch (_) {}
+    setLeads(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l))
+  }
+
+  const deleteLead = async (id) => {
+    try {
+      const { error } = await supabase.from('leads').delete().eq('id', id)
+      if (!error) { setLeads(prev => prev.filter(l => l.id !== id)); return }
+    } catch (_) {}
+    setLeads(prev => prev.filter(l => l.id !== id))
+  }
+
+  // ── CLIENTES ───────────────────────────────────────────────
+  const addCliente = async (cliente) => {
+    try {
+      const { data: d, error } = await supabase.from('clientes').insert([cliente]).select().single()
+      if (!error && d) { setClientes(prev => [d, ...prev]); return }
+    } catch (_) {}
+    setClientes(prev => [{ ...cliente, id: `c${Date.now()}` }, ...prev])
+  }
+
+  const updateCliente = async (id, updates) => {
+    try {
+      const { error } = await supabase.from('clientes').update(updates).eq('id', id)
+      if (!error) { setClientes(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c)); return }
+    } catch (_) {}
+    setClientes(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
+  }
+
+  const deleteCliente = async (id) => {
+    try {
+      const { error } = await supabase.from('clientes').delete().eq('id', id)
+      if (!error) { setClientes(prev => prev.filter(c => c.id !== id)); return }
+    } catch (_) {}
+    setClientes(prev => prev.filter(c => c.id !== id))
+  }
+
+  // ── TAREAS ─────────────────────────────────────────────────
+  const addTask = async (tarea) => {
+    try {
+      const { data: d, error } = await supabase.from('tareas').insert([tarea]).select().single()
+      if (!error && d) { setTasks(prev => [d, ...prev]); return }
+    } catch (_) {}
+    setTasks(prev => [{ ...tarea, id: `t${Date.now()}`, done: false }, ...prev])
   }
 
   const updateTask = async (id, updates) => {
@@ -102,6 +148,57 @@ export default function App() {
     setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t))
   }
 
+  const deleteTask = async (id) => {
+    try {
+      const { error } = await supabase.from('tareas').delete().eq('id', id)
+      if (!error) { setTasks(prev => prev.filter(t => t.id !== id)); return }
+    } catch (_) {}
+    setTasks(prev => prev.filter(t => t.id !== id))
+  }
+
+  // ── PROYECTOS ──────────────────────────────────────────────
+  const addProyecto = async (proyecto) => {
+    try {
+      const { data: d, error } = await supabase.from('proyectos').insert([proyecto]).select().single()
+      if (!error && d) { setProyectos(prev => [d, ...prev]); return }
+    } catch (_) {}
+    setProyectos(prev => [{ ...proyecto, id: `p${Date.now()}` }, ...prev])
+  }
+
+  const updateProyecto = async (id, updates) => {
+    try {
+      const { error } = await supabase.from('proyectos').update(updates).eq('id', id)
+      if (!error) { setProyectos(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p)); return }
+    } catch (_) {}
+    setProyectos(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
+  }
+
+  const deleteProyecto = async (id) => {
+    try {
+      const { error } = await supabase.from('proyectos').delete().eq('id', id)
+      if (!error) { setProyectos(prev => prev.filter(p => p.id !== id)); return }
+    } catch (_) {}
+    setProyectos(prev => prev.filter(p => p.id !== id))
+  }
+
+  // ── GASTOS ─────────────────────────────────────────────────
+  const addGasto = async (gasto) => {
+    try {
+      const { data: d, error } = await supabase.from('gastos').insert([gasto]).select().single()
+      if (!error && d) { setGastos(prev => [d, ...prev]); return }
+    } catch (_) {}
+    setGastos(prev => [{ ...gasto, id: `g${Date.now()}` }, ...prev])
+  }
+
+  const deleteGasto = async (id) => {
+    try {
+      const { error } = await supabase.from('gastos').delete().eq('id', id)
+      if (!error) { setGastos(prev => prev.filter(g => g.id !== id)); return }
+    } catch (_) {}
+    setGastos(prev => prev.filter(g => g.id !== id))
+  }
+
+  // ──────────────────────────────────────────────────────────
   const counts = {
     leads:     leads.filter(l => !['Ganado','Perdido'].includes(l.estado)).length,
     clientes:  clientes.length,
@@ -109,7 +206,14 @@ export default function App() {
     proyectos: proyectos.filter(p => p.estado !== 'Cerrado').length,
   }
 
-  const data = { leads, clientes, tasks, proyectos, gastos, updateTask }
+  const data = {
+    leads, clientes, tasks, proyectos, gastos,
+    addLead, updateLead, deleteLead,
+    addCliente, updateCliente, deleteCliente,
+    addTask, updateTask, deleteTask,
+    addProyecto, updateProyecto, deleteProyecto,
+    addGasto, deleteGasto,
+  }
 
   const pageEl = (() => {
     switch (page) {
