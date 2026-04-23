@@ -261,7 +261,11 @@ export default function App() {
   const addCobro = async (cobro) => {
     try {
       const { data: d, error } = await supabase.from('cobros').insert([cobro]).select().single()
-      if (!error && d) { setCobros(prev => [d, ...prev]); return }
+      if (!error && d) {
+        // Preserve our explicit pagado value — Supabase column may default to false
+        setCobros(prev => [{ ...cobro, id: d.id, created_at: d.created_at }, ...prev])
+        return
+      }
       if (error) console.error('[Supabase] addCobro error:', error.message, '— guardando solo en local')
     } catch (e) { console.error('[Supabase] addCobro exception:', e) }
     setCobros(prev => [{ ...cobro, id: `cb${Date.now()}` }, ...prev])

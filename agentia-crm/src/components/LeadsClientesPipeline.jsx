@@ -255,12 +255,6 @@ function ClienteModal({ cliente, onClose, onSave, onDelete }) {
         </F>
         <F label="Ajustes pendientes"><input type="number" min="0" value={form.ajustes||0} onChange={e => set('ajustes', Number(e.target.value))} /></F>
       </div>
-      <F label="Pagado">
-        <select value={form.pagado?'si':'no'} onChange={e => set('pagado', e.target.value==='si')}>
-          <option value="si">Sí — pagado</option>
-          <option value="no">No — pendiente</option>
-        </select>
-      </F>
       {!isNew && (
         <div className="modal-danger-zone">
           <span>Zona peligrosa</span>
@@ -299,7 +293,7 @@ export function Clientes({ data }) {
 
       <div className="card">
         <table className="table">
-          <thead><tr><th>Cliente</th><th>Servicio</th><th>Estado</th><th>Pago</th><th>Ajustes</th><th>Resp.</th><th>Desde</th><th style={{textAlign:'right'}}>Importe</th><th></th></tr></thead>
+          <thead><tr><th>Cliente</th><th>Servicio</th><th>Estado</th><th>Ajustes</th><th>Resp.</th><th>Desde</th><th style={{textAlign:'right'}}>Importe</th><th></th></tr></thead>
           <tbody>
             {clientes.map(c => {
               const chip = c.estado==='Cerrado'?'gray':c.estado==='En curso'?'blue':c.estado==='En revisión'?'violet':c.estado==='Recurrente'?'green':'amber'
@@ -308,11 +302,6 @@ export function Clientes({ data }) {
                   <td><div className="primary">{c.nombre}</div></td>
                   <td className="muted">{c.servicio}</td>
                   <td><span className={`chip ${chip}`}><span className="dot"/>{c.estado}</span></td>
-                  <td onClick={e => { e.stopPropagation(); data.updateCliente?.(c.id, {pagado: !c.pagado}) }}>
-                    {c.pagado
-                      ? <span className="chip green" style={{cursor:'pointer'}}><span className="dot"/>Pagado</span>
-                      : <span className="chip amber" style={{cursor:'pointer'}}><span className="dot"/>Pendiente</span>}
-                  </td>
                   <td>{c.ajustes>0 ? <span className="pend">{c.ajustes} pendiente{c.ajustes>1?'s':''}</span> : <span className="muted small">—</span>}</td>
                   <td><div className="avatar sm">{c.responsable}</div></td>
                   <td className="muted small">{c.since}</td>

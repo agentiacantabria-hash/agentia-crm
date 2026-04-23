@@ -135,45 +135,31 @@ export function Finanzas({ role, data }) {
           <div className="label">Ingresos cobrados</div>
           <div className="big"><span className="currency">€</span>{eur(ingresosMes)}</div>
           <div style={{display:'flex', alignItems:'center', gap:10, marginTop:10}}>
-            <span className="chip green"><span className="dot"/>{pagados.length} cobros</span>
+            <span className="chip green"><span className="dot"/>{pagados.length} cobro{pagados.length!==1?'s':''}</span>
+            {pendientes.length > 0 && <span className="chip amber"><span className="dot"/>{pendientes.length} pendiente{pendientes.length!==1?'s':''}</span>}
           </div>
           <div style={{height:8}}/>
           <div className="progress">
             <div className="bar" style={{width: ingresosMes > 0 ? `${Math.min(100, Math.round(ingresosMes/20000*100))}%` : '0%'}}/>
           </div>
           <div className="small" style={{color:'var(--text-3)', marginTop:6}}>
-            {ingresosMes > 0 ? `${Math.min(100, Math.round(ingresosMes/20000*100))}% del objetivo mensual (€20.000)` : 'Sin cobros registrados aún'}
+            {ingresosMes > 0 ? `${Math.min(100, Math.round(ingresosMes/20000*100))}% del objetivo €20.000` : 'Sin cobros aún'}
           </div>
         </div>
 
         <div className="fin-card">
-          <div className="label">Cobros pendientes</div>
+          <div className="label">Por cobrar</div>
           <div className="big"><span className="currency">€</span>{eur(cobrosPend)}</div>
-          {pendientes.length > 0
-            ? <div className="small" style={{color:'var(--warn)', marginTop:8, fontFamily:'var(--font-mono)'}}>{pendientes.length} factura{pendientes.length!==1?'s':''} abierta{pendientes.length!==1?'s':''}</div>
-            : <div className="small" style={{color:'var(--ok)', marginTop:8, fontFamily:'var(--font-mono)'}}>Todo cobrado</div>
-          }
-          <div className="divider"/>
-          {pendientes.length === 0 && (
-            <div className="small" style={{color:'var(--text-4)', textAlign:'center', padding:'12px 0'}}>
-              Sin facturas pendientes · <button className="btn sm ghost" onClick={() => setAddingCobro(true)} style={{display:'inline-flex'}}>Añadir</button>
-            </div>
-          )}
-          {pendientes.map((r, i) => (
-            <div key={r.id} style={{display:'flex', alignItems:'center', gap:8, padding:'6px 0', borderBottom: i < pendientes.length-1 ? '1px dashed var(--line-1)' : 'none'}}>
-              <div style={{flex:1}}>
-                <div style={{fontSize:13}}>{r.cliente}</div>
-                <div className="small" style={{color: r.vencida ? 'var(--danger)' : 'var(--text-3)'}}>
-                  {r.vence ? (r.vencida ? 'venció ' : 'vence ') + r.vence : 'Sin fecha'}
-                </div>
-              </div>
-              <div className="mono" style={{fontSize:13}}>€{eur(r.monto||0)}</div>
-              <button className="btn sm" style={{background:'var(--ok)', color:'#fff', border:'none', padding:'4px 10px', fontSize:11, whiteSpace:'nowrap'}}
-                onClick={() => data.updateCobro?.(r.id, { pagado: true, vencida: false })}>
-                ✓ Cobrado
-              </button>
-            </div>
-          ))}
+          <div className="small" style={{color: pendientes.length > 0 ? 'var(--warn)' : 'var(--ok)', marginTop:8, fontFamily:'var(--font-mono)'}}>
+            {pendientes.length > 0 ? `${pendientes.length} factura${pendientes.length!==1?'s':''} sin cobrar` : 'Todo cobrado ✓'}
+          </div>
+          <div style={{height:8}}/>
+          <div className="progress">
+            <div className="bar warn" style={{width: (ingresosMes+cobrosPend) > 0 ? `${Math.round(cobrosPend/(ingresosMes+cobrosPend)*100)}%` : '0%'}}/>
+          </div>
+          <div className="small" style={{color:'var(--text-3)', marginTop:6}}>
+            {(ingresosMes+cobrosPend) > 0 ? `${Math.round(cobrosPend/(ingresosMes+cobrosPend)*100)}% del total aún no cobrado` : 'Añade facturas desde la tabla'}
+          </div>
         </div>
 
         <div className="fin-card">
@@ -191,7 +177,7 @@ export function Finanzas({ role, data }) {
               <div style={{width:`${Math.round(gastoPerso/gastosMes*100)}%`, background:'#FFB547'}}/>
             </div>
           )}
-          <div className="small" style={{color:'var(--text-3)', marginTop:12}}>Margen neto estimado: <span style={{color:'var(--ok)', fontFamily:'var(--font-mono)'}}>{margen}%</span></div>
+          <div className="small" style={{color:'var(--text-3)', marginTop:12}}>Margen estimado: <span style={{color: margen>=60?'var(--ok)':margen>=30?'var(--warn)':'var(--danger)', fontFamily:'var(--font-mono)'}}>{margen}%</span></div>
         </div>
       </div>
 
