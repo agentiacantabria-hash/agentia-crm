@@ -1,7 +1,27 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { I } from './Icons'
 
+function getSidebarUser(role) {
+  try {
+    const users = JSON.parse(localStorage.getItem('agentia_usuarios') || '[]')
+    const u = users.find(u => u.rol === (role === 'admin' ? 'Admin' : 'Empleado') && u.estado === 'activo')
+    return u || { n: role === 'admin' ? 'Administrador' : 'Empleado', ini: role === 'admin' ? 'AD' : 'EM' }
+  } catch { return { n: 'Usuario', ini: 'U' } }
+}
+
 export function Sidebar({ page, setPage, role, counts, isOpen, onClose }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef(null)
+  const user = getSidebarUser(role)
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
   const nav = [
     { key:'dashboard', label:'Inicio',    icon: I.Home },
     { key:'leads',     label:'Leads',     icon: I.Leads,    count: counts.leads },
@@ -11,67 +31,84 @@ export function Sidebar({ page, setPage, role, counts, isOpen, onClose }) {
     { key:'proyectos', label:'Proyectos', icon: I.Projects, count: counts.proyectos },
   ]
   const admin = [
-    { key:'finanzas', label:'Finanzas', icon: I.Finance,   adminOnly: true },
-    { key:'ajustes',  label:'Ajustes',  icon: I.Settings,  adminOnly: true },
+    { key:'finanzas', label:'Finanzas', icon: I.Finance,  adminOnly: true },
+    { key:'ajustes',  label:'Ajustes',  icon: I.Settings, adminOnly: true },
   ]
 
-  const handleNav = (key) => {
-    setPage(key)
-    onClose?.()
-  }
+  const handleNav = (key) => { setPage(key); onClose?.() }
 
   return (
     <>
       <div className={`sidebar-overlay ${isOpen ? 'open' : ''}`} onClick={onClose} />
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
-      <div className="sidebar-brand">
-        <div className="logo" aria-label="Agentia logo" />
-        <div>
-          <div className="name">Agentia</div>
-          <div className="tag">CRM · v1.0</div>
+        <div className="sidebar-brand">
+          <div className="logo" aria-label="Agentia logo" />
+          <div>
+            <div className="name">Agentia</div>
+            <div className="tag">CRM · v1.0</div>
+          </div>
         </div>
-      </div>
 
-      <div className="nav-section-label">Trabajo</div>
-      {nav.map(n => (
-        <div key={n.key} className={`nav-item ${page === n.key ? 'active' : ''}`} onClick={() => handleNav(n.key)}>
-          <n.icon />
-          <span>{n.label}</span>
-          {n.count != null && <span className="count">{n.count}</span>}
-        </div>
-      ))}
-
-      <div className="nav-section-label">Administración</div>
-      {admin.map(n => {
-        const disabled = n.adminOnly && role !== 'admin'
-        return (
-          <div key={n.key}
-               className={`nav-item ${page === n.key ? 'active' : ''}`}
-               style={disabled ? { opacity: 0.45, cursor: 'not-allowed' } : {}}
-               onClick={() => !disabled && handleNav(n.key)}>
+        <div className="nav-section-label">Trabajo</div>
+        {nav.map(n => (
+          <div key={n.key} className={`nav-item ${page === n.key ? 'active' : ''}`} onClick={() => handleNav(n.key)}>
             <n.icon />
             <span>{n.label}</span>
-            {disabled && <I.Lock size={13} style={{ marginLeft: 'auto', color: 'var(--text-4)' }} />}
+            {n.count != null && <span className="count">{n.count}</span>}
           </div>
-        )
-      })}
+        ))}
 
-      <div className="sidebar-footer">
-        <div className="avatar">{role === 'admin' ? 'LP' : 'AR'}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 500 }}>{role === 'admin' ? 'Lucía P.' : 'Andrés R.'}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            {role === 'admin' ? 'Admin · Agentia' : 'Empleado · Agentia'}
+        <div className="nav-section-label">Administración</div>
+        {admin.map(n => {
+          const disabled = n.adminOnly && role !== 'admin'
+          return (
+            <div key={n.key}
+                 className={`nav-item ${page === n.key ? 'active' : ''}`}
+                 style={disabled ? { opacity: 0.45, cursor: 'not-allowed' } : {}}
+                 onClick={() => !disabled && handleNav(n.key)}>
+              <n.icon />
+              <span>{n.label}</span>
+              {disabled && <I.Lock size={13} style={{ marginLeft: 'auto', color: 'var(--text-4)' }} />}
+            </div>
+          )
+        })}
+
+        <div className="sidebar-footer" ref={menuRef}>
+          <div className="avatar">{user.ini || '?'}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{user.n}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              {role === 'admin' ? 'Admin' : 'Empleado'} · Agentia
+            </div>
           </div>
+          <button className="icon-btn" style={{width:28, height:28}} onClick={() => setMenuOpen(o => !o)}>
+            <I.MoreH size={16} />
+          </button>
+
+          {menuOpen && (
+            <div style={{
+              position:'absolute', bottom:'calc(100% + 8px)', right:8,
+              background:'var(--surface-2)', border:'1px solid var(--line-2)',
+              borderRadius:10, padding:'6px 0', minWidth:160,
+              boxShadow:'0 8px 30px rgba(0,0,0,0.4)', zIndex:200,
+            }}>
+              <div className="row-menu-item" onClick={() => { handleNav('ajustes'); setMenuOpen(false) }}
+                style={{display:'flex', alignItems:'center', gap:10, padding:'8px 14px', cursor:'pointer', fontSize:13, color:'var(--text-1)'}}>
+                <I.Settings size={14}/> Ajustes
+              </div>
+              <div className="row-menu-item" onClick={() => { handleNav('ajustes'); setMenuOpen(false) }}
+                style={{display:'flex', alignItems:'center', gap:10, padding:'8px 14px', cursor:'pointer', fontSize:13, color:'var(--text-1)'}}>
+                <I.Users size={14}/> Editar perfil
+              </div>
+            </div>
+          )}
         </div>
-        <I.MoreH size={16} />
-      </div>
-    </aside>
+      </aside>
     </>
   )
 }
 
-export function Topbar({ crumb, setDrawerOpen, role, setRole, onMenuClick }) {
+export function Topbar({ crumb, setDrawerOpen, role, setRole, onMenuClick, notifCount = 0 }) {
   return (
     <header className="topbar">
       <button className="hamburger" onClick={onMenuClick} aria-label="Abrir menú">
@@ -97,9 +134,9 @@ export function Topbar({ crumb, setDrawerOpen, role, setRole, onMenuClick }) {
         <button className={role === 'empleado' ? 'active' : ''} onClick={() => setRole('empleado')}>Empleado</button>
       </div>
 
-      <button className="icon-btn" title="Notificaciones">
+      <button className="icon-btn" title="Notificaciones" style={{position:'relative'}}>
         <I.Bell size={16} />
-        <span className="dot" />
+        {notifCount > 0 && <span className="dot" style={{position:'absolute', top:6, right:6}} />}
       </button>
       <button className="btn primary" onClick={() => setDrawerOpen(true)}>
         <I.Plus size={14} /> Nuevo lead

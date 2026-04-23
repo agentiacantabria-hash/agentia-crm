@@ -253,6 +253,10 @@ export default function App() {
     proyectos: proyectos.filter(p => p.estado !== 'Cerrado').length,
   }
 
+  const notifCount =
+    tasks.filter(t => t.when_group === 'vencida' && !t.done).length +
+    cobros.filter(c => c.vencida && !c.pagado).length
+
   const data = {
     leads, clientes, tasks, proyectos, gastos, cobros,
     addLead, updateLead, deleteLead,
@@ -282,7 +286,7 @@ export default function App() {
       <div className="app" data-screen-label={PAGES.find(p => p[0] === page)?.[1]}>
         <Sidebar page={page} setPage={setPage} role={role} counts={counts} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <div className="content">
-          <Topbar crumb={crumbMap[page]} setDrawerOpen={setDrawer} role={role} setRole={setRole} onMenuClick={() => setSidebarOpen(o => !o)} />
+          <Topbar crumb={crumbMap[page]} setDrawerOpen={setDrawer} role={role} setRole={setRole} onMenuClick={() => setSidebarOpen(o => !o)} notifCount={notifCount} />
           <main className="main">{pageEl}</main>
         </div>
       </div>

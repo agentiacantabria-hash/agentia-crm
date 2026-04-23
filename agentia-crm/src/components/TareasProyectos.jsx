@@ -2,33 +2,83 @@ import React, { useState } from 'react'
 import { I } from './Icons'
 import { Modal, F } from './Modal'
 
-const RESP = ['LP','AR']
+// ── helpers ─────────────────────────────────────────────────────
+function getUsers() {
+  try { return JSON.parse(localStorage.getItem('agentia_usuarios') || '[]') } catch { return [] }
+}
+function getServicios() {
+  try {
+    const s = JSON.parse(localStorage.getItem('agentia_servicios') || '[]')
+    return s.filter(x => x.activo).map(x => x.n)
+  } catch { return [] }
+}
+
+function computeWhenGroup(due_date) {
+  if (!due_date) return null
+  const today = new Date(); today.setHours(0,0,0,0)
+  const due   = new Date(due_date); due.setHours(0,0,0,0)
+  const diff  = Math.floor((due - today) / 86400000)
+  if (diff < 0)  return 'vencida'
+  if (diff === 0) return 'hoy'
+  if (diff === 1) return 'mañana'
+  return 'semana'
+}
+
+function effectiveGroup(task) {
+  if (task.due_date) return computeWhenGroup(task.due_date)
+  return task.when_group || 'semana'
+}
+
+function todayIso() {
+  return new Date().toISOString().slice(0,10)
+}
+
+function tomorrowIso() {
+  const d = new Date(); d.setDate(d.getDate()+1)
+  return d.toISOString().slice(0,10)
+}
+
+function weekIso() {
+  const d = new Date(); d.setDate(d.getDate()+3)
+  return d.toISOString().slice(0,10)
+}
 
 // ── Tareas ───────────────────────────────────────────────────────
 
-function TareaModal({ tarea, onClose, onSave }) {
+function TareaModal({ tarea, onClose, onSave, onDelete }) {
   const isNew = !tarea?.id
+  const users = getUsers()
+  const respOptions = users.filter(u => u.estado === 'activo').map(u => u.ini || u.n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())
+  const defaultResp = respOptions[0] || 'LP'
+
   const [form, setForm] = useState(tarea || {
-    title:'', cliente:'', when_group:'hoy', time:'', prio:'media', resp:'LP', tag:'Operativo', done:false,
+    title:'', cliente:'', due_date: todayIso(), time:'', prio:'media', resp: defaultResp, tag:'Operativo', done:false,
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const [confirmDel, setConfirmDel] = useState(false)
+
+  const handleSave = () => {
+    const group = computeWhenGroup(form.due_date) || form.when_group || 'hoy'
+    onSave({ ...form, when_group: group })
+  }
 
   return (
     <Modal open title={isNew ? 'Nueva tarea' : 'Editar tarea'}
-      onClose={onClose} onSave={() => onSave(form)} saveLabel={isNew ? 'Crear tarea' : 'Guardar'}>
-      <F label="Título"><input value={form.title} onChange={e => set('title', e.target.value)} placeholder="¿Qué hay que hacer?" autoFocus /></F>
+      onClose={onClose} onSave={handleSave} saveLabel={isNew ? 'Crear tarea' : 'Guardar'}>
+      <F label="Título">
+        <input value={form.title} onChange={e => set('title', e.target.value)} placeholder="¿Qué hay que hacer?" autoFocus />
+      </F>
       <div className="form-2col">
-        <F label="Cliente"><input value={form.cliente||''} onChange={e => set('cliente', e.target.value)} placeholder="Ej: Clínica Marbella" /></F>
-        <F label="Hora"><input value={form.time||''} onChange={e => set('time', e.target.value)} placeholder="14:00" /></F>
+        <F label="Cliente / empresa">
+          <input value={form.cliente||''} onChange={e => set('cliente', e.target.value)} placeholder="Ej: Clínica Marbella" />
+        </F>
+        <F label="Hora">
+          <input value={form.time||''} onChange={e => set('time', e.target.value)} placeholder="14:00" />
+        </F>
       </div>
       <div className="form-2col">
-        <F label="Cuándo">
-          <select value={form.when_group||'hoy'} onChange={e => set('when_group', e.target.value)}>
-            <option value="vencida">Vencida</option>
-            <option value="hoy">Hoy</option>
-            <option value="mañana">Mañana</option>
-            <option value="semana">Esta semana</option>
-          </select>
+        <F label="Fecha límite">
+          <input type="date" value={form.due_date||''} onChange={e => set('due_date', e.target.value)} />
         </F>
         <F label="Prioridad">
           <select value={form.prio||'media'} onChange={e => set('prio', e.target.value)}>
@@ -40,8 +90,8 @@ function TareaModal({ tarea, onClose, onSave }) {
       </div>
       <div className="form-2col">
         <F label="Responsable">
-          <select value={form.resp||'LP'} onChange={e => set('resp', e.target.value)}>
-            {RESP.map(r=><option key={r}>{r}</option>)}
+          <select value={form.resp||defaultResp} onChange={e => set('resp', e.target.value)}>
+            {(respOptions.length ? respOptions : ['LP','AR']).map(r=><option key={r}>{r}</option>)}
           </select>
         </F>
         <F label="Etiqueta">
@@ -50,6 +100,15 @@ function TareaModal({ tarea, onClose, onSave }) {
           </select>
         </F>
       </div>
+      {!isNew && (
+        <div className="modal-danger-zone">
+          <span>Zona peligrosa</span>
+          {confirmDel
+            ? <button className="btn danger sm" onClick={() => { onDelete?.(form.id); onClose() }}>¿Confirmar?</button>
+            : <button className="btn sm ghost" onClick={() => setConfirmDel(true)} style={{color:'var(--danger)'}}>Eliminar tarea</button>
+          }
+        </div>
+      )}
     </Modal>
   )
 }
@@ -57,7 +116,7 @@ function TareaModal({ tarea, onClose, onSave }) {
 export function Tareas({ data }) {
   const { tasks = [], updateTask, addTask, deleteTask } = data || {}
   const [creating, setCreating] = useState(false)
-  const [editing, setEditing] = useState(null)
+  const [editing, setEditing]   = useState(null)
 
   const toggle = (id) => {
     const task = tasks.find(t => t.id === id)
@@ -71,11 +130,16 @@ export function Tareas({ data }) {
   }
 
   const groups = [
-    { key:'vencida', label:'Vencidas',        color:'var(--danger)', icon:I.Flame },
-    { key:'hoy',     label:'Hoy',             color:'var(--brand)',  icon:I.Target },
-    { key:'mañana',  label:'Mañana',          color:'var(--violet)', icon:I.Calendar },
-    { key:'semana',  label:'Esta semana',     color:'var(--text-3)', icon:I.Clock },
+    { key:'vencida', label:'Vencidas',    color:'var(--danger)', icon:I.Flame },
+    { key:'hoy',     label:'Hoy',         color:'var(--brand)',  icon:I.Target },
+    { key:'mañana',  label:'Mañana',      color:'var(--violet)', icon:I.Calendar },
+    { key:'semana',  label:'Esta semana', color:'var(--text-3)', icon:I.Clock },
   ]
+
+  const formatDate = (due_date) => {
+    if (!due_date) return null
+    return new Date(due_date + 'T00:00:00').toLocaleDateString('es-ES', { day:'numeric', month:'short' })
+  }
 
   return (
     <div className="fade-in">
@@ -92,7 +156,7 @@ export function Tareas({ data }) {
       <div className="grid-main-side">
         <div style={{display:'flex', flexDirection:'column', gap:14}}>
           {groups.map(g => {
-            const list = tasks.filter(t => t.when_group === g.key)
+            const list = tasks.filter(t => effectiveGroup(t) === g.key)
             if (!list.length) return null
             return (
               <div className="card" key={g.key}>
@@ -109,15 +173,16 @@ export function Tareas({ data }) {
                       <div className={`check ${t.done?'done':''}`} onClick={()=>toggle(t.id)} style={{cursor:'pointer'}}>{t.done && <I.Check size={12} stroke={2.4}/>}</div>
                       <div onClick={() => setEditing(t)} style={{minWidth:0, flex:1, cursor:'pointer'}}>
                         <div className="title">{t.title}</div>
-                        <div className="sub">{t.cliente} · {t.time} · <span style={{color:'var(--text-4)'}}>{t.tag}</span></div>
+                        <div className="sub">
+                          {t.cliente && `${t.cliente} · `}
+                          {t.due_date ? formatDate(t.due_date) : t.time}
+                          {t.time && t.due_date ? ` · ${t.time}` : ''}
+                          {' · '}<span style={{color:'var(--text-4)'}}>{t.tag}</span>
+                        </div>
                       </div>
                       <div className="meta">
                         <span className={`chip ${t.prio==='alta'?'red':t.prio==='media'?'amber':'gray'}`}><span className="dot"/>{t.prio}</span>
                         <div className="avatar xs">{t.resp}</div>
-                        <button className="icon-btn" style={{width:22, height:22, color:'var(--text-4)'}}
-                          onClick={() => { if (confirm('¿Eliminar tarea?')) deleteTask?.(t.id) }}>
-                          <I.Close size={11}/>
-                        </button>
                       </div>
                     </div>
                   ))}
@@ -125,6 +190,11 @@ export function Tareas({ data }) {
               </div>
             )
           })}
+          {tasks.filter(t => !t.done).length === 0 && (
+            <div className="card" style={{textAlign:'center', padding:'32px 0', color:'var(--text-4)'}}>
+              Sin tareas pendientes · <button className="btn sm ghost" onClick={() => setCreating(true)} style={{display:'inline-flex'}}>Crear tarea</button>
+            </div>
+          )}
         </div>
 
         <div style={{display:'flex', flexDirection:'column', gap:14}}>
@@ -132,10 +202,10 @@ export function Tareas({ data }) {
             <div className="card-head"><h3>Resumen operativo</h3></div>
             <div className="card-body" style={{display:'flex', flexDirection:'column', gap:12}}>
               {[
-                {l:'Vencidas', v:tasks.filter(t=>t.when_group==='vencida'&&!t.done).length, c:'#FF5A6A'},
-                {l:'Hoy', v:tasks.filter(t=>t.when_group==='hoy'&&!t.done).length, c:'#4F8BFF'},
-                {l:'Mañana', v:tasks.filter(t=>t.when_group==='mañana'&&!t.done).length, c:'#9A7BFF'},
-                {l:'Completadas hoy', v:tasks.filter(t=>t.done&&t.when_group==='hoy').length, c:'#3ECF8E'},
+                {l:'Vencidas', v:tasks.filter(t=>effectiveGroup(t)==='vencida'&&!t.done).length, c:'#FF5A6A'},
+                {l:'Hoy', v:tasks.filter(t=>effectiveGroup(t)==='hoy'&&!t.done).length, c:'#4F8BFF'},
+                {l:'Mañana', v:tasks.filter(t=>effectiveGroup(t)==='mañana'&&!t.done).length, c:'#9A7BFF'},
+                {l:'Completadas', v:tasks.filter(t=>t.done).length, c:'#3ECF8E'},
               ].map((r,i)=>(
                 <div key={i} style={{display:'flex', alignItems:'center', gap:12}}>
                   <div style={{width:6, height:24, borderRadius:3, background:r.c, boxShadow:`0 0 10px ${r.c}66`}}/>
@@ -153,6 +223,7 @@ export function Tareas({ data }) {
           tarea={editing}
           onClose={() => { setCreating(false); setEditing(null) }}
           onSave={handleSave}
+          onDelete={deleteTask}
         />
       )}
     </div>
@@ -163,8 +234,14 @@ export function Tareas({ data }) {
 
 function ProyectoModal({ proyecto, onClose, onSave, onDelete }) {
   const isNew = !proyecto?.id
+  const users    = getUsers()
+  const servList = getServicios()
+  const DEFAULT_SERVICIOS = ['Web premium','Automatización WhatsApp','Chatbot de reservas','Mantenimiento mensual','E-commerce + SEO','Web + Captación']
+  const servicios = servList.length ? servList : DEFAULT_SERVICIOS
+  const respOptions = users.filter(u => u.estado === 'activo').map(u => u.ini || u.n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())
+
   const [form, setForm] = useState(proyecto || {
-    cliente:'', servicio:'Web premium', estado:'En curso', progreso:0, ajustes:0, pago:'Pendiente', resp:'LP',
+    cliente:'', servicio: servicios[0] || 'Web premium', estado:'En curso', progreso:0, ajustes:0, pago:'Pendiente', resp: respOptions[0] || 'LP',
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const [confirmDel, setConfirmDel] = useState(false)
@@ -176,7 +253,7 @@ function ProyectoModal({ proyecto, onClose, onSave, onDelete }) {
         <F label="Cliente"><input value={form.cliente} onChange={e => set('cliente', e.target.value)} autoFocus /></F>
         <F label="Servicio">
           <select value={form.servicio||''} onChange={e => set('servicio', e.target.value)}>
-            {['Web premium','Automatización WhatsApp','Chatbot de reservas','Mantenimiento mensual','E-commerce + SEO','Web + Captación'].map(s=><option key={s}>{s}</option>)}
+            {servicios.map(s=><option key={s}>{s}</option>)}
           </select>
         </F>
       </div>
@@ -187,8 +264,8 @@ function ProyectoModal({ proyecto, onClose, onSave, onDelete }) {
           </select>
         </F>
         <F label="Responsable">
-          <select value={form.resp||'LP'} onChange={e => set('resp', e.target.value)}>
-            {RESP.map(r=><option key={r}>{r}</option>)}
+          <select value={form.resp||''} onChange={e => set('resp', e.target.value)}>
+            {(respOptions.length ? respOptions : ['LP','AR']).map(r=><option key={r}>{r}</option>)}
           </select>
         </F>
       </div>
@@ -218,7 +295,7 @@ function ProyectoModal({ proyecto, onClose, onSave, onDelete }) {
 
 export function Proyectos({ data }) {
   const proyectos = data?.proyectos || []
-  const [editing, setEditing] = useState(null)
+  const [editing, setEditing]   = useState(null)
   const [creating, setCreating] = useState(false)
 
   const estadoChip = {
@@ -273,6 +350,11 @@ export function Proyectos({ data }) {
               </div>
             </div>
           ))}
+          {proyectos.length === 0 && (
+            <div style={{textAlign:'center', padding:'32px 0', color:'var(--text-4)'}}>
+              Sin proyectos aún · <button className="btn sm ghost" onClick={() => setCreating(true)} style={{display:'inline-flex'}}>Crear proyecto</button>
+            </div>
+          )}
         </div>
       </div>
 

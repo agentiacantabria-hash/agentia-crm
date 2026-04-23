@@ -3,16 +3,32 @@ import { I } from './Icons'
 import { Modal, F } from './Modal'
 import { STATE_COLORS, PIPELINE_COLS, eur } from './data'
 
-const SERVICIOS = ['Web premium','Automatización WhatsApp','Chatbot de reservas','Mantenimiento mensual','Campaña captación']
-const RESP = ['LP','AR']
+function getServicios() {
+  try {
+    const s = JSON.parse(localStorage.getItem('agentia_servicios') || '[]')
+    const active = s.filter(x => x.activo).map(x => x.n)
+    return active.length ? active : ['Web premium','Automatización WhatsApp','Chatbot de reservas','Mantenimiento mensual','Campaña captación']
+  } catch { return ['Web premium','Automatización WhatsApp','Chatbot de reservas'] }
+}
+
+function getResp() {
+  try {
+    const users = JSON.parse(localStorage.getItem('agentia_usuarios') || '[]')
+    const r = users.filter(u => u.estado === 'activo').map(u => u.ini || u.n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())
+    return r.length ? r : ['LP','AR']
+  } catch { return ['LP','AR'] }
+}
 
 // ── Leads ────────────────────────────────────────────────────────
 
 function LeadModal({ lead, onClose, onSave, onDelete }) {
   const isNew = !lead?.id
+  const SERVICIOS = getServicios()
+  const RESP = getResp()
   const [form, setForm] = useState(lead || {
-    empresa:'', sector:'', ciudad:'', responsable:'LP', servicio:'Web premium',
-    estado:'Nuevo', next:'', monto:0, origen:'Instagram', temp:'cold', notas:'',
+    empresa:'', sector:'', ciudad:'', contacto:'', telefono:'', email:'',
+    responsable: RESP[0] || 'LP', servicio: SERVICIOS[0] || 'Web premium',
+    estado:'Nuevo', next:'', monto:0, origen:'Instagram', notas:'',
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const [confirmDel, setConfirmDel] = useState(false)
@@ -22,15 +38,15 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
       onClose={onClose} onSave={() => onSave(form)} saveLabel={isNew ? 'Crear lead' : 'Guardar cambios'}>
       <div className="form-2col">
         <F label="Empresa"><input value={form.empresa} onChange={e => set('empresa', e.target.value)} placeholder="Ej: Clínica Marbella" autoFocus /></F>
-        <F label="Sector"><input value={form.sector||''} onChange={e => set('sector', e.target.value)} placeholder="Salud, Legal…" /></F>
+        <F label="Contacto"><input value={form.contacto||''} onChange={e => set('contacto', e.target.value)} placeholder="Nombre del contacto" /></F>
       </div>
       <div className="form-2col">
+        <F label="Teléfono"><input value={form.telefono||''} onChange={e => set('telefono', e.target.value)} placeholder="+34 600 000 000" /></F>
+        <F label="Email"><input type="email" value={form.email||''} onChange={e => set('email', e.target.value)} placeholder="contacto@empresa.com" /></F>
+      </div>
+      <div className="form-2col">
+        <F label="Sector"><input value={form.sector||''} onChange={e => set('sector', e.target.value)} placeholder="Salud, Legal…" /></F>
         <F label="Ciudad"><input value={form.ciudad||''} onChange={e => set('ciudad', e.target.value)} /></F>
-        <F label="Origen">
-          <select value={form.origen||''} onChange={e => set('origen', e.target.value)}>
-            {['Instagram','LinkedIn','Referido','Formulario web','Evento','Otro'].map(o=><option key={o}>{o}</option>)}
-          </select>
-        </F>
       </div>
       <div className="form-2col">
         <F label="Servicio">
@@ -38,9 +54,9 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
             {SERVICIOS.map(s=><option key={s}>{s}</option>)}
           </select>
         </F>
-        <F label="Responsable">
-          <select value={form.responsable||''} onChange={e => set('responsable', e.target.value)}>
-            {RESP.map(r=><option key={r}>{r}</option>)}
+        <F label="Origen">
+          <select value={form.origen||''} onChange={e => set('origen', e.target.value)}>
+            {['Instagram','LinkedIn','Referido','Formulario web','Evento','Otro'].map(o=><option key={o}>{o}</option>)}
           </select>
         </F>
       </div>
@@ -50,9 +66,9 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
             {PIPELINE_COLS.map(s=><option key={s}>{s}</option>)}
           </select>
         </F>
-        <F label="Temperatura">
-          <select value={form.temp||'cold'} onChange={e => set('temp', e.target.value)}>
-            {[['hot','Caliente 🔥'],['warm','Tibio'],['cold','Frío'],['won','Ganado ✓'],['lost','Perdido']].map(([k,v])=><option key={k} value={k}>{v}</option>)}
+        <F label="Responsable">
+          <select value={form.responsable||''} onChange={e => set('responsable', e.target.value)}>
+            {RESP.map(r=><option key={r}>{r}</option>)}
           </select>
         </F>
       </div>
@@ -186,9 +202,12 @@ export function Leads({ data, openQuick }) {
 
 function ClienteModal({ cliente, onClose, onSave, onDelete }) {
   const isNew = !cliente?.id
+  const SERVICIOS = getServicios()
+  const RESP = getResp()
   const [form, setForm] = useState(cliente || {
-    nombre:'', servicio:'Web premium', importe:0, estado:'En curso',
-    pagado:false, ajustes:0, responsable:'LP', since:'',
+    nombre:'', contacto:'', telefono:'', email:'',
+    servicio: SERVICIOS[0] || 'Web premium', importe:0, estado:'En curso',
+    pagado:false, ajustes:0, responsable: RESP[0] || 'LP', since:'',
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const [confirmDel, setConfirmDel] = useState(false)
@@ -197,6 +216,11 @@ function ClienteModal({ cliente, onClose, onSave, onDelete }) {
     <Modal open title={isNew ? 'Nuevo cliente' : `Editar — ${form.nombre}`}
       onClose={onClose} onSave={() => onSave(form)} saveLabel={isNew ? 'Crear cliente' : 'Guardar cambios'}>
       <F label="Nombre / empresa"><input value={form.nombre} onChange={e => set('nombre', e.target.value)} autoFocus /></F>
+      <div className="form-2col">
+        <F label="Contacto"><input value={form.contacto||''} onChange={e => set('contacto', e.target.value)} placeholder="Nombre del contacto" /></F>
+        <F label="Teléfono"><input value={form.telefono||''} onChange={e => set('telefono', e.target.value)} placeholder="+34 600 000 000" /></F>
+      </div>
+      <F label="Email"><input type="email" value={form.email||''} onChange={e => set('email', e.target.value)} placeholder="contacto@empresa.com" /></F>
       <div className="form-2col">
         <F label="Servicio">
           <select value={form.servicio||''} onChange={e => set('servicio', e.target.value)}>
