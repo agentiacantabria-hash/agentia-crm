@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { I } from './Icons'
 
-export function Sidebar({ page, setPage, role, counts }) {
+export function Sidebar({ page, setPage, role, counts, isOpen, onClose }) {
   const nav = [
     { key:'dashboard', label:'Inicio',    icon: I.Home },
     { key:'leads',     label:'Leads',     icon: I.Leads,    count: counts.leads },
@@ -15,8 +15,15 @@ export function Sidebar({ page, setPage, role, counts }) {
     { key:'ajustes',  label:'Ajustes',  icon: I.Settings,  adminOnly: true },
   ]
 
+  const handleNav = (key) => {
+    setPage(key)
+    onClose?.()
+  }
+
   return (
-    <aside className="sidebar">
+    <>
+      <div className={`sidebar-overlay ${isOpen ? 'open' : ''}`} onClick={onClose} />
+      <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-brand">
         <div className="logo" aria-label="Agentia logo" />
         <div>
@@ -27,7 +34,7 @@ export function Sidebar({ page, setPage, role, counts }) {
 
       <div className="nav-section-label">Trabajo</div>
       {nav.map(n => (
-        <div key={n.key} className={`nav-item ${page === n.key ? 'active' : ''}`} onClick={() => setPage(n.key)}>
+        <div key={n.key} className={`nav-item ${page === n.key ? 'active' : ''}`} onClick={() => handleNav(n.key)}>
           <n.icon />
           <span>{n.label}</span>
           {n.count != null && <span className="count">{n.count}</span>}
@@ -41,7 +48,7 @@ export function Sidebar({ page, setPage, role, counts }) {
           <div key={n.key}
                className={`nav-item ${page === n.key ? 'active' : ''}`}
                style={disabled ? { opacity: 0.45, cursor: 'not-allowed' } : {}}
-               onClick={() => !disabled && setPage(n.key)}>
+               onClick={() => !disabled && handleNav(n.key)}>
             <n.icon />
             <span>{n.label}</span>
             {disabled && <I.Lock size={13} style={{ marginLeft: 'auto', color: 'var(--text-4)' }} />}
@@ -60,12 +67,18 @@ export function Sidebar({ page, setPage, role, counts }) {
         <I.MoreH size={16} />
       </div>
     </aside>
+    </>
   )
 }
 
-export function Topbar({ crumb, setDrawerOpen, role, setRole }) {
+export function Topbar({ crumb, setDrawerOpen, role, setRole, onMenuClick }) {
   return (
     <header className="topbar">
+      <button className="hamburger" onClick={onMenuClick} aria-label="Abrir menú">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+          <line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="15" x2="17" y2="15"/>
+        </svg>
+      </button>
       <div className="crumb">{crumb.map((c, i) => (
         <span key={i}>{i === crumb.length - 1
           ? <b>{c}</b>

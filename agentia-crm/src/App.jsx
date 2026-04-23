@@ -40,6 +40,7 @@ export default function App() {
   const [page, setPage]   = useState(() => localStorage.getItem('agentia_page') || 'dashboard')
   const [role, setRole]   = useState(() => localStorage.getItem('agentia_role') || 'admin')
   const [drawer, setDrawer] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [hue, setHue]     = useState(225)
 
   const [leads,     setLeads]     = useState(MOCK_LEADS)
@@ -127,9 +128,9 @@ export default function App() {
   return (
     <>
       <div className="app" data-screen-label={PAGES.find(p => p[0] === page)?.[1]}>
-        <Sidebar page={page} setPage={setPage} role={role} counts={counts} />
+        <Sidebar page={page} setPage={setPage} role={role} counts={counts} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <div className="content">
-          <Topbar crumb={crumbMap[page]} setDrawerOpen={setDrawer} role={role} setRole={setRole} />
+          <Topbar crumb={crumbMap[page]} setDrawerOpen={setDrawer} role={role} setRole={setRole} onMenuClick={() => setSidebarOpen(o => !o)} />
           <main className="main">{pageEl}</main>
         </div>
       </div>
