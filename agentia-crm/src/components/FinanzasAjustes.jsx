@@ -5,6 +5,37 @@ import { PIPELINE_COLS, STATE_COLORS, eur } from './data'
 
 // ── Finanzas ─────────────────────────────────────────────────────
 
+function CobroModal({ cobro, onClose, onSave }) {
+  const isNew = !cobro?.id
+  const [form, setForm] = useState(cobro || {
+    cliente:'', monto:0, vence:'', vencida:false, pagado:false,
+  })
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  return (
+    <Modal open title={isNew ? 'Nueva factura' : 'Editar factura'}
+      onClose={onClose} onSave={() => onSave(form)} saveLabel={isNew ? 'Añadir factura' : 'Guardar'}>
+      <F label="Cliente"><input value={form.cliente} onChange={e => set('cliente', e.target.value)} placeholder="Ej: Bodegas Altura" autoFocus /></F>
+      <div className="form-2col">
+        <F label="Importe (€)"><input type="number" min="0" value={form.monto||0} onChange={e => set('monto', Number(e.target.value))} /></F>
+        <F label="Fecha de vencimiento"><input value={form.vence||''} onChange={e => set('vence', e.target.value)} placeholder="28 abr" /></F>
+      </div>
+      <div className="form-2col">
+        <F label="Estado">
+          <select value={form.pagado?'pagado':form.vencida?'vencida':'pendiente'} onChange={e => {
+            const val = e.target.value
+            setForm(f => ({ ...f, pagado: val === 'pagado', vencida: val === 'vencida' }))
+          }}>
+            <option value="pendiente">Pendiente</option>
+            <option value="vencida">Vencida</option>
+            <option value="pagado">Pagada</option>
+          </select>
+        </F>
+      </div>
+    </Modal>
+  )
+}
+
 function GastoModal({ gasto, onClose, onSave }) {
   const [form, setForm] = useState(gasto || {
     concepto:'', tipo:'Herramienta', monto:0, recurrente:false, fecha:'',
@@ -38,7 +69,10 @@ function GastoModal({ gasto, onClose, onSave }) {
 
 export function Finanzas({ role, data }) {
   const gastos = data?.gastos || []
-  const [addingGasto, setAddingGasto] = useState(false)
+  const cobros = data?.cobros || []
+  const [addingGasto, setAddingGasto]   = useState(false)
+  const [addingCobro, setAddingCobro]   = useState(false)
+  const [editingCobro, setEditingCobro] = useState(null)
 
   if (role !== 'admin') {
     return (
@@ -52,13 +86,24 @@ export function Finanzas({ role, data }) {
     )
   }
 
-  const ingresosMes = 14820
-  const cobrosPend = 5300
-  const gastosMes = gastos.reduce((a,g) => a + (g.monto||0), 0)
-  const gastoIA = gastos.filter(g => g.tipo === 'IA').reduce((a,g) => a + (g.monto||0), 0)
-  const gastoInfra = gastos.filter(g => g.tipo === 'Infra').reduce((a,g) => a + (g.monto||0), 0)
-  const gastoHerr = gastos.filter(g => g.tipo === 'Herramienta').reduce((a,g) => a + (g.monto||0), 0)
-  const gastoPerso = gastos.filter(g => g.tipo === 'Personas').reduce((a,g) => a + (g.monto||0), 0)
+  const pendientes  = cobros.filter(c => !c.pagado)
+  const pagados     = cobros.filter(c => c.pagado)
+  const ingresosMes = pagados.reduce((a,c) => a + (c.monto||0), 0)
+  const cobrosPend  = pendientes.reduce((a,c) => a + (c.monto||0), 0)
+  const gastosMes   = gastos.reduce((a,g) => a + (g.monto||0), 0)
+  const gastoIA     = gastos.filter(g => g.tipo === 'IA').reduce((a,g) => a + (g.monto||0), 0)
+  const gastoInfra  = gastos.filter(g => g.tipo === 'Infra').reduce((a,g) => a + (g.monto||0), 0)
+  const gastoHerr   = gastos.filter(g => g.tipo === 'Herramienta').reduce((a,g) => a + (g.monto||0), 0)
+  const gastoPerso  = gastos.filter(g => g.tipo === 'Personas').reduce((a,g) => a + (g.monto||0), 0)
+  const margen      = (ingresosMes + cobrosPend) > 0
+    ? Math.round((ingresosMes - gastosMes) / (ingresosMes + cobrosPend) * 100)
+    : 100
+
+  const handleSaveCobro = (form) => {
+    if (form.id) data.updateCobro?.(form.id, form)
+    else data.addCobro?.(form)
+    setAddingCobro(false); setEditingCobro(null)
+  }
 
   return (
     <div className="fade-in">
@@ -68,36 +113,50 @@ export function Finanzas({ role, data }) {
           <p className="page-subtitle">Visión ejecutiva del negocio · abril 2026</p>
         </div>
         <div className="page-actions">
+          <button className="btn" onClick={() => setAddingCobro(true)}><I.Plus size={13}/> Nueva factura</button>
           <button className="btn primary" onClick={() => setAddingGasto(true)}><I.Plus size={13}/> Añadir gasto</button>
         </div>
       </div>
 
       <div className="grid-3" style={{marginBottom:16}}>
         <div className="fin-card accent">
-          <div className="label">Ingresos del mes</div>
+          <div className="label">Ingresos cobrados</div>
           <div className="big"><span className="currency">€</span>{eur(ingresosMes)}</div>
           <div style={{display:'flex', alignItems:'center', gap:10, marginTop:10}}>
-            <span className="chip green"><span className="dot"/>+18%</span>
-            <span className="small" style={{color:'var(--text-3)'}}>vs marzo · 6 cobros</span>
+            <span className="chip green"><span className="dot"/>{pagados.length} cobros</span>
           </div>
           <div style={{height:8}}/>
-          <div className="progress"><div className="bar" style={{width:'74%'}}/></div>
-          <div className="small" style={{color:'var(--text-3)', marginTop:6}}>74% del objetivo mensual (€20.000)</div>
+          <div className="progress">
+            <div className="bar" style={{width: ingresosMes > 0 ? `${Math.min(100, Math.round(ingresosMes/20000*100))}%` : '0%'}}/>
+          </div>
+          <div className="small" style={{color:'var(--text-3)', marginTop:6}}>
+            {ingresosMes > 0 ? `${Math.min(100, Math.round(ingresosMes/20000*100))}% del objetivo mensual (€20.000)` : 'Sin cobros registrados aún'}
+          </div>
         </div>
 
         <div className="fin-card">
           <div className="label">Cobros pendientes</div>
           <div className="big"><span className="currency">€</span>{eur(cobrosPend)}</div>
-          <div className="small" style={{color:'var(--warn)', marginTop:8, fontFamily:'var(--font-mono)'}}>3 facturas abiertas</div>
+          {pendientes.length > 0
+            ? <div className="small" style={{color:'var(--warn)', marginTop:8, fontFamily:'var(--font-mono)'}}>{pendientes.length} factura{pendientes.length!==1?'s':''} abierta{pendientes.length!==1?'s':''}</div>
+            : <div className="small" style={{color:'var(--ok)', marginTop:8, fontFamily:'var(--font-mono)'}}>Todo cobrado</div>
+          }
           <div className="divider"/>
-          {[
-            {c:'Taller Ronda', v:1800, d:'venció 18 abr', late:true},
-            {c:'Academia Logos', v:1740, d:'vence 28 abr'},
-            {c:'Bodegas Altura', v:1760, d:'vence 5 may'},
-          ].map((r,i)=>(
-            <div key={i} style={{display:'flex', alignItems:'center', padding:'6px 0', borderBottom: i<2?'1px dashed var(--line-1)':'none'}}>
-              <div style={{flex:1}}><div style={{fontSize:13}}>{r.c}</div><div className="small" style={{color: r.late?'var(--danger)':'var(--text-3)'}}>{r.d}</div></div>
-              <div className="mono">€{eur(r.v)}</div>
+          {pendientes.length === 0 && (
+            <div className="small" style={{color:'var(--text-4)', textAlign:'center', padding:'12px 0'}}>
+              Sin facturas pendientes · <button className="btn sm ghost" onClick={() => setAddingCobro(true)} style={{display:'inline-flex'}}>Añadir</button>
+            </div>
+          )}
+          {pendientes.map((r, i) => (
+            <div key={r.id} style={{display:'flex', alignItems:'center', gap:8, padding:'6px 0', borderBottom: i < pendientes.length-1 ? '1px dashed var(--line-1)' : 'none'}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13}}>{r.cliente}</div>
+                <div className="small" style={{color: r.vencida ? 'var(--danger)' : 'var(--text-3)'}}>
+                  {r.vencida ? 'venció' : 'vence'} {r.vence}
+                </div>
+              </div>
+              <div className="mono">€{eur(r.monto||0)}</div>
+              <button className="icon-btn" style={{width:22, height:22}} onClick={() => setEditingCobro(r)}><I.ChevronR size={12}/></button>
             </div>
           ))}
         </div>
@@ -117,36 +176,58 @@ export function Finanzas({ role, data }) {
               <div style={{width:`${Math.round(gastoPerso/gastosMes*100)}%`, background:'#FFB547'}}/>
             </div>
           )}
-          <div className="small" style={{color:'var(--text-3)', marginTop:12}}>Margen neto estimado: <span style={{color:'var(--ok)', fontFamily:'var(--font-mono)'}}>{gastosMes>0?Math.round((ingresosMes-gastosMes)/ingresosMes*100):100}%</span></div>
+          <div className="small" style={{color:'var(--text-3)', marginTop:12}}>Margen neto estimado: <span style={{color:'var(--ok)', fontFamily:'var(--font-mono)'}}>{margen}%</span></div>
         </div>
       </div>
 
       <div className="grid-main-side">
         <div className="card">
-          <div className="card-head"><h3>Rentabilidad por cliente · mes</h3></div>
-          <table className="table">
-            <thead><tr><th>Cliente</th><th>Servicio</th><th style={{textAlign:'right'}}>Ingreso</th><th style={{textAlign:'right'}}>Coste</th><th style={{textAlign:'right'}}>Margen</th></tr></thead>
-            <tbody>
-              {[
-                {c:'Bodegas Altura', s:'E-commerce + SEO', i:3600, co:320},
-                {c:'Óptica Horizonte', s:'Web + Chatbot', i:3400, co:280},
-                {c:'Restaurante Marinero', s:'Chatbot', i:1600, co:110},
-                {c:'Clínica Dental Nova', s:'Mantenimiento', i:240, co:20},
-                {c:'Academia Logos', s:'Web', i:1160, co:140},
-              ].map((r,i) => {
-                const m = r.i - r.co, pct = Math.round(m/r.i*100)
-                return (
-                  <tr key={i}>
-                    <td><span className="primary">{r.c}</span></td>
-                    <td className="muted">{r.s}</td>
-                    <td className="mono" style={{textAlign:'right'}}>€{eur(r.i)}</td>
-                    <td className="mono" style={{textAlign:'right', color:'var(--text-3)'}}>€{eur(r.co)}</td>
-                    <td style={{textAlign:'right'}}><span className="chip green"><span className="dot"/>{pct}% · €{eur(m)}</span></td>
+          <div className="card-head">
+            <h3>Todas las facturas</h3>
+            <div className="right">
+              <button className="btn sm" onClick={() => setAddingCobro(true)}><I.Plus size={12}/></button>
+            </div>
+          </div>
+          {cobros.length === 0 ? (
+            <div className="small" style={{color:'var(--text-4)', textAlign:'center', padding:'24px 0'}}>
+              Sin facturas — añade tu primera factura con el botón de arriba
+            </div>
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th style={{textAlign:'right'}}>Importe</th>
+                  <th>Vencimiento</th>
+                  <th>Estado</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {cobros.map(c => (
+                  <tr key={c.id} style={{cursor:'pointer'}} onClick={() => setEditingCobro(c)}>
+                    <td><span className="primary">{c.cliente}</span></td>
+                    <td className="mono" style={{textAlign:'right'}}>€{eur(c.monto||0)}</td>
+                    <td className="muted">{c.vence}</td>
+                    <td>
+                      {c.pagado
+                        ? <span className="chip green"><span className="dot"/>Pagada</span>
+                        : c.vencida
+                          ? <span className="chip red"><span className="dot"/>Vencida</span>
+                          : <span className="chip amber"><span className="dot"/>Pendiente</span>
+                      }
+                    </td>
+                    <td style={{textAlign:'right'}}>
+                      <button className="icon-btn" style={{width:24, height:24, color:'var(--text-4)'}}
+                        onClick={e => { e.stopPropagation(); if (confirm(`¿Eliminar factura de ${c.cliente}?`)) data.deleteCobro?.(c.id) }}>
+                        <I.Close size={11}/>
+                      </button>
+                    </td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
         <div className="card">
@@ -176,6 +257,13 @@ export function Finanzas({ role, data }) {
         </div>
       </div>
 
+      {(addingCobro || editingCobro) && (
+        <CobroModal
+          cobro={editingCobro}
+          onClose={() => { setAddingCobro(false); setEditingCobro(null) }}
+          onSave={handleSaveCobro}
+        />
+      )}
       {addingGasto && (
         <GastoModal
           onClose={() => setAddingGasto(false)}

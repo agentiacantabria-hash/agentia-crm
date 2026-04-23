@@ -12,6 +12,7 @@ import {
   TASKS as MOCK_TASKS,
   PROYECTOS as MOCK_PROYECTOS,
   GASTOS as MOCK_GASTOS,
+  COBROS as MOCK_COBROS,
 } from './components/data'
 
 const PAGES = [
@@ -48,6 +49,7 @@ export default function App() {
   const [tasks,     setTasks]     = useState(MOCK_TASKS)
   const [proyectos, setProyectos] = useState(MOCK_PROYECTOS)
   const [gastos,    setGastos]    = useState(MOCK_GASTOS)
+  const [cobros,    setCobros]    = useState(MOCK_COBROS)
 
   useEffect(() => { localStorage.setItem('agentia_page', page) }, [page])
   useEffect(() => { localStorage.setItem('agentia_role', role) }, [role])
@@ -64,18 +66,20 @@ export default function App() {
   useEffect(() => {
     async function load() {
       try {
-        const [l, c, t, p, g] = await Promise.all([
+        const [l, c, t, p, g, co] = await Promise.all([
           supabase.from('leads').select('*').order('created_at', { ascending: false }),
           supabase.from('clientes').select('*').order('created_at', { ascending: false }),
           supabase.from('tareas').select('*').order('created_at', { ascending: false }),
           supabase.from('proyectos').select('*').order('created_at', { ascending: false }),
           supabase.from('gastos').select('*').order('created_at', { ascending: false }),
+          supabase.from('cobros').select('*').order('created_at', { ascending: false }),
         ])
         if (!l.error && l.data)  setLeads(l.data)
         if (!c.error && c.data)  setClientes(c.data)
         if (!t.error && t.data)  setTasks(t.data)
         if (!p.error && p.data)  setProyectos(p.data)
         if (!g.error && g.data)  setGastos(g.data)
+        if (!co.error && co.data) setCobros(co.data)
       } catch (_) {}
     }
     load()
@@ -198,6 +202,31 @@ export default function App() {
     setGastos(prev => prev.filter(g => g.id !== id))
   }
 
+  // ── COBROS ─────────────────────────────────────────────────
+  const addCobro = async (cobro) => {
+    try {
+      const { data: d, error } = await supabase.from('cobros').insert([cobro]).select().single()
+      if (!error && d) { setCobros(prev => [d, ...prev]); return }
+    } catch (_) {}
+    setCobros(prev => [{ ...cobro, id: `cb${Date.now()}` }, ...prev])
+  }
+
+  const updateCobro = async (id, updates) => {
+    try {
+      const { error } = await supabase.from('cobros').update(updates).eq('id', id)
+      if (!error) { setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c)); return }
+    } catch (_) {}
+    setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
+  }
+
+  const deleteCobro = async (id) => {
+    try {
+      const { error } = await supabase.from('cobros').delete().eq('id', id)
+      if (!error) { setCobros(prev => prev.filter(c => c.id !== id)); return }
+    } catch (_) {}
+    setCobros(prev => prev.filter(c => c.id !== id))
+  }
+
   // ──────────────────────────────────────────────────────────
   const counts = {
     leads:     leads.filter(l => !['Ganado','Perdido'].includes(l.estado)).length,
@@ -207,12 +236,13 @@ export default function App() {
   }
 
   const data = {
-    leads, clientes, tasks, proyectos, gastos,
+    leads, clientes, tasks, proyectos, gastos, cobros,
     addLead, updateLead, deleteLead,
     addCliente, updateCliente, deleteCliente,
     addTask, updateTask, deleteTask,
     addProyecto, updateProyecto, deleteProyecto,
     addGasto, deleteGasto,
+    addCobro, updateCobro, deleteCobro,
   }
 
   const pageEl = (() => {

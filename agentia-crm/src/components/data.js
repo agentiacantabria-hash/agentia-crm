@@ -39,6 +39,12 @@ export const PROYECTOS = [
   { id:'p6', cliente:'Inmobiliaria Litoral', servicio:'Web premium', estado:'Cerrado', progreso:100, ajustes:0, pago:'Pagado', resp:'AR' },
 ]
 
+export const COBROS = [
+  { id:'cb1', cliente:'Taller Ronda',    monto:1800, vence:'18 abr', vencida:true,  pagado:false },
+  { id:'cb2', cliente:'Academia Logos',  monto:1740, vence:'28 abr', vencida:false, pagado:false },
+  { id:'cb3', cliente:'Bodegas Altura',  monto:1760, vence:'5 may',  vencida:false, pagado:false },
+]
+
 export const GASTOS = [
   { id:'g1', concepto:'OpenAI — API', tipo:'IA', monto:128, recurrente:true, fecha:'15 abr' },
   { id:'g2', concepto:'Anthropic — Claude', tipo:'IA', monto:85, recurrente:true, fecha:'12 abr' },
