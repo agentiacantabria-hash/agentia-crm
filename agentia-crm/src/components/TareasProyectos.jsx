@@ -48,7 +48,7 @@ function weekIso() {
 function TareaModal({ tarea, onClose, onSave, onDelete }) {
   const isNew = !tarea?.id
   const users = getUsers()
-  const respOptions = users.filter(u => u.estado === 'activo').map(u => u.ini || u.n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())
+  const respOptions = users.filter(u => u.estado === 'activo').map(u => u.ini || (u.n||'').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() || '?')
   const defaultResp = respOptions[0] || 'LP'
 
   const [form, setForm] = useState(tarea || {
@@ -238,7 +238,7 @@ function ProyectoModal({ proyecto, onClose, onSave, onDelete }) {
   const servList = getServicios()
   const DEFAULT_SERVICIOS = ['Web premium','Automatización WhatsApp','Chatbot de reservas','Mantenimiento mensual','E-commerce + SEO','Web + Captación']
   const servicios = servList.length ? servList : DEFAULT_SERVICIOS
-  const respOptions = users.filter(u => u.estado === 'activo').map(u => u.ini || u.n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())
+  const respOptions = users.filter(u => u.estado === 'activo').map(u => u.ini || (u.n||'').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() || '?')
 
   const [form, setForm] = useState(proyecto || {
     cliente:'', servicio: servicios[0] || 'Web premium', estado:'En curso', progreso:0, ajustes:0, pago:'Pendiente', resp: respOptions[0] || 'LP',

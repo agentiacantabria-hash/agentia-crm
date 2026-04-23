@@ -14,11 +14,11 @@ function CobroModal({ cobro, onClose, onSave }) {
 
   return (
     <Modal open title={isNew ? 'Nueva factura' : 'Editar factura'}
-      onClose={onClose} onSave={() => onSave(form)} saveLabel={isNew ? 'Añadir factura' : 'Guardar'}>
+      onClose={onClose} onSave={() => onSave({ ...form, monto: parseFloat(form.monto) || 0 })} saveLabel={isNew ? 'Añadir factura' : 'Guardar'}>
       <F label="Cliente"><input value={form.cliente} onChange={e => set('cliente', e.target.value)} placeholder="Ej: Bodegas Altura" autoFocus /></F>
       <div className="form-2col">
-        <F label="Importe (€)"><input type="number" min="0" value={form.monto||0} onChange={e => set('monto', Number(e.target.value))} /></F>
-        <F label="Fecha de vencimiento"><input value={form.vence||''} onChange={e => set('vence', e.target.value)} placeholder="28 abr" /></F>
+        <F label="Importe (€)"><input type="number" min="0" placeholder="0" value={form.monto ?? ''} onChange={e => set('monto', e.target.value)} /></F>
+        <F label="Fecha de vencimiento"><input type="date" value={form.vence||''} onChange={e => set('vence', e.target.value)} /></F>
       </div>
       <div className="form-2col">
         <F label="Estado">
@@ -36,15 +36,17 @@ function CobroModal({ cobro, onClose, onSave }) {
   )
 }
 
-function GastoModal({ gasto, onClose, onSave }) {
+function GastoModal({ gasto, onClose, onSave, onDelete }) {
+  const isNew = !gasto?.id
   const [form, setForm] = useState(gasto || {
-    concepto:'', tipo:'Herramienta', monto:0, recurrente:false, fecha:'',
+    concepto:'', tipo:'Herramienta', monto:'', recurrente:false, fecha:'',
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const [confirmDel, setConfirmDel] = useState(false)
 
   return (
-    <Modal open title={gasto ? 'Editar gasto' : 'Nuevo gasto'}
-      onClose={onClose} onSave={() => onSave(form)} saveLabel={gasto ? 'Guardar' : 'Añadir gasto'}>
+    <Modal open title={isNew ? 'Nuevo gasto' : 'Editar gasto'}
+      onClose={onClose} onSave={() => onSave({ ...form, monto: parseFloat(form.monto) || 0 })} saveLabel={isNew ? 'Añadir gasto' : 'Guardar'}>
       <F label="Concepto"><input value={form.concepto} onChange={e => set('concepto', e.target.value)} placeholder="Ej: OpenAI — API" autoFocus /></F>
       <div className="form-2col">
         <F label="Tipo">
@@ -52,10 +54,10 @@ function GastoModal({ gasto, onClose, onSave }) {
             {['IA','Infra','Herramienta','Personas','Otro'].map(t=><option key={t}>{t}</option>)}
           </select>
         </F>
-        <F label="Importe (€)"><input type="number" min="0" value={form.monto||0} onChange={e => set('monto', Number(e.target.value))} /></F>
+        <F label="Importe (€)"><input type="number" min="0" placeholder="0" value={form.monto ?? ''} onChange={e => set('monto', e.target.value)} /></F>
       </div>
       <div className="form-2col">
-        <F label="Fecha"><input value={form.fecha||''} onChange={e => set('fecha', e.target.value)} placeholder="15 abr" /></F>
+        <F label="Fecha"><input type="date" value={form.fecha||''} onChange={e => set('fecha', e.target.value)} /></F>
         <F label="Recurrente">
           <select value={form.recurrente?'si':'no'} onChange={e => set('recurrente', e.target.value==='si')}>
             <option value="no">No — pago único</option>
@@ -63,6 +65,15 @@ function GastoModal({ gasto, onClose, onSave }) {
           </select>
         </F>
       </div>
+      {!isNew && (
+        <div className="modal-danger-zone">
+          <span>Zona peligrosa</span>
+          {confirmDel
+            ? <button className="btn danger sm" onClick={() => { onDelete?.(form.id); onClose() }}>¿Confirmar eliminación?</button>
+            : <button className="btn sm ghost" onClick={() => setConfirmDel(true)} style={{color:'var(--danger)'}}>Eliminar gasto</button>
+          }
+        </div>
+      )}
     </Modal>
   )
 }
@@ -71,6 +82,7 @@ export function Finanzas({ role, data }) {
   const gastos = data?.gastos || []
   const cobros = data?.cobros || []
   const [addingGasto, setAddingGasto]   = useState(false)
+  const [editingGasto, setEditingGasto] = useState(null)
   const [addingCobro, setAddingCobro]   = useState(false)
   const [editingCobro, setEditingCobro] = useState(null)
 
@@ -110,7 +122,7 @@ export function Finanzas({ role, data }) {
       <div className="page-head">
         <div>
           <h1 className="page-title">Finanzas</h1>
-          <p className="page-subtitle">Visión ejecutiva del negocio · abril 2026</p>
+          <p className="page-subtitle">Visión ejecutiva del negocio · {new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</p>
         </div>
         <div className="page-actions">
           <button className="btn" onClick={() => setAddingCobro(true)}><I.Plus size={13}/> Nueva factura</button>
@@ -239,7 +251,7 @@ export function Finanzas({ role, data }) {
             {gastos.map(g => {
               const typeColor = g.tipo==='IA'?'#9A7BFF':g.tipo==='Infra'?'#4F8BFF':g.tipo==='Personas'?'#FFB547':'#3ECF8E'
               return (
-                <div className="task" key={g.id}>
+                <div className="task" key={g.id} style={{cursor:'pointer'}} onClick={() => setEditingGasto(g)}>
                   <div style={{width:30, height:30, borderRadius:8, background:`${typeColor}22`, color:typeColor, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0}}><I.Receipt size={14}/></div>
                   <div style={{flex:1, minWidth:0}}>
                     <div className="title">{g.concepto}</div>
@@ -247,7 +259,7 @@ export function Finanzas({ role, data }) {
                   </div>
                   <div className="mono" style={{fontSize:13}}>€{eur(g.monto||0)}</div>
                   <button className="icon-btn" style={{width:22, height:22, color:'var(--text-4)'}}
-                    onClick={() => { if (confirm(`¿Eliminar "${g.concepto}"?`)) data.deleteGasto?.(g.id) }}>
+                    onClick={e => { e.stopPropagation(); if (confirm(`¿Eliminar "${g.concepto}"?`)) data.deleteGasto?.(g.id) }}>
                     <I.Close size={11}/>
                   </button>
                 </div>
@@ -264,10 +276,16 @@ export function Finanzas({ role, data }) {
           onSave={handleSaveCobro}
         />
       )}
-      {addingGasto && (
+      {(addingGasto || editingGasto) && (
         <GastoModal
-          onClose={() => setAddingGasto(false)}
-          onSave={form => { data.addGasto?.(form); setAddingGasto(false) }}
+          gasto={editingGasto}
+          onClose={() => { setAddingGasto(false); setEditingGasto(null) }}
+          onSave={form => {
+            if (form.id) data.updateGasto?.(form.id, form)
+            else data.addGasto?.(form)
+            setAddingGasto(false); setEditingGasto(null)
+          }}
+          onDelete={id => { data.deleteGasto?.(id); setEditingGasto(null) }}
         />
       )}
     </div>

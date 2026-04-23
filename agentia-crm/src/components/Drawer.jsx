@@ -2,31 +2,64 @@ import React, { useState } from 'react'
 import { I } from './Icons'
 import { PIPELINE_COLS } from './data'
 
+function getServicios() {
+  try {
+    const s = JSON.parse(localStorage.getItem('agentia_servicios') || '[]')
+    const activos = s.filter(x => x.activo !== false).map(x => x.n).filter(Boolean)
+    return activos.length ? activos : ['Web premium', 'Automatización WhatsApp', 'Chatbot de reservas', 'Mantenimiento mensual']
+  } catch { return ['Web premium', 'Automatización WhatsApp', 'Chatbot de reservas', 'Mantenimiento mensual'] }
+}
+
+function getResp() {
+  try {
+    const u = JSON.parse(localStorage.getItem('agentia_usuarios') || '[]')
+    const activos = u.filter(x => x.estado === 'activo').map(x => ({ label: x.n || x.nombre, value: x.n || x.nombre }))
+    return activos.length ? activos : [{ label: 'Administrador', value: 'Administrador' }]
+  } catch { return [{ label: 'Administrador', value: 'Administrador' }] }
+}
+
+const ORIGENES = ['Instagram', 'LinkedIn', 'Referido', 'Formulario web', 'Otro']
+
+const EMPTY = {
+  empresa: '', servicio: '', contacto: '', origen: 'Instagram', origenCustom: '', notas: '',
+  sector: '', ciudad: '', telefono: '', email: '', instagram: '', responsable: '',
+  estado: 'Nuevo', next_contact: '', monto: '',
+}
+
 export function QuickLeadDrawer({ open, onClose, onSave }) {
   const [mode, setMode] = useState('quick')
-  const [form, setForm] = useState({
-    empresa: '', servicio: 'Web premium', contacto: '', origen: 'Instagram', notas: '',
-    sector: '', ciudad: '', telefono: '', email: '', instagram: '', responsable: 'LP',
-    estado: 'Nuevo', next_contact: '',
-  })
+  const [form, setForm] = useState(EMPTY)
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const handleSave = () => {
+    if (!form.empresa.trim()) return
+    const servicios = getServicios()
+    const resp = getResp()
+    const origenFinal = form.origen === 'Otro' ? (form.origenCustom.trim() || 'Otro') : form.origen
     const lead = {
-      empresa: form.empresa,
-      servicio: form.servicio,
-      origen: form.origen,
-      estado: form.estado || 'Nuevo',
-      monto: 0,
-      temp: 'cold',
-      next: form.notas || 'Primer contacto',
-      sector: form.sector,
-      ciudad: form.ciudad,
-      responsable: form.responsable,
+      empresa:      form.empresa.trim(),
+      servicio:     form.servicio || servicios[0] || '',
+      origen:       origenFinal,
+      estado:       form.estado || 'Nuevo',
+      monto:        parseFloat(form.monto) || 0,
+      temp:         'cold',
+      next:         (form.notas || '').trim() || 'Primer contacto',
+      next_contact: form.next_contact || '',
+      sector:       form.sector,
+      ciudad:       form.ciudad,
+      responsable:  form.responsable || resp[0]?.value || '',
+      contacto:     form.contacto,
+      telefono:     form.telefono,
+      email:        form.email,
     }
     onSave?.(lead)
+    onClose?.()
+    setForm(EMPTY)
   }
+
+  const servicios = getServicios()
+  const resp = getResp()
 
   return (
     <>
@@ -58,10 +91,7 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
               <div className="field">
                 <label className="lbl">Servicio de interés</label>
                 <select className="select" value={form.servicio} onChange={e => set('servicio', e.target.value)}>
-                  <option>Web premium</option>
-                  <option>Automatización WhatsApp</option>
-                  <option>Chatbot de reservas</option>
-                  <option>Mantenimiento mensual</option>
+                  {servicios.map(s => <option key={s}>{s}</option>)}
                 </select>
               </div>
               <div className="field-row">
@@ -72,11 +102,16 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
                 <div className="field">
                   <label className="lbl">Origen</label>
                   <select className="select" value={form.origen} onChange={e => set('origen', e.target.value)}>
-                    <option>Instagram</option><option>LinkedIn</option>
-                    <option>Referido</option><option>Formulario web</option>
+                    {ORIGENES.map(o => <option key={o}>{o}</option>)}
                   </select>
                 </div>
               </div>
+              {form.origen === 'Otro' && (
+                <div className="field">
+                  <label className="lbl">Especifica el origen</label>
+                  <input className="input" placeholder="Ej: Feria, podcast, amigo…" value={form.origenCustom} onChange={e => set('origenCustom', e.target.value)} />
+                </div>
+              )}
               <div className="field">
                 <label className="lbl">Notas rápidas</label>
                 <textarea className="textarea" placeholder="Cualquier detalle que no quieras olvidar…" value={form.notas} onChange={e => set('notas', e.target.value)} />
@@ -96,10 +131,16 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
                 <div className="field"><label className="lbl">Ciudad</label><input className="input" value={form.ciudad} onChange={e => set('ciudad', e.target.value)} /></div>
                 <div className="field"><label className="lbl">Origen</label>
                   <select className="select" value={form.origen} onChange={e => set('origen', e.target.value)}>
-                    <option>Instagram</option><option>LinkedIn</option><option>Referido</option><option>Formulario web</option>
+                    {ORIGENES.map(o => <option key={o}>{o}</option>)}
                   </select>
                 </div>
               </div>
+              {form.origen === 'Otro' && (
+                <div className="field">
+                  <label className="lbl">Especifica el origen</label>
+                  <input className="input" placeholder="Ej: Feria, podcast, amigo…" value={form.origenCustom} onChange={e => set('origenCustom', e.target.value)} />
+                </div>
+              )}
               <div className="field-row">
                 <div className="field"><label className="lbl">Teléfono</label><input className="input" value={form.telefono} onChange={e => set('telefono', e.target.value)} /></div>
                 <div className="field"><label className="lbl">Email</label><input className="input" value={form.email} onChange={e => set('email', e.target.value)} /></div>
@@ -108,14 +149,19 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
                 <div className="field"><label className="lbl">Instagram</label><input className="input" placeholder="@handle" value={form.instagram} onChange={e => set('instagram', e.target.value)} /></div>
                 <div className="field"><label className="lbl">Responsable</label>
                   <select className="select" value={form.responsable} onChange={e => set('responsable', e.target.value)}>
-                    <option value="LP">Lucía P.</option><option value="AR">Andrés R.</option>
+                    {resp.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                   </select>
                 </div>
               </div>
-              <div className="field"><label className="lbl">Servicio de interés</label>
-                <select className="select" value={form.servicio} onChange={e => set('servicio', e.target.value)}>
-                  <option>Web premium</option><option>Automatización WhatsApp</option><option>Chatbot de reservas</option><option>Mantenimiento mensual</option>
-                </select>
+              <div className="field-row">
+                <div className="field"><label className="lbl">Servicio de interés</label>
+                  <select className="select" value={form.servicio} onChange={e => set('servicio', e.target.value)}>
+                    {servicios.map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div className="field"><label className="lbl">Importe (€)</label>
+                  <input className="input" type="number" min="0" placeholder="0" value={form.monto} onChange={e => set('monto', e.target.value)} />
+                </div>
               </div>
               <div className="field-row">
                 <div className="field"><label className="lbl">Estado</label>

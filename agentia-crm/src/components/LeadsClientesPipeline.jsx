@@ -25,17 +25,20 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
   const isNew = !lead?.id
   const SERVICIOS = getServicios()
   const RESP = getResp()
-  const [form, setForm] = useState(lead || {
+  const [form, setForm] = useState(lead ? { ...lead, monto: lead.monto ?? '' } : {
     empresa:'', sector:'', ciudad:'', contacto:'', telefono:'', email:'',
     responsable: RESP[0] || 'LP', servicio: SERVICIOS[0] || 'Web premium',
-    estado:'Nuevo', next:'', monto:0, origen:'Instagram', notas:'',
+    estado:'Nuevo', next:'', monto:'', origen:'Instagram', origenCustom:'', notas:'',
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const [confirmDel, setConfirmDel] = useState(false)
 
   return (
     <Modal open title={isNew ? 'Nuevo lead' : `Editar — ${form.empresa}`}
-      onClose={onClose} onSave={() => onSave(form)} saveLabel={isNew ? 'Crear lead' : 'Guardar cambios'}>
+      onClose={onClose} onSave={() => {
+        const origenFinal = form.origen === 'Otro' ? (form.origenCustom?.trim() || 'Otro') : form.origen
+        onSave({ ...form, monto: parseFloat(form.monto) || 0, origen: origenFinal })
+      }} saveLabel={isNew ? 'Crear lead' : 'Guardar cambios'}>
       <div className="form-2col">
         <F label="Empresa"><input value={form.empresa} onChange={e => set('empresa', e.target.value)} placeholder="Ej: Clínica Marbella" autoFocus /></F>
         <F label="Contacto"><input value={form.contacto||''} onChange={e => set('contacto', e.target.value)} placeholder="Nombre del contacto" /></F>
@@ -60,6 +63,9 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
           </select>
         </F>
       </div>
+      {form.origen === 'Otro' && (
+        <F label="Especifica el origen"><input value={form.origenCustom||''} onChange={e => set('origenCustom', e.target.value)} placeholder="Ej: Feria, podcast, amigo…" /></F>
+      )}
       <div className="form-2col">
         <F label="Estado">
           <select value={form.estado||''} onChange={e => set('estado', e.target.value)}>
@@ -73,7 +79,7 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
         </F>
       </div>
       <div className="form-2col">
-        <F label="Importe (€)"><input type="number" value={form.monto||0} onChange={e => set('monto', Number(e.target.value))} /></F>
+        <F label="Importe (€)"><input type="number" min="0" placeholder="0" value={form.monto ?? ''} onChange={e => set('monto', e.target.value)} /></F>
         <F label="Próximo paso"><input value={form.next||''} onChange={e => set('next', e.target.value)} placeholder="Llamar el lunes…" /></F>
       </div>
       <F label="Notas"><textarea value={form.notas||''} onChange={e => set('notas', e.target.value)} placeholder="Detalles adicionales…" /></F>
@@ -97,7 +103,11 @@ function RowMenu({ onEdit, onDelete }) {
   useEffect(() => {
     const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    document.addEventListener('touchstart', handler, { passive: true })
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('touchstart', handler)
+    }
   }, [])
 
   return (

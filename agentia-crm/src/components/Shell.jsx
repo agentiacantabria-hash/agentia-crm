@@ -11,16 +11,24 @@ function getSidebarUser(role) {
 
 export function Sidebar({ page, setPage, role, counts, isOpen, onClose }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef(null)
+  const [menuPos, setMenuPos] = useState({ bottom: 80, right: 16 })
+  const btnRef = useRef(null)
   const user = getSidebarUser(role)
 
   useEffect(() => {
-    function handleClick(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false)
+    function handleClose(e) {
+      if (btnRef.current && btnRef.current.contains(e.target)) return
+      setMenuOpen(false)
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
+    if (menuOpen) {
+      document.addEventListener('mousedown', handleClose)
+      document.addEventListener('touchstart', handleClose, { passive: true })
+      return () => {
+        document.removeEventListener('mousedown', handleClose)
+        document.removeEventListener('touchstart', handleClose)
+      }
+    }
+  }, [menuOpen])
 
   const nav = [
     { key:'dashboard', label:'Inicio',    icon: I.Home },
@@ -35,7 +43,18 @@ export function Sidebar({ page, setPage, role, counts, isOpen, onClose }) {
     { key:'ajustes',  label:'Ajustes',  icon: I.Settings, adminOnly: true },
   ]
 
-  const handleNav = (key) => { setPage(key); onClose?.() }
+  const handleNav = (key) => { setPage(key); onClose?.(); setMenuOpen(false) }
+
+  const handleMenuToggle = () => {
+    if (!menuOpen && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect()
+      setMenuPos({
+        bottom: window.innerHeight - rect.top + 8,
+        left: rect.left,
+      })
+    }
+    setMenuOpen(o => !o)
+  }
 
   return (
     <>
@@ -73,7 +92,7 @@ export function Sidebar({ page, setPage, role, counts, isOpen, onClose }) {
           )
         })}
 
-        <div className="sidebar-footer" ref={menuRef}>
+        <div className="sidebar-footer">
           <div className="avatar">{user.ini || '?'}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{user.n}</div>
@@ -81,29 +100,33 @@ export function Sidebar({ page, setPage, role, counts, isOpen, onClose }) {
               {role === 'admin' ? 'Admin' : 'Empleado'} · Agentia
             </div>
           </div>
-          <button className="icon-btn" style={{width:28, height:28}} onClick={() => setMenuOpen(o => !o)}>
+          <button ref={btnRef} className="icon-btn" style={{width:28, height:28}} onClick={handleMenuToggle}>
             <I.MoreH size={16} />
           </button>
-
-          {menuOpen && (
-            <div style={{
-              position:'absolute', bottom:'calc(100% + 8px)', right:8,
-              background:'var(--surface-2)', border:'1px solid var(--line-2)',
-              borderRadius:10, padding:'6px 0', minWidth:160,
-              boxShadow:'0 8px 30px rgba(0,0,0,0.4)', zIndex:200,
-            }}>
-              <div className="row-menu-item" onClick={() => { handleNav('ajustes'); setMenuOpen(false) }}
-                style={{display:'flex', alignItems:'center', gap:10, padding:'8px 14px', cursor:'pointer', fontSize:13, color:'var(--text-1)'}}>
-                <I.Settings size={14}/> Ajustes
-              </div>
-              <div className="row-menu-item" onClick={() => { handleNav('ajustes'); setMenuOpen(false) }}
-                style={{display:'flex', alignItems:'center', gap:10, padding:'8px 14px', cursor:'pointer', fontSize:13, color:'var(--text-1)'}}>
-                <I.Users size={14}/> Editar perfil
-              </div>
-            </div>
-          )}
         </div>
       </aside>
+
+      {menuOpen && (
+        <div style={{
+          position:'fixed',
+          bottom: menuPos.bottom,
+          left: menuPos.left,
+          background:'var(--surface-2)',
+          border:'1px solid var(--line-2)',
+          borderRadius:10, padding:'6px 0', minWidth:180,
+          boxShadow:'0 8px 30px rgba(0,0,0,0.5)',
+          zIndex:400,
+        }}>
+          <div className="row-menu-item" onClick={() => handleNav('ajustes')}
+            style={{display:'flex', alignItems:'center', gap:10, padding:'10px 16px', cursor:'pointer', fontSize:13, color:'var(--text-1)'}}>
+            <I.Settings size={14}/> Ajustes
+          </div>
+          <div className="row-menu-item" onClick={() => handleNav('ajustes')}
+            style={{display:'flex', alignItems:'center', gap:10, padding:'10px 16px', cursor:'pointer', fontSize:13, color:'var(--text-1)'}}>
+            <I.Users size={14}/> Editar perfil
+          </div>
+        </div>
+      )}
     </>
   )
 }

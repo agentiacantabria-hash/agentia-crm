@@ -71,7 +71,14 @@ export default function App() {
         if (!t.error && t.data)  setTasks(t.data)
         if (!p.error && p.data)  setProyectos(p.data)
         if (!g.error && g.data)  setGastos(g.data)
-        if (!co.error && co.data) setCobros(co.data)
+        if (!co.error && co.data) {
+          const today = new Date(); today.setHours(0,0,0,0)
+          setCobros(co.data.map(c => {
+            if (c.pagado || !c.vence) return c
+            const venceDate = new Date(c.vence); venceDate.setHours(0,0,0,0)
+            return { ...c, vencida: venceDate < today }
+          }))
+        }
       } catch (_) {}
     }
     load()
@@ -81,9 +88,39 @@ export default function App() {
   const addLead = async (lead) => {
     try {
       const { data: d, error } = await supabase.from('leads').insert([lead]).select().single()
-      if (!error && d) { setLeads(prev => [d, ...prev]); return }
+      if (!error && d) {
+        setLeads(prev => [d, ...prev])
+        autoWinLead(d)
+        return
+      }
     } catch (_) {}
-    setLeads(prev => [{ ...lead, id: `l${Date.now()}` }, ...prev])
+    const local = { ...lead, id: `l${Date.now()}` }
+    setLeads(prev => [local, ...prev])
+    autoWinLead(local)
+  }
+
+  const autoWinLead = (lead) => {
+    if (lead.estado !== 'Ganado') return
+    const monto = parseFloat(lead.monto) || 0
+    const yaExiste = clientes.some(c => c.nombre === lead.empresa)
+    if (!yaExiste) {
+      const mes = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
+      addCliente({
+        nombre: lead.empresa, servicio: lead.servicio || '',
+        importe: monto, estado: 'En curso',
+        pagado: true, ajustes: 0, responsable: lead.responsable || '', since: mes,
+      })
+    }
+    if (monto > 0) {
+      addCobro({
+        cliente: lead.empresa,
+        concepto: lead.servicio || 'Servicio',
+        monto,
+        vence: '',
+        pagado: true,
+        vencida: false,
+      })
+    }
   }
 
   const updateLead = async (id, updates) => {
@@ -93,17 +130,9 @@ export default function App() {
     } catch (_) {}
     setLeads(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l))
 
-    // Lead ganado → crear cliente automáticamente si no existe
+    // Lead ganado → crear cliente + cobro pagado si hay monto
     if (updates.estado === 'Ganado' && lead) {
-      const yaExiste = clientes.some(c => c.nombre === lead.empresa)
-      if (!yaExiste) {
-        const mes = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
-        addCliente({
-          nombre: lead.empresa, servicio: lead.servicio || '',
-          importe: lead.monto || 0, estado: 'En curso',
-          pagado: false, ajustes: 0, responsable: lead.responsable || '', since: mes,
-        })
-      }
+      autoWinLead({ ...lead, ...updates })
     }
   }
 
@@ -212,6 +241,13 @@ export default function App() {
     setGastos(prev => [{ ...gasto, id: `g${Date.now()}` }, ...prev])
   }
 
+  const updateGasto = async (id, updates) => {
+    try {
+      await supabase.from('gastos').update(updates).eq('id', id)
+    } catch (_) {}
+    setGastos(prev => prev.map(g => g.id === id ? { ...g, ...updates } : g))
+  }
+
   const deleteGasto = async (id) => {
     try {
       const { error } = await supabase.from('gastos').delete().eq('id', id)
@@ -263,7 +299,7 @@ export default function App() {
     addCliente, updateCliente, deleteCliente,
     addTask, updateTask, deleteTask,
     addProyecto, updateProyecto, deleteProyecto,
-    addGasto, deleteGasto,
+    addGasto, updateGasto, deleteGasto,
     addCobro, updateCobro, deleteCobro,
   }
 
