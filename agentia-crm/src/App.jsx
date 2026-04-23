@@ -71,11 +71,11 @@ export default function App() {
           supabase.from('proyectos').select('*').order('created_at', { ascending: false }),
           supabase.from('gastos').select('*').order('created_at', { ascending: false }),
         ])
-        if (!l.error && l.data?.length)  setLeads(l.data)
-        if (!c.error && c.data?.length)  setClientes(c.data)
-        if (!t.error && t.data?.length)  setTasks(t.data)
-        if (!p.error && p.data?.length)  setProyectos(p.data)
-        if (!g.error && g.data?.length)  setGastos(g.data)
+        if (!l.error && l.data)  setLeads(l.data)
+        if (!c.error && c.data)  setClientes(c.data)
+        if (!t.error && t.data)  setTasks(t.data)
+        if (!p.error && p.data)  setProyectos(p.data)
+        if (!g.error && g.data)  setGastos(g.data)
       } catch (_) {}
     }
     load()
