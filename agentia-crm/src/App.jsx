@@ -90,10 +90,15 @@ export default function App() {
     load()
   }, [])
 
+  // Convierte strings vacíos a null para campos de tipo date en Supabase
+  const clean = (obj) => Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [k, v === '' ? null : v])
+  )
+
   // ── LEADS ──────────────────────────────────────────────────
   const addLead = async (lead) => {
     try {
-      const { data: d, error } = await supabase.from('leads').insert([lead]).select().single()
+      const { data: d, error } = await supabase.from('leads').insert([clean(lead)]).select().single()
       if (!error && d) {
         console.log('[Supabase] lead guardado OK:', d.id)
         setLeads(prev => [d, ...prev])
@@ -161,7 +166,7 @@ export default function App() {
   // ── CLIENTES ───────────────────────────────────────────────
   const addCliente = async (cliente) => {
     try {
-      const { data: d, error } = await supabase.from('clientes').insert([cliente]).select().single()
+      const { data: d, error } = await supabase.from('clientes').insert([clean(cliente)]).select().single()
       if (!error && d) { setClientes(prev => [d, ...prev]); return }
     } catch (_) {}
     setClientes(prev => [{ ...cliente, id: `c${Date.now()}` }, ...prev])
@@ -194,7 +199,7 @@ export default function App() {
   // ── TAREAS ─────────────────────────────────────────────────
   const addTask = async (tarea) => {
     try {
-      const { data: d, error } = await supabase.from('tareas').insert([tarea]).select().single()
+      const { data: d, error } = await supabase.from('tareas').insert([clean(tarea)]).select().single()
       if (!error && d) { setTasks(prev => [d, ...prev]); return }
     } catch (_) {}
     setTasks(prev => [{ ...tarea, id: `t${Date.now()}`, done: false }, ...prev])
@@ -219,7 +224,7 @@ export default function App() {
   // ── PROYECTOS ──────────────────────────────────────────────
   const addProyecto = async (proyecto) => {
     try {
-      const { data: d, error } = await supabase.from('proyectos').insert([proyecto]).select().single()
+      const { data: d, error } = await supabase.from('proyectos').insert([clean(proyecto)]).select().single()
       if (!error && d) { setProyectos(prev => [d, ...prev]); return }
     } catch (_) {}
     setProyectos(prev => [{ ...proyecto, id: `p${Date.now()}` }, ...prev])
@@ -244,7 +249,7 @@ export default function App() {
   // ── GASTOS ─────────────────────────────────────────────────
   const addGasto = async (gasto) => {
     try {
-      const { data: d, error } = await supabase.from('gastos').insert([gasto]).select().single()
+      const { data: d, error } = await supabase.from('gastos').insert([clean(gasto)]).select().single()
       if (!error && d) { setGastos(prev => [d, ...prev]); return }
     } catch (_) {}
     setGastos(prev => [{ ...gasto, id: `g${Date.now()}` }, ...prev])
@@ -268,7 +273,7 @@ export default function App() {
   // ── COBROS ─────────────────────────────────────────────────
   const addCobro = async (cobro) => {
     try {
-      const { data: d, error } = await supabase.from('cobros').insert([cobro]).select().single()
+      const { data: d, error } = await supabase.from('cobros').insert([clean(cobro)]).select().single()
       if (!error && d) {
         // Preserve our explicit pagado value — Supabase column may default to false
         setCobros(prev => [{ ...cobro, id: d.id, created_at: d.created_at }, ...prev])
