@@ -125,33 +125,38 @@ export default function App() {
       })
     }
     if (monto > 0) {
-      addCobro({
-        cliente: lead.empresa,
-        concepto: lead.servicio || 'Servicio',
-        monto,
-        vence: '',
-        pagado: true,
-        vencida: false,
-      })
+      addCobro({ cliente: lead.empresa, concepto: lead.servicio || 'Servicio', monto, vence: null, pagado: true, vencida: false })
     }
+  }
+
+  // Encuentra el cobro automático asociado a un lead ganado
+  const findCobroAuto = (lead) => {
+    const monto = parseFloat(lead.monto) || 0
+    return cobros.find(c => c.cliente === lead.empresa && c.monto === monto && c.pagado)
   }
 
   const updateLead = async (id, updates) => {
     const lead = leads.find(l => l.id === id)
     try {
-      await supabase.from('leads').update(updates).eq('id', id)
+      await supabase.from('leads').update(clean(updates)).eq('id', id)
     } catch (_) {}
     setLeads(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l))
 
-    // Lead ganado → crear cliente + cobro pagado
-    if (updates.estado === 'Ganado' && lead && lead.estado !== 'Ganado') {
+    const nuevoEstado = updates.estado
+    const eraGanado  = lead?.estado === 'Ganado'
+    const seraGanado = nuevoEstado === 'Ganado'
+
+    if (seraGanado && !eraGanado) {
+      // Pasa a Ganado → crear cobro y cliente
       autoWinLead({ ...lead, ...updates })
-    }
-    // Lead des-ganado → eliminar el cobro automático que se creó
-    if (lead && lead.estado === 'Ganado' && updates.estado && updates.estado !== 'Ganado') {
-      const monto = parseFloat(lead.monto) || 0
-      const cobroAuto = cobros.find(c => c.cliente === lead.empresa && c.monto === monto && c.pagado)
-      if (cobroAuto) deleteCobro(cobroAuto.id)
+    } else if (eraGanado && nuevoEstado && !seraGanado) {
+      // Deja de ser Ganado → eliminar cobro automático
+      const c = findCobroAuto(lead)
+      if (c) deleteCobro(c.id)
+    } else if (eraGanado && !nuevoEstado && updates.monto !== undefined) {
+      // Sigue Ganado pero cambia el importe → actualizar cobro
+      const c = findCobroAuto(lead)
+      if (c) updateCobro(c.id, { monto: parseFloat(updates.monto) || 0 })
     }
   }
 
@@ -162,7 +167,12 @@ export default function App() {
     } catch (_) {}
     setLeads(prev => prev.filter(l => l.id !== id))
 
-    // Cascade: borrar tareas y proyectos del lead solo si no hay cliente activo con ese nombre
+    if (lead?.estado === 'Ganado') {
+      // Eliminar cobro automático del lead ganado
+      const c = findCobroAuto(lead)
+      if (c) deleteCobro(c.id)
+    }
+    // Cascade: borrar tareas y proyectos solo si no hay cliente activo con ese nombre
     if (lead && !clientes.some(c => c.nombre === lead.empresa)) {
       tasks.filter(t => t.cliente === lead.empresa).forEach(t => deleteTask(t.id))
       proyectos.filter(p => p.cliente === lead.empresa).forEach(p => deleteProyecto(p.id))
@@ -180,7 +190,7 @@ export default function App() {
 
   const updateCliente = async (id, updates) => {
     try {
-      const { error } = await supabase.from('clientes').update(updates).eq('id', id)
+      const { error } = await supabase.from('clientes').update(clean(updates)).eq('id', id)
       if (!error) { setClientes(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c)); return }
     } catch (_) {}
     setClientes(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
@@ -213,7 +223,7 @@ export default function App() {
 
   const updateTask = async (id, updates) => {
     try {
-      const { error } = await supabase.from('tareas').update(updates).eq('id', id)
+      const { error } = await supabase.from('tareas').update(clean(updates)).eq('id', id)
       if (!error) { setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t)); return }
     } catch (_) {}
     setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t))
@@ -238,7 +248,7 @@ export default function App() {
 
   const updateProyecto = async (id, updates) => {
     try {
-      const { error } = await supabase.from('proyectos').update(updates).eq('id', id)
+      const { error } = await supabase.from('proyectos').update(clean(updates)).eq('id', id)
       if (!error) { setProyectos(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p)); return }
     } catch (_) {}
     setProyectos(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
@@ -263,7 +273,7 @@ export default function App() {
 
   const updateGasto = async (id, updates) => {
     try {
-      await supabase.from('gastos').update(updates).eq('id', id)
+      await supabase.from('gastos').update(clean(updates)).eq('id', id)
     } catch (_) {}
     setGastos(prev => prev.map(g => g.id === id ? { ...g, ...updates } : g))
   }
@@ -292,7 +302,7 @@ export default function App() {
 
   const updateCobro = async (id, updates) => {
     try {
-      const { error } = await supabase.from('cobros').update(updates).eq('id', id)
+      const { error } = await supabase.from('cobros').update(clean(updates)).eq('id', id)
       if (!error) { setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c)); return }
     } catch (_) {}
     setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
