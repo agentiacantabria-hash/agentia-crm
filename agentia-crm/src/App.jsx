@@ -58,6 +58,7 @@ export default function App() {
   useEffect(() => {
     async function load() {
       try {
+        console.log('[Supabase] Cargando datos...')
         const [l, c, t, p, g, co] = await Promise.all([
           supabase.from('leads').select('*').order('created_at', { ascending: false }),
           supabase.from('clientes').select('*').order('created_at', { ascending: false }),
@@ -66,6 +67,11 @@ export default function App() {
           supabase.from('gastos').select('*').order('created_at', { ascending: false }),
           supabase.from('cobros').select('*').order('created_at', { ascending: false }),
         ])
+        console.log('[Supabase] leads:', l.data?.length ?? 'ERROR', l.error?.message || '')
+        console.log('[Supabase] clientes:', c.data?.length ?? 'ERROR', c.error?.message || '')
+        console.log('[Supabase] cobros:', co.data?.length ?? 'ERROR', co.error?.message || '')
+        if (l.error) console.error('[Supabase] leads error:', l.error)
+        if (c.error) console.error('[Supabase] clientes error:', c.error)
         if (!l.error && l.data)  setLeads(l.data)
         if (!c.error && c.data)  setClientes(c.data)
         if (!t.error && t.data)  setTasks(t.data)
@@ -79,7 +85,7 @@ export default function App() {
             return { ...c, vencida: venceDate < today }
           }))
         }
-      } catch (_) {}
+      } catch (e) { console.error('[Supabase] excepción al cargar:', e) }
     }
     load()
   }, [])
@@ -89,11 +95,13 @@ export default function App() {
     try {
       const { data: d, error } = await supabase.from('leads').insert([lead]).select().single()
       if (!error && d) {
+        console.log('[Supabase] lead guardado OK:', d.id)
         setLeads(prev => [d, ...prev])
         autoWinLead(d)
         return
       }
-    } catch (_) {}
+      console.error('[Supabase] addLead error:', error?.message, error)
+    } catch (e) { console.error('[Supabase] addLead excepción:', e) }
     const local = { ...lead, id: `l${Date.now()}` }
     setLeads(prev => [local, ...prev])
     autoWinLead(local)
