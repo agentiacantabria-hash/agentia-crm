@@ -7,8 +7,8 @@ import { PIPELINE_COLS, STATE_COLORS, eur } from './data'
 
 function CobroModal({ cobro, onClose, onSave }) {
   const isNew = !cobro?.id
-  const [form, setForm] = useState(cobro || {
-    cliente:'', monto:0, vence:'', vencida:false, pagado:false,
+  const [form, setForm] = useState(cobro ? { ...cobro, monto: cobro.monto ?? '' } : {
+    cliente:'', monto:'', vence:'', vencida:false, pagado:false,
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 

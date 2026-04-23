@@ -214,9 +214,9 @@ function ClienteModal({ cliente, onClose, onSave, onDelete }) {
   const isNew = !cliente?.id
   const SERVICIOS = getServicios()
   const RESP = getResp()
-  const [form, setForm] = useState(cliente || {
+  const [form, setForm] = useState(cliente ? { ...cliente, importe: cliente.importe ?? '' } : {
     nombre:'', contacto:'', telefono:'', email:'',
-    servicio: SERVICIOS[0] || 'Web premium', importe:0, estado:'En curso',
+    servicio: SERVICIOS[0] || 'Web premium', importe:'', estado:'En curso',
     pagado:false, ajustes:0, responsable: RESP[0] || 'LP', since:'',
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -224,7 +224,7 @@ function ClienteModal({ cliente, onClose, onSave, onDelete }) {
 
   return (
     <Modal open title={isNew ? 'Nuevo cliente' : `Editar — ${form.nombre}`}
-      onClose={onClose} onSave={() => onSave(form)} saveLabel={isNew ? 'Crear cliente' : 'Guardar cambios'}>
+      onClose={onClose} onSave={() => onSave({ ...form, importe: parseFloat(form.importe) || 0, ajustes: parseInt(form.ajustes) || 0 })} saveLabel={isNew ? 'Crear cliente' : 'Guardar cambios'}>
       <F label="Nombre / empresa"><input value={form.nombre} onChange={e => set('nombre', e.target.value)} autoFocus /></F>
       <div className="form-2col">
         <F label="Contacto"><input value={form.contacto||''} onChange={e => set('contacto', e.target.value)} placeholder="Nombre del contacto" /></F>
@@ -244,7 +244,7 @@ function ClienteModal({ cliente, onClose, onSave, onDelete }) {
         </F>
       </div>
       <div className="form-2col">
-        <F label="Importe (€)"><input type="number" value={form.importe||0} onChange={e => set('importe', Number(e.target.value))} /></F>
+        <F label="Importe (€)"><input type="number" min="0" placeholder="0" value={form.importe ?? ''} onChange={e => set('importe', e.target.value)} /></F>
         <F label="Desde (ej: Abr 2026)"><input value={form.since||''} onChange={e => set('since', e.target.value)} /></F>
       </div>
       <div className="form-2col">
@@ -346,6 +346,9 @@ export function Clientes({ data }) {
 
 export function Pipeline({ data }) {
   const leads = data?.leads || []
+  const [movingId, setMovingId] = useState(null)
+  const [editing, setEditing]   = useState(null)
+
   const cols = PIPELINE_COLS.map(label => ({
     label,
     color: STATE_COLORS[label]?.color || '#6B7590',
@@ -354,16 +357,23 @@ export function Pipeline({ data }) {
 
   const moveCard = (leadId, newEstado) => {
     data.updateLead?.(leadId, { estado: newEstado })
+    setMovingId(null)
   }
 
   const totalAbierto = leads.filter(l => !['Ganado','Perdido'].includes(l.estado)).reduce((a,l)=>a+(l.monto||0),0)
+
+  const handleSave = (form) => {
+    if (form.id) data.updateLead?.(form.id, form)
+    else data.addLead?.(form)
+    setEditing(null)
+  }
 
   return (
     <div className="fade-in">
       <div className="page-head">
         <div>
           <h1 className="page-title">Pipeline</h1>
-          <p className="page-subtitle">Mueve las tarjetas entre columnas para actualizar el estado · €{eur(totalAbierto)} abiertos</p>
+          <p className="page-subtitle">Arrastra en desktop · toca la tarjeta para mover en móvil · €{eur(totalAbierto)} abiertos</p>
         </div>
         <div className="page-actions">
           <div className="segmented"><button className="active">Kanban</button></div>
@@ -385,6 +395,28 @@ export function Pipeline({ data }) {
         ))}
       </div>
 
+      {/* Modal para mover tarjeta en móvil */}
+      {movingId && (() => {
+        const lead = leads.find(l => l.id === movingId)
+        return (
+          <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:300,display:'flex',alignItems:'flex-end'}} onClick={() => setMovingId(null)}>
+            <div style={{width:'100%',background:'var(--surface-1)',borderRadius:'20px 20px 0 0',padding:'20px 16px 32px'}} onClick={e=>e.stopPropagation()}>
+              <div style={{fontSize:13,color:'var(--text-3)',marginBottom:14}}>Mover <b style={{color:'var(--text-0)'}}>{lead?.empresa}</b> a…</div>
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {PIPELINE_COLS.map(col => (
+                  <button key={col} className="btn" style={{justifyContent:'flex-start',gap:10,opacity:lead?.estado===col?0.4:1}}
+                    disabled={lead?.estado===col}
+                    onClick={() => moveCard(movingId, col)}>
+                    <div style={{width:8,height:8,borderRadius:'50%',background:STATE_COLORS[col]?.color||'#6B7590',flexShrink:0}}/>
+                    {col}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       <div className="kanban">
         {cols.map(col=>(
           <div className="kanban-col" key={col.label}
@@ -397,7 +429,8 @@ export function Pipeline({ data }) {
             </div>
             {col.items.map(l=>(
               <div className="kanban-card" key={l.id} draggable
-                onDragStart={e => e.dataTransfer.setData('leadId', l.id)}>
+                onDragStart={e => e.dataTransfer.setData('leadId', l.id)}
+                onClick={() => setEditing(l)}>
                 <div className="name">{l.empresa}</div>
                 <div className="sub">{l.servicio}</div>
                 <div className="meta">
@@ -405,11 +438,24 @@ export function Pipeline({ data }) {
                   <span>{l.ciudad}</span>
                   <span className="amount">€{eur(l.monto||0)}</span>
                 </div>
+                <button className="btn sm ghost" style={{marginTop:8,width:'100%',fontSize:11}}
+                  onClick={e => { e.stopPropagation(); setMovingId(l.id) }}>
+                  Mover →
+                </button>
               </div>
             ))}
           </div>
         ))}
       </div>
+
+      {editing && (
+        <LeadModal
+          lead={editing}
+          onClose={() => setEditing(null)}
+          onSave={handleSave}
+          onDelete={id => { data.deleteLead?.(id); setEditing(null) }}
+        />
+      )}
     </div>
   )
 }

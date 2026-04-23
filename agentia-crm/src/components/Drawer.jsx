@@ -13,9 +13,12 @@ function getServicios() {
 function getResp() {
   try {
     const u = JSON.parse(localStorage.getItem('agentia_usuarios') || '[]')
-    const activos = u.filter(x => x.estado === 'activo').map(x => ({ label: x.n || x.nombre, value: x.n || x.nombre }))
-    return activos.length ? activos : [{ label: 'Administrador', value: 'Administrador' }]
-  } catch { return [{ label: 'Administrador', value: 'Administrador' }] }
+    const activos = u.filter(x => x.estado === 'activo').map(x => {
+      const ini = x.ini || (x.n||'').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() || '?'
+      return { label: `${x.n || ini} (${ini})`, value: ini }
+    })
+    return activos.length ? activos : [{ label: 'Admin', value: 'AD' }]
+  } catch { return [{ label: 'Admin', value: 'AD' }] }
 }
 
 const ORIGENES = ['Instagram', 'LinkedIn', 'Referido', 'Formulario web', 'Otro']

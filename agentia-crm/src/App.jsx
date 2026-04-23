@@ -130,8 +130,8 @@ export default function App() {
     } catch (_) {}
     setLeads(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l))
 
-    // Lead ganado → crear cliente + cobro pagado si hay monto
-    if (updates.estado === 'Ganado' && lead) {
+    // Lead ganado → crear cliente + cobro pagado si hay monto (solo cuando cambia a Ganado, no en ediciones posteriores)
+    if (updates.estado === 'Ganado' && lead && lead.estado !== 'Ganado') {
       autoWinLead({ ...lead, ...updates })
     }
   }
@@ -289,9 +289,13 @@ export default function App() {
     proyectos: proyectos.filter(p => p.estado !== 'Cerrado').length,
   }
 
+  const _today = new Date(); _today.setHours(0,0,0,0)
   const notifCount =
-    tasks.filter(t => t.when_group === 'vencida' && !t.done).length +
-    cobros.filter(c => c.vencida && !c.pagado).length
+    tasks.filter(t => !t.done && (
+      t.when_group === 'vencida' ||
+      (t.due_date && new Date(t.due_date + 'T00:00:00') < _today)
+    )).length +
+    cobros.filter(c => !c.pagado && (c.vencida || (c.vence && new Date(c.vence) < _today))).length
 
   const data = {
     leads, clientes, tasks, proyectos, gastos, cobros,
