@@ -164,11 +164,14 @@ export function Finanzas({ role, data }) {
               <div style={{flex:1}}>
                 <div style={{fontSize:13}}>{r.cliente}</div>
                 <div className="small" style={{color: r.vencida ? 'var(--danger)' : 'var(--text-3)'}}>
-                  {r.vencida ? 'venció' : 'vence'} {r.vence}
+                  {r.vence ? (r.vencida ? 'venció ' : 'vence ') + r.vence : 'Sin fecha'}
                 </div>
               </div>
-              <div className="mono">€{eur(r.monto||0)}</div>
-              <button className="icon-btn" style={{width:22, height:22}} onClick={() => setEditingCobro(r)}><I.ChevronR size={12}/></button>
+              <div className="mono" style={{fontSize:13}}>€{eur(r.monto||0)}</div>
+              <button className="btn sm" style={{background:'var(--ok)', color:'#fff', border:'none', padding:'4px 10px', fontSize:11, whiteSpace:'nowrap'}}
+                onClick={() => data.updateCobro?.(r.id, { pagado: true, vencida: false })}>
+                ✓ Cobrado
+              </button>
             </div>
           ))}
         </div>

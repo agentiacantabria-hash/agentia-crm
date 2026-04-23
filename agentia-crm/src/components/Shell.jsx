@@ -12,12 +12,14 @@ function getSidebarUser(role) {
 export function Sidebar({ page, setPage, role, counts, isOpen, onClose }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuPos, setMenuPos] = useState({ bottom: 80, right: 16 })
-  const btnRef = useRef(null)
+  const btnRef  = useRef(null)
+  const menuRef = useRef(null)
   const user = getSidebarUser(role)
 
   useEffect(() => {
     function handleClose(e) {
-      if (btnRef.current && btnRef.current.contains(e.target)) return
+      if (btnRef.current  && btnRef.current.contains(e.target))  return
+      if (menuRef.current && menuRef.current.contains(e.target)) return
       setMenuOpen(false)
     }
     if (menuOpen) {
@@ -107,7 +109,7 @@ export function Sidebar({ page, setPage, role, counts, isOpen, onClose }) {
       </aside>
 
       {menuOpen && (
-        <div style={{
+        <div ref={menuRef} style={{
           position:'fixed',
           bottom: menuPos.bottom,
           left: menuPos.left,
@@ -117,11 +119,11 @@ export function Sidebar({ page, setPage, role, counts, isOpen, onClose }) {
           boxShadow:'0 8px 30px rgba(0,0,0,0.5)',
           zIndex:400,
         }}>
-          <div className="row-menu-item" onClick={() => handleNav('ajustes')}
+          <div className="row-menu-item" onPointerDown={() => handleNav('ajustes')}
             style={{display:'flex', alignItems:'center', gap:10, padding:'10px 16px', cursor:'pointer', fontSize:13, color:'var(--text-1)'}}>
             <I.Settings size={14}/> Ajustes
           </div>
-          <div className="row-menu-item" onClick={() => handleNav('ajustes')}
+          <div className="row-menu-item" onPointerDown={() => handleNav('ajustes')}
             style={{display:'flex', alignItems:'center', gap:10, padding:'10px 16px', cursor:'pointer', fontSize:13, color:'var(--text-1)'}}>
             <I.Users size={14}/> Editar perfil
           </div>
