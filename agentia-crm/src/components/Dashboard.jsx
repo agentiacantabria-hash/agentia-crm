@@ -2,6 +2,19 @@ import React from 'react'
 import { I } from './Icons'
 import { STATE_COLORS, PIPELINE_COLS, eur } from './data'
 
+function effectiveGroup(task) {
+  if (task.due_date) {
+    const today = new Date(); today.setHours(0,0,0,0)
+    const due = new Date(task.due_date); due.setHours(0,0,0,0)
+    const diff = Math.floor((due - today) / 86400000)
+    if (diff < 0) return 'vencida'
+    if (diff === 0) return 'hoy'
+    if (diff === 1) return 'mañana'
+    return 'semana'
+  }
+  return task.when_group || 'semana'
+}
+
 function getAdminName() {
   try {
     const users = JSON.parse(localStorage.getItem('agentia_usuarios') || '[]')
@@ -131,7 +144,7 @@ function PipelineFunnel({ leads }) {
 }
 
 export default function Dashboard({ role, setPage, openQuick, data }) {
-  const { leads = [], tasks = [], proyectos = [], clientes = [], gastos = [], cobros = [] } = data || {}
+  const { leads = [], tasks = [], proyectos = [], clientes = [], gastos = [], cobros = [], updateTask } = data || {}
 
   // ── computed ────────────────────────────────────────────────
   const ingresosMes   = cobros.filter(c => c.pagado).reduce((a,c) => a + (c.monto||0), 0)
@@ -324,9 +337,12 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
             <div className="right"><button className="btn sm ghost" onClick={() => setPage('tareas')}>Ver todas <I.ChevronR size={12}/></button></div>
           </div>
           <div>
-            {tasks.filter(t => t.when_group === 'hoy').slice(0,4).map(t => (
+            {tasks.filter(t => effectiveGroup(t) === 'hoy' || effectiveGroup(t) === 'vencida').slice(0,5).map(t => (
               <div className="task" key={t.id}>
-                <div className={`check ${t.done ? 'done' : ''}`}>{t.done && <I.Check size={12} stroke={2.4}/>}</div>
+                <div className={`check ${t.done ? 'done' : ''}`} style={{cursor:'pointer'}}
+                  onClick={() => updateTask?.(t.id, { done: !t.done })}>
+                  {t.done && <I.Check size={12} stroke={2.4}/>}
+                </div>
                 <div style={{minWidth:0, flex:1}}>
                   <div className="title" style={{textDecoration: t.done?'line-through':'none', color: t.done?'var(--text-3)':'var(--text-0)'}}>{t.title}</div>
                   <div className="sub">{t.cliente} · {t.time}</div>
@@ -334,7 +350,7 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
                 <span className={`chip ${t.prio==='alta'?'red':t.prio==='media'?'amber':'gray'}`}><span className="dot"/>{t.prio}</span>
               </div>
             ))}
-            {tasks.filter(t => t.when_group === 'hoy').length === 0 && (
+            {tasks.filter(t => !t.done && ['hoy','vencida'].includes(effectiveGroup(t))).length === 0 && (
               <div className="small" style={{color:'var(--text-4)', textAlign:'center', padding:'24px 0'}}>Sin tareas para hoy</div>
             )}
           </div>

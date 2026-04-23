@@ -25,10 +25,11 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
   const isNew = !lead?.id
   const SERVICIOS = getServicios()
   const RESP = getResp()
-  const [form, setForm] = useState(lead ? { ...lead, monto: lead.monto ?? '' } : {
+  const [form, setForm] = useState(lead ? { ...lead, monto: lead.monto ?? '', yaCobrado: true, crearProyecto: false } : {
     empresa:'', sector:'', ciudad:'', contacto:'', telefono:'', email:'',
     responsable: RESP[0] || 'LP', servicio: SERVICIOS[0] || 'Web premium',
     estado:'Nuevo', next:'', monto:'', origen:'Instagram', origenCustom:'', notas:'',
+    yaCobrado: true, crearProyecto: false,
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const [confirmDel, setConfirmDel] = useState(false)
@@ -83,6 +84,24 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
         <F label="Próximo paso"><input value={form.next||''} onChange={e => set('next', e.target.value)} placeholder="Llamar el lunes…" /></F>
       </div>
       <F label="Notas"><textarea value={form.notas||''} onChange={e => set('notas', e.target.value)} placeholder="Detalles adicionales…" /></F>
+
+      {form.estado === 'Ganado' && parseFloat(form.monto) > 0 && (
+        <div className="form-2col" style={{padding:'12px 14px', background:'rgba(62,207,142,0.06)', border:'1px solid rgba(62,207,142,0.2)', borderRadius:10}}>
+          <F label="¿Ya han pagado?">
+            <select value={form.yaCobrado !== false ? 'si' : 'no'} onChange={e => set('yaCobrado', e.target.value === 'si')}>
+              <option value="si">Sí — marcar como cobrado</option>
+              <option value="no">No — pendiente de pago</option>
+            </select>
+          </F>
+          <F label="¿Crear proyecto?">
+            <select value={form.crearProyecto ? 'si' : 'no'} onChange={e => set('crearProyecto', e.target.value === 'si')}>
+              <option value="no">No por ahora</option>
+              <option value="si">Sí — crear proyecto</option>
+            </select>
+          </F>
+        </div>
+      )}
+
       {!isNew && (
         <div className="modal-danger-zone">
           <span>Zona peligrosa</span>

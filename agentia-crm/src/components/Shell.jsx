@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { I } from './Icons'
 
 function getSidebarUser(role) {
@@ -133,7 +133,81 @@ export function Sidebar({ page, setPage, role, counts, isOpen, onClose }) {
   )
 }
 
-export function Topbar({ crumb, setDrawerOpen, role, setRole, onMenuClick, notifCount = 0 }) {
+export function SearchModal({ open, onClose, data, setPage }) {
+  const [q, setQ] = useState('')
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    if (open) { setQ(''); setTimeout(() => inputRef.current?.focus(), 50) }
+  }, [open])
+
+  useEffect(() => {
+    const handler = (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); open ? onClose() : null } }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [open, onClose])
+
+  if (!open) return null
+
+  const { leads = [], clientes = [], tasks = [] } = data || {}
+  const ql = q.toLowerCase().trim()
+
+  const results = ql.length < 1 ? [] : [
+    ...leads.filter(l => l.empresa?.toLowerCase().includes(ql) || l.servicio?.toLowerCase().includes(ql))
+      .slice(0,4).map(l => ({ type:'Lead', label: l.empresa, sub: l.estado, page:'leads', color:'var(--brand-2)' })),
+    ...clientes.filter(c => c.nombre?.toLowerCase().includes(ql) || c.servicio?.toLowerCase().includes(ql))
+      .slice(0,4).map(c => ({ type:'Cliente', label: c.nombre, sub: c.servicio, page:'clientes', color:'var(--ok)' })),
+    ...tasks.filter(t => t.title?.toLowerCase().includes(ql) || t.cliente?.toLowerCase().includes(ql))
+      .slice(0,4).map(t => ({ type:'Tarea', label: t.title, sub: t.cliente, page:'tareas', color:'var(--violet)' })),
+  ]
+
+  return (
+    <>
+      <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:900,backdropFilter:'blur(4px)'}} onClick={onClose}/>
+      <div style={{position:'fixed',top:'18%',left:'50%',transform:'translateX(-50%)',width:'min(560px,92vw)',background:'var(--surface-1)',border:'1px solid var(--line-2)',borderRadius:16,boxShadow:'0 24px 60px rgba(0,0,0,0.7)',zIndex:901,overflow:'hidden'}}>
+        <div style={{display:'flex',alignItems:'center',gap:12,padding:'14px 18px',borderBottom:'1px solid var(--line-1)'}}>
+          <I.Search size={16} style={{color:'var(--text-3)',flexShrink:0}}/>
+          <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)}
+            placeholder="Buscar leads, clientes, tareas…"
+            style={{flex:1,background:'none',border:'none',outline:'none',fontSize:15,color:'var(--text-0)'}}
+            onKeyDown={e => { if (e.key === 'Escape') onClose() }}
+          />
+          <kbd style={{fontSize:11,color:'var(--text-4)',border:'1px solid var(--line-2)',borderRadius:5,padding:'2px 6px'}}>Esc</kbd>
+        </div>
+        <div style={{maxHeight:360,overflowY:'auto'}}>
+          {results.length === 0 && ql.length > 0 && (
+            <div style={{padding:'32px 0',textAlign:'center',color:'var(--text-4)',fontSize:13}}>Sin resultados para "{q}"</div>
+          )}
+          {results.length === 0 && ql.length === 0 && (
+            <div style={{padding:'32px 0',textAlign:'center',color:'var(--text-4)',fontSize:13}}>Escribe para buscar en leads, clientes y tareas</div>
+          )}
+          {results.map((r,i) => (
+            <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 18px',cursor:'pointer',borderBottom:'1px solid var(--line-1)'}}
+              onPointerDown={() => { setPage(r.page); onClose() }}
+              onMouseEnter={e => e.currentTarget.style.background='var(--surface-2)'}
+              onMouseLeave={e => e.currentTarget.style.background=''}
+            >
+              <span style={{fontSize:11,fontWeight:600,color:r.color,background:`${r.color}18`,padding:'2px 8px',borderRadius:20,whiteSpace:'nowrap'}}>{r.type}</span>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13.5,color:'var(--text-0)',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.label}</div>
+                {r.sub && <div style={{fontSize:12,color:'var(--text-3)',marginTop:1}}>{r.sub}</div>}
+              </div>
+              <I.ChevronR size={13} style={{color:'var(--text-4)',flexShrink:0}}/>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
+export function Topbar({ crumb, setDrawerOpen, role, setRole, onMenuClick, notifCount = 0, onSearchOpen }) {
+  useEffect(() => {
+    const handler = (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); onSearchOpen?.() } }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onSearchOpen])
+
   return (
     <header className="topbar">
       <button className="hamburger" onClick={onMenuClick} aria-label="Abrir menú">
@@ -148,7 +222,7 @@ export function Topbar({ crumb, setDrawerOpen, role, setRole, onMenuClick, notif
         </span>
       ))}</div>
 
-      <div className="topbar-search">
+      <div className="topbar-search" style={{cursor:'pointer'}} onClick={onSearchOpen}>
         <I.Search size={14} />
         <span>Buscar clientes, leads, tareas…</span>
         <kbd>⌘K</kbd>

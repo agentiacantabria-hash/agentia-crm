@@ -45,7 +45,7 @@ function weekIso() {
 
 // ── Tareas ───────────────────────────────────────────────────────
 
-function TareaModal({ tarea, onClose, onSave, onDelete }) {
+function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [] }) {
   const isNew = !tarea?.id
   const users = getUsers()
   const respOptions = users.filter(u => u.estado === 'activo').map(u => u.ini || (u.n||'').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() || '?')
@@ -70,7 +70,13 @@ function TareaModal({ tarea, onClose, onSave, onDelete }) {
       </F>
       <div className="form-2col">
         <F label="Cliente / empresa">
-          <input value={form.cliente||''} onChange={e => set('cliente', e.target.value)} placeholder="Ej: Clínica Marbella" />
+          {clientes.length > 0
+            ? <select value={form.cliente||''} onChange={e => set('cliente', e.target.value)}>
+                <option value="">— Sin cliente —</option>
+                {clientes.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+              </select>
+            : <input value={form.cliente||''} onChange={e => set('cliente', e.target.value)} placeholder="Ej: Clínica Marbella" />
+          }
         </F>
         <F label="Hora">
           <input value={form.time||''} onChange={e => set('time', e.target.value)} placeholder="14:00" />
@@ -114,7 +120,7 @@ function TareaModal({ tarea, onClose, onSave, onDelete }) {
 }
 
 export function Tareas({ data }) {
-  const { tasks = [], updateTask, addTask, deleteTask } = data || {}
+  const { tasks = [], clientes = [], updateTask, addTask, deleteTask } = data || {}
   const [creating, setCreating] = useState(false)
   const [editing, setEditing]   = useState(null)
 
@@ -224,6 +230,7 @@ export function Tareas({ data }) {
           onClose={() => { setCreating(false); setEditing(null) }}
           onSave={handleSave}
           onDelete={deleteTask}
+          clientes={clientes}
         />
       )}
     </div>

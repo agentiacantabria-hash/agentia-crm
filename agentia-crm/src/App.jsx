@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Sidebar, Topbar } from './components/Shell'
+import { Sidebar, Topbar, SearchModal } from './components/Shell'
 import { QuickLeadDrawer } from './components/Drawer'
 import Dashboard from './components/Dashboard'
 import { Leads, Clientes, Pipeline } from './components/LeadsClientesPipeline'
@@ -34,6 +34,7 @@ export default function App() {
   const [role, setRole]   = useState(() => localStorage.getItem('agentia_role') || 'admin')
   const [drawer, setDrawer] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [hue, setHue]     = useState(225)
 
   const [leads,     setLeads]     = useState([])
@@ -58,7 +59,6 @@ export default function App() {
   useEffect(() => {
     async function load() {
       try {
-        console.log('[Supabase] Cargando datos...')
         const [l, c, t, p, g, co] = await Promise.all([
           supabase.from('leads').select('*').order('created_at', { ascending: false }),
           supabase.from('clientes').select('*').order('created_at', { ascending: false }),
@@ -67,11 +67,6 @@ export default function App() {
           supabase.from('gastos').select('*').order('created_at', { ascending: false }),
           supabase.from('cobros').select('*').order('created_at', { ascending: false }),
         ])
-        console.log('[Supabase] leads:', l.data?.length ?? 'ERROR', l.error?.message || '')
-        console.log('[Supabase] clientes:', c.data?.length ?? 'ERROR', c.error?.message || '')
-        console.log('[Supabase] cobros:', co.data?.length ?? 'ERROR', co.error?.message || '')
-        if (l.error) console.error('[Supabase] leads error:', l.error)
-        if (c.error) console.error('[Supabase] clientes error:', c.error)
         if (!l.error && l.data)  setLeads(l.data)
         if (!c.error && c.data)  setClientes(c.data)
         if (!t.error && t.data)  setTasks(t.data)
@@ -97,35 +92,38 @@ export default function App() {
 
   // ── LEADS ──────────────────────────────────────────────────
   const addLead = async (lead) => {
+    const { yaCobrado, crearProyecto, origenCustom, ...leadData } = lead
     try {
-      const { data: d, error } = await supabase.from('leads').insert([clean(lead)]).select().single()
+      const { data: d, error } = await supabase.from('leads').insert([clean(leadData)]).select().single()
       if (!error && d) {
-        console.log('[Supabase] lead guardado OK:', d.id)
         setLeads(prev => [d, ...prev])
-        autoWinLead(d)
+        autoWinLead({ ...d, yaCobrado, crearProyecto })
         return
       }
-      console.error('[Supabase] addLead error:', error?.message, error)
-    } catch (e) { console.error('[Supabase] addLead excepción:', e) }
-    const local = { ...lead, id: `l${Date.now()}` }
+    } catch (_) {}
+    const local = { ...leadData, id: `l${Date.now()}` }
     setLeads(prev => [local, ...prev])
-    autoWinLead(local)
+    autoWinLead({ ...local, yaCobrado, crearProyecto })
   }
 
   const autoWinLead = (lead) => {
     if (lead.estado !== 'Ganado') return
     const monto = parseFloat(lead.monto) || 0
+    const yaCobrado = lead.yaCobrado !== false
     const yaExiste = clientes.some(c => c.nombre === lead.empresa)
     if (!yaExiste) {
       const mes = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
       addCliente({
         nombre: lead.empresa, servicio: lead.servicio || '',
         importe: monto, estado: 'En curso',
-        pagado: true, ajustes: 0, responsable: lead.responsable || '', since: mes,
+        ajustes: 0, responsable: lead.responsable || '', since: mes,
       })
     }
     if (monto > 0) {
-      addCobro({ cliente: lead.empresa, concepto: lead.servicio || 'Servicio', monto, vence: null, pagado: true, vencida: false })
+      addCobro({ cliente: lead.empresa, concepto: lead.servicio || 'Servicio', monto, vence: null, pagado: yaCobrado, vencida: false })
+    }
+    if (lead.crearProyecto) {
+      addProyecto({ nombre: lead.empresa, cliente: lead.empresa, estado: 'En curso', responsable: lead.responsable || '' })
     }
   }
 
@@ -137,18 +135,19 @@ export default function App() {
 
   const updateLead = async (id, updates) => {
     const lead = leads.find(l => l.id === id)
+    const { yaCobrado, crearProyecto, origenCustom, ...safeUpdates } = updates
     try {
-      await supabase.from('leads').update(clean(updates)).eq('id', id)
+      await supabase.from('leads').update(clean(safeUpdates)).eq('id', id)
     } catch (_) {}
-    setLeads(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l))
+    setLeads(prev => prev.map(l => l.id === id ? { ...l, ...safeUpdates } : l))
 
-    const nuevoEstado = updates.estado
+    const nuevoEstado = safeUpdates.estado
     const eraGanado  = lead?.estado === 'Ganado'
     const seraGanado = nuevoEstado === 'Ganado'
 
     if (seraGanado && !eraGanado) {
       // Pasa a Ganado → crear cobro y cliente
-      autoWinLead({ ...lead, ...updates })
+      autoWinLead({ ...lead, ...safeUpdates, yaCobrado, crearProyecto })
     } else if (eraGanado && nuevoEstado && !seraGanado) {
       // Deja de ser Ganado → eliminar cobro automático
       const c = findCobroAuto(lead)
@@ -295,8 +294,7 @@ export default function App() {
         setCobros(prev => [{ ...cobro, id: d.id, created_at: d.created_at }, ...prev])
         return
       }
-      if (error) console.error('[Supabase] addCobro error:', error.message, '— guardando solo en local')
-    } catch (e) { console.error('[Supabase] addCobro exception:', e) }
+    } catch (_) {}
     setCobros(prev => [{ ...cobro, id: `cb${Date.now()}` }, ...prev])
   }
 
@@ -361,12 +359,13 @@ export default function App() {
       <div className="app" data-screen-label={PAGES.find(p => p[0] === page)?.[1]}>
         <Sidebar page={page} setPage={setPage} role={role} counts={counts} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <div className="content">
-          <Topbar crumb={crumbMap[page]} setDrawerOpen={setDrawer} role={role} setRole={setRole} onMenuClick={() => setSidebarOpen(o => !o)} notifCount={notifCount} />
+          <Topbar crumb={crumbMap[page]} setDrawerOpen={setDrawer} role={role} setRole={setRole} onMenuClick={() => setSidebarOpen(o => !o)} notifCount={notifCount} onSearchOpen={() => setSearchOpen(true)} />
           <main className="main">{pageEl}</main>
         </div>
       </div>
 
       <QuickLeadDrawer open={drawer} onClose={() => setDrawer(false)} onSave={addLead} />
+      <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} data={data} setPage={setPage} />
     </>
   )
 }

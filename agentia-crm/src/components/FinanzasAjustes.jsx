@@ -218,7 +218,13 @@ export function Finanzas({ role, data }) {
                           : <span className="chip amber"><span className="dot"/>Pendiente</span>
                       }
                     </td>
-                    <td style={{textAlign:'right'}}>
+                    <td style={{textAlign:'right', display:'flex', alignItems:'center', gap:6, justifyContent:'flex-end'}}>
+                      {!c.pagado && (
+                        <button className="btn sm" style={{padding:'3px 10px', fontSize:12}}
+                          onClick={e => { e.stopPropagation(); data.updateCobro?.(c.id, { pagado: true, vencida: false }) }}>
+                          ✓ Cobrado
+                        </button>
+                      )}
                       <button className="icon-btn" style={{width:24, height:24, color:'var(--text-4)'}}
                         onClick={e => { e.stopPropagation(); if (confirm(`¿Eliminar factura de ${c.cliente}?`)) data.deleteCobro?.(c.id) }}>
                         <I.Close size={11}/>
