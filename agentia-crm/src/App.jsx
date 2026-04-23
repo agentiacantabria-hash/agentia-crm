@@ -178,7 +178,8 @@ export default function App() {
     if (cliente) {
       tasks.filter(t => t.cliente === cliente.nombre).forEach(t => deleteTask(t.id))
       proyectos.filter(p => p.cliente === cliente.nombre).forEach(p => deleteProyecto(p.id))
-      cobros.filter(c => c.cliente === cliente.nombre).forEach(c => deleteCobro(c.id))
+      // Solo borrar cobros NO pagados — los pagados son historial financiero
+      cobros.filter(c => c.cliente === cliente.nombre && !c.pagado).forEach(c => deleteCobro(c.id))
     }
   }
 
@@ -261,7 +262,8 @@ export default function App() {
     try {
       const { data: d, error } = await supabase.from('cobros').insert([cobro]).select().single()
       if (!error && d) { setCobros(prev => [d, ...prev]); return }
-    } catch (_) {}
+      if (error) console.error('[Supabase] addCobro error:', error.message, '— guardando solo en local')
+    } catch (e) { console.error('[Supabase] addCobro exception:', e) }
     setCobros(prev => [{ ...cobro, id: `cb${Date.now()}` }, ...prev])
   }
 
