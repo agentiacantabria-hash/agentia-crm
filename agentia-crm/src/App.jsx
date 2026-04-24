@@ -110,14 +110,17 @@ export default function App() {
     if (lead.estado !== 'Cobrado') return
     const monto = parseFloat(lead.monto) || 0
     const yaCobrado = lead.yaCobrado !== false
-    const yaExiste = clientes.some(c => c.nombre === lead.empresa)
-    if (!yaExiste) {
-      const mes = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
-      addCliente({
-        nombre: lead.empresa, servicio: lead.servicio || '',
-        importe: monto, estado: yaCobrado ? 'Pagado · ajustes' : 'En curso',
-        ajustes: 0, responsable: lead.responsable || '', since: mes,
-      })
+    // Solo crear cliente si ya han pagado — si no, queda en Finanzas como cobro pendiente
+    if (yaCobrado) {
+      const yaExiste = clientes.some(c => c.nombre === lead.empresa)
+      if (!yaExiste) {
+        const mes = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
+        addCliente({
+          nombre: lead.empresa, servicio: lead.servicio || '',
+          importe: monto, estado: 'Pagado · ajustes',
+          ajustes: 0, responsable: lead.responsable || '', since: mes,
+        })
+      }
     }
     if (monto > 0) {
       addCobro({ cliente: lead.empresa, concepto: lead.servicio || 'Servicio', monto, vence: null, pagado: yaCobrado, vencida: false })
@@ -127,10 +130,21 @@ export default function App() {
     }
   }
 
-  // Encuentra el cobro automático asociado a un lead ganado
+  const crearClienteDesdeCobro = (cobro) => {
+    const yaExiste = clientes.some(c => c.nombre === cobro.cliente)
+    if (yaExiste) return
+    const mes = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
+    addCliente({
+      nombre: cobro.cliente, servicio: cobro.concepto || '',
+      importe: cobro.monto, estado: 'Pagado · ajustes',
+      ajustes: 0, responsable: '', since: mes,
+    })
+  }
+
+  // Encuentra el cobro automático asociado a un lead (pagado o pendiente)
   const findCobroAuto = (lead) => {
     const monto = parseFloat(lead.monto) || 0
-    return cobros.find(c => c.cliente === lead.empresa && c.monto === monto && c.pagado)
+    return cobros.find(c => c.cliente === lead.empresa && c.monto === monto)
   }
 
   const updateLead = async (id, updates) => {
@@ -299,11 +313,17 @@ export default function App() {
   }
 
   const updateCobro = async (id, updates) => {
+    const cobro = cobros.find(c => c.id === id)
     try {
       const { error } = await supabase.from('cobros').update(clean(updates)).eq('id', id)
-      if (!error) { setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c)); return }
-    } catch (_) {}
-    setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
+      if (!error) { setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c)); }
+    } catch (_) {
+      setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
+    }
+    // Si acaba de marcarse como pagado, crear cliente automáticamente
+    if (updates.pagado === true && cobro && !cobro.pagado && cobro.cliente) {
+      crearClienteDesdeCobro(cobro)
+    }
   }
 
   const deleteCobro = async (id) => {
