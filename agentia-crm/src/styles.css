@@ -271,10 +271,13 @@ input, textarea, select { font-family: inherit; }
   border: 1px solid var(--line-1);
   padding: 7px 12px;
   border-radius: 9px;
-  width: 320px;
+  width: 260px;
+  flex-shrink: 1;
+  min-width: 140px;
   color: var(--text-2);
   font-size: 13px;
   transition: border-color 0.15s;
+  overflow: hidden;
 }
 .topbar-search:hover { border-color: var(--line-2); }
 .topbar-search kbd {
@@ -292,9 +295,15 @@ input, textarea, select { font-family: inherit; }
 .topbar > .segmented { display: none; }
 .topbar > .icon-btn  { display: none; }
 @media (min-width: 769px) {
-  .topbar > .segmented { display: flex; }
-  .topbar > .icon-btn  { display: inline-flex; }
+  .topbar > .segmented { display: flex; flex-shrink: 0; }
+  .topbar > .icon-btn  { display: inline-flex; flex-shrink: 0; }
 }
+/* Ocultar role switcher en pantallas medianas para evitar overflow */
+@media (min-width: 769px) and (max-width: 1100px) {
+  .topbar > .segmented { display: none; }
+}
+/* Btn nuevo lead no se encoge */
+.topbar > .btn { flex-shrink: 0; }
 
 .icon-btn {
   width: 34px; height: 34px;
@@ -712,8 +721,8 @@ input, textarea, select { font-family: inherit; }
 /* Kanban */
 .kanban {
   display: grid;
-  grid-template-columns: repeat(7, minmax(240px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(7, minmax(200px, 1fr));
+  gap: 10px;
   overflow-x: auto;
   padding-bottom: 8px;
 }

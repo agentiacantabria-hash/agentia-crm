@@ -660,72 +660,14 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened }) {
           })()}
 
           <div className="kanban" ref={kanbanRef}>
-            {activeCols.map(col=>(
-              <div className="kanban-col" key={col.label} data-col={col.label}
-                style={touchDrag?.targetCol === col.label ? { outline: `2px solid ${col.color}`, borderRadius: 10 } : undefined}
-                onDragOver={e => e.preventDefault()}
-                onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('leadId'); if (id) moveCard(id, col.label) }}>
-                <div className="kanban-col-head">
-                  <div className="bar" style={{'--col-color': col.color}}/>
-                  <span className="title">{col.label}</span>
-                  <span className="count">{col.items.length}</span>
-                  {col.items.length > 0 && (
-                    <span style={{fontSize:10, color:'var(--text-4)', fontFamily:'var(--font-mono)', marginLeft:4}}>
-                      €{eur(col.items.reduce((a,l) => a + (l.monto||0), 0))}
-                    </span>
-                  )}
-                </div>
-                {col.items.map(l=>{
-                  const isSeñal      = l.estado === STAGE.SEÑAL
-                  const señalCobrada = parseFloat(l.señal_cobrada) || 0
-                  const total        = parseFloat(l.monto) || 0
-                  const pct          = total > 0 ? Math.round(señalCobrada / total * 100) : 0
-                  const diasDesde    = l.señal_fecha
-                    ? Math.floor((Date.now() - new Date(l.señal_fecha)) / 86400000)
-                    : 0
-                  return (
-                    <div className="kanban-card" key={l.id} draggable
-                      onDragStart={e => e.dataTransfer.setData('leadId', l.id)}
-                      onTouchStart={e => handleCardTouchStart(e, l)}
-                      onClick={() => setEditing(l)}>
-                      <div className="name">{l.empresa}</div>
-                      <div className="sub">{l.servicio}</div>
-                      {isSeñal && (
-                        <div style={{marginTop:8}}>
-                          <div style={{display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:4}}>
-                            <span style={{color:'#2EC4B6'}}>Señal €{eur(señalCobrada)}</span>
-                            <span style={{color:'var(--text-3)'}}>Resto €{eur(total-señalCobrada)}</span>
-                          </div>
-                          <div style={{height:4, background:'rgba(255,255,255,0.06)', borderRadius:2}}>
-                            <div style={{width:`${pct}%`, height:'100%', background:'#2EC4B6', borderRadius:2}}/>
-                          </div>
-                          <div style={{fontSize:10.5, color:'var(--text-4)', marginTop:4, display:'flex', alignItems:'center', gap:6}}>
-                            {diasDesde > 0 ? `Hace ${diasDesde}d` : 'Hoy'}
-                            {diasDesde > 30 && <span style={{color:'#FF5A6A', fontWeight:600}}>⚠ +30d</span>}
-                          </div>
-                        </div>
-                      )}
-                      <div className="meta">
-                        <div className="avatar xs">{l.responsable}</div>
-                        <span>{l.ciudad}</span>
-                        <span className="amount">€{eur(l.monto||0)}</span>
-                      </div>
-                      <button className="btn sm ghost" style={{marginTop:8,width:'100%',fontSize:11}}
-                        onClick={e => { e.stopPropagation(); setMovingId(l.id) }}>
-                        Mover →
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            ))}
-          </div>
-
-          <div style={{marginTop:20, borderTop:'1px dashed var(--line-1)', paddingTop:14}}>
-            <div style={{fontSize:11, color:'var(--text-4)', fontWeight:600, letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:10}}>Cerrados</div>
-            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px, 1fr))', gap:12}}>
-              {closedCols.map(col=>(
+            {[...activeCols, ...closedCols].map(col=>{
+              const isClosed = STAGES_CLOSED.includes(col.label)
+              return (
                 <div className="kanban-col" key={col.label} data-col={col.label}
+                  style={{
+                    ...(touchDrag?.targetCol === col.label ? { outline: `2px solid ${col.color}`, borderRadius: 10 } : {}),
+                    ...(isClosed ? { opacity: 0.75, background: 'linear-gradient(180deg, #080C16 0%, #06091200 100%)' } : {}),
+                  }}
                   onDragOver={e => e.preventDefault()}
                   onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('leadId'); if (id) moveCard(id, col.label) }}>
                   <div className="kanban-col-head">
@@ -738,22 +680,53 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened }) {
                       </span>
                     )}
                   </div>
-                  {col.items.map(l=>(
-                    <div className="kanban-card" key={l.id} style={{opacity:0.7}} draggable
-                      onDragStart={e => e.dataTransfer.setData('leadId', l.id)}
-                      onClick={() => setEditing(l)}>
-                      <div className="name">{l.empresa}</div>
-                      <div className="sub">{l.servicio}</div>
-                      <div className="meta">
-                        <div className="avatar xs">{l.responsable}</div>
-                        <span>{l.ciudad}</span>
-                        <span className="amount">€{eur(l.monto||0)}</span>
+                  {col.items.map(l=>{
+                    const isSeñal      = l.estado === STAGE.SEÑAL
+                    const señalCobrada = parseFloat(l.señal_cobrada) || 0
+                    const total        = parseFloat(l.monto) || 0
+                    const pct          = total > 0 ? Math.round(señalCobrada / total * 100) : 0
+                    const diasDesde    = l.señal_fecha
+                      ? Math.floor((Date.now() - new Date(l.señal_fecha)) / 86400000)
+                      : 0
+                    return (
+                      <div className="kanban-card" key={l.id} draggable
+                        onDragStart={e => e.dataTransfer.setData('leadId', l.id)}
+                        onTouchStart={e => handleCardTouchStart(e, l)}
+                        onClick={() => setEditing(l)}>
+                        <div className="name">{l.empresa}</div>
+                        <div className="sub">{l.servicio}</div>
+                        {isSeñal && (
+                          <div style={{marginTop:8}}>
+                            <div style={{display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:4}}>
+                              <span style={{color:'#2EC4B6'}}>Señal €{eur(señalCobrada)}</span>
+                              <span style={{color:'var(--text-3)'}}>Resto €{eur(total-señalCobrada)}</span>
+                            </div>
+                            <div style={{height:4, background:'rgba(255,255,255,0.06)', borderRadius:2}}>
+                              <div style={{width:`${pct}%`, height:'100%', background:'#2EC4B6', borderRadius:2}}/>
+                            </div>
+                            <div style={{fontSize:10.5, color:'var(--text-4)', marginTop:4, display:'flex', alignItems:'center', gap:6}}>
+                              {diasDesde > 0 ? `Hace ${diasDesde}d` : 'Hoy'}
+                              {diasDesde > 30 && <span style={{color:'#FF5A6A', fontWeight:600}}>⚠ +30d</span>}
+                            </div>
+                          </div>
+                        )}
+                        <div className="meta">
+                          <div className="avatar xs">{l.responsable}</div>
+                          <span>{l.ciudad}</span>
+                          <span className="amount">€{eur(l.monto||0)}</span>
+                        </div>
+                        {!isClosed && (
+                          <button className="btn sm ghost" style={{marginTop:8,width:'100%',fontSize:11}}
+                            onClick={e => { e.stopPropagation(); setMovingId(l.id) }}>
+                            Mover →
+                          </button>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
-              ))}
-            </div>
+              )
+            })}
           </div>
 
           {touchDrag && (
