@@ -37,7 +37,11 @@ function computeWhenGroup(due_date) {
   if (diff < 0)  return 'vencida'
   if (diff === 0) return 'hoy'
   if (diff === 1) return 'mañana'
-  return 'semana'
+  // Friday of the current work week
+  const dow = today.getDay() || 7 // Sun=7, Mon=1...Fri=5,Sat=6
+  const friday = new Date(today); friday.setDate(today.getDate() + (5 - (dow > 5 ? dow - 7 : dow)))
+  if (due <= friday) return 'semana'
+  return 'proxima'
 }
 
 function effectiveGroup(task) {
@@ -355,10 +359,11 @@ export function Tareas({ data, openItem, onItemOpened }) {
   }
 
   const groups = [
-    { key:'vencida', label:'Vencidas',    color:'var(--danger)', icon:I.Flame },
-    { key:'hoy',     label:'Hoy',         color:'var(--brand)',  icon:I.Target },
-    { key:'mañana',  label:'Mañana',      color:'var(--violet)', icon:I.Calendar },
-    { key:'semana',  label:'Esta semana', color:'var(--text-3)', icon:I.Clock },
+    { key:'vencida', label:'Vencidas',       color:'var(--danger)', icon:I.Flame },
+    { key:'hoy',     label:'Hoy',            color:'var(--brand)',  icon:I.Target },
+    { key:'mañana',  label:'Mañana',         color:'var(--violet)', icon:I.Calendar },
+    { key:'semana',  label:'Esta semana',    color:'var(--text-3)', icon:I.Clock },
+    { key:'proxima', label:'Próxima semana', color:'var(--text-4)', icon:I.Clock },
   ]
 
   const formatDate = (due_date) => {
