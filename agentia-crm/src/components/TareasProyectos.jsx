@@ -37,11 +37,14 @@ function computeWhenGroup(due_date) {
   if (diff < 0)  return 'vencida'
   if (diff === 0) return 'hoy'
   if (diff === 1) return 'mañana'
-  // Friday of the current work week
-  const dow = today.getDay() || 7 // Sun=7, Mon=1...Fri=5,Sat=6
-  const friday = new Date(today); friday.setDate(today.getDate() + (5 - (dow > 5 ? dow - 7 : dow)))
-  if (due <= friday) return 'semana'
-  return 'proxima'
+  // ISO week: Mon=0 … Sun=6
+  const dayOfWeek = (today.getDay() + 6) % 7
+  const thisMonday = new Date(today); thisMonday.setDate(today.getDate() - dayOfWeek)
+  const thisFriday = new Date(thisMonday); thisFriday.setDate(thisMonday.getDate() + 4)
+  const nextFriday = new Date(thisMonday); nextFriday.setDate(thisMonday.getDate() + 11)
+  if (due <= thisFriday) return 'semana'
+  if (due <= nextFriday) return 'proxima'
+  return 'mas'
 }
 
 function effectiveGroup(task) {
@@ -364,6 +367,7 @@ export function Tareas({ data, openItem, onItemOpened }) {
     { key:'mañana',  label:'Mañana',         color:'var(--violet)', icon:I.Calendar },
     { key:'semana',  label:'Esta semana',    color:'var(--text-3)', icon:I.Clock },
     { key:'proxima', label:'Próxima semana', color:'var(--text-4)', icon:I.Clock },
+    { key:'mas',     label:'Más adelante',   color:'var(--text-4)', icon:I.Clock },
   ]
 
   const formatDate = (due_date) => {
