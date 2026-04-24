@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { I } from './Icons'
-import { Modal, F, SelectOrText } from './Modal'
+import { Modal, F, SelectOrText, CustomSelect } from './Modal'
 
 // ── helpers ─────────────────────────────────────────────────────
 function getUsers() {
@@ -71,10 +71,7 @@ function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [] }) {
       <div className="form-2col">
         <F label="Cliente / empresa">
           {clientes.length > 0
-            ? <select value={form.cliente||''} onChange={e => set('cliente', e.target.value)}>
-                <option value="">— Sin cliente —</option>
-                {clientes.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
-              </select>
+            ? <CustomSelect value={form.cliente||''} onChange={v => set('cliente', v)} options={[{value:'',label:'— Sin cliente —'},...clientes.map(c=>({value:c.nombre,label:c.nombre}))]} />
             : <input value={form.cliente||''} onChange={e => set('cliente', e.target.value)} placeholder="Ej: Clínica Marbella" />
           }
         </F>
@@ -87,18 +84,12 @@ function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [] }) {
           <input type="date" value={form.due_date||''} onChange={e => set('due_date', e.target.value)} />
         </F>
         <F label="Prioridad">
-          <select value={form.prio||'media'} onChange={e => set('prio', e.target.value)}>
-            <option value="alta">Alta</option>
-            <option value="media">Media</option>
-            <option value="baja">Baja</option>
-          </select>
+          <CustomSelect value={form.prio||'media'} onChange={v => set('prio', v)} options={[{value:'alta',label:'Alta'},{value:'media',label:'Media'},{value:'baja',label:'Baja'}]} />
         </F>
       </div>
       <div className="form-2col">
         <F label="Responsable">
-          <select value={form.resp||defaultResp} onChange={e => set('resp', e.target.value)}>
-            {(respOptions.length ? respOptions : ['LP','AR']).map(r=><option key={r}>{r}</option>)}
-          </select>
+          <CustomSelect value={form.resp||defaultResp} onChange={v => set('resp', v)} options={respOptions.length ? respOptions : ['LP','AR']} />
         </F>
         <F label="Etiqueta">
           <SelectOrText value={form.tag||'Operativo'} onChange={v => set('tag', v)} options={['Comercial','Operativo','Entrega','Finanzas']} placeholder="Ej: Marketing…" />
@@ -262,14 +253,10 @@ function ProyectoModal({ proyecto, onClose, onSave, onDelete }) {
       </div>
       <div className="form-2col">
         <F label="Estado">
-          <select value={form.estado||''} onChange={e => set('estado', e.target.value)}>
-            {['En curso','En revisión','Pagado · ajustes','Cerrado'].map(s=><option key={s}>{s}</option>)}
-          </select>
+          <CustomSelect value={form.estado||'En curso'} onChange={v => set('estado', v)} options={['En curso','En revisión','Pagado · ajustes','Cerrado']} />
         </F>
         <F label="Responsable">
-          <select value={form.resp||''} onChange={e => set('resp', e.target.value)}>
-            {(respOptions.length ? respOptions : ['LP','AR']).map(r=><option key={r}>{r}</option>)}
-          </select>
+          <CustomSelect value={form.resp||respOptions[0]||'LP'} onChange={v => set('resp', v)} options={respOptions.length ? respOptions : ['LP','AR']} />
         </F>
       </div>
       <F label={`Progreso — ${form.progreso}%`}>

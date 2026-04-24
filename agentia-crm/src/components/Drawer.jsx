@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { I } from './Icons'
 import { PIPELINE_COLS } from './data'
-import { SelectOrText } from './Modal'
+import { SelectOrText, CustomSelect } from './Modal'
 
 function getServicios() {
   try {
@@ -103,9 +103,7 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
                 </div>
                 <div className="field">
                   <label className="lbl">Origen</label>
-                  <select className="select" value={form.origen} onChange={e => set('origen', e.target.value)}>
-                    {ORIGENES.map(o => <option key={o}>{o}</option>)}
-                  </select>
+                  <CustomSelect className="select" value={form.origen} onChange={v => set('origen', v)} options={ORIGENES} />
                 </div>
               </div>
               {form.origen === 'Otro' && (
@@ -132,9 +130,7 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
               <div className="field-row">
                 <div className="field"><label className="lbl">Ciudad</label><input className="input" value={form.ciudad} onChange={e => set('ciudad', e.target.value)} /></div>
                 <div className="field"><label className="lbl">Origen</label>
-                  <select className="select" value={form.origen} onChange={e => set('origen', e.target.value)}>
-                    {ORIGENES.map(o => <option key={o}>{o}</option>)}
-                  </select>
+                  <CustomSelect className="select" value={form.origen} onChange={v => set('origen', v)} options={ORIGENES} />
                 </div>
               </div>
               {form.origen === 'Otro' && (
@@ -150,9 +146,7 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
               <div className="field-row">
                 <div className="field"><label className="lbl">Instagram</label><input className="input" placeholder="@handle" value={form.instagram} onChange={e => set('instagram', e.target.value)} /></div>
                 <div className="field"><label className="lbl">Responsable</label>
-                  <select className="select" value={form.responsable} onChange={e => set('responsable', e.target.value)}>
-                    {resp.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                  </select>
+                  <CustomSelect className="select" value={form.responsable} onChange={v => set('responsable', v)} options={resp.map(r => ({ value: r.value, label: r.label }))} />
                 </div>
               </div>
               <div className="field-row">
@@ -165,9 +159,7 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
               </div>
               <div className="field-row">
                 <div className="field"><label className="lbl">Estado</label>
-                  <select className="select" value={form.estado} onChange={e => set('estado', e.target.value)}>
-                    {PIPELINE_COLS.map(s => <option key={s}>{s}</option>)}
-                  </select>
+                  <CustomSelect className="select" value={form.estado} onChange={v => set('estado', v)} options={PIPELINE_COLS} />
                 </div>
                 <div className="field"><label className="lbl">Próximo contacto</label><input className="input" type="date" value={form.next_contact} onChange={e => set('next_contact', e.target.value)} /></div>
               </div>

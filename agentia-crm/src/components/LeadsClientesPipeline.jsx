@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { I } from './Icons'
-import { Modal, F, SelectOrText } from './Modal'
+import { Modal, F, SelectOrText, CustomSelect } from './Modal'
 import { STATE_COLORS, PIPELINE_COLS, eur } from './data'
 
 function getServicios() {
@@ -57,9 +57,7 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
           <SelectOrText value={form.servicio||''} onChange={v => set('servicio', v)} options={SERVICIOS} placeholder="Ej: Web + Chatbot…" />
         </F>
         <F label="Origen">
-          <select value={form.origen||''} onChange={e => set('origen', e.target.value)}>
-            {['Instagram','LinkedIn','Referido','Formulario web','Evento','Otro'].map(o=><option key={o}>{o}</option>)}
-          </select>
+          <CustomSelect value={form.origen||'Instagram'} onChange={v => set('origen', v)} options={['Instagram','LinkedIn','Referido','Formulario web','Evento','Otro']} />
         </F>
       </div>
       {form.origen === 'Otro' && (
@@ -67,14 +65,10 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
       )}
       <div className="form-2col">
         <F label="Estado">
-          <select value={form.estado||''} onChange={e => set('estado', e.target.value)}>
-            {PIPELINE_COLS.map(s=><option key={s}>{s}</option>)}
-          </select>
+          <CustomSelect value={form.estado||'Cliente Nuevo'} onChange={v => set('estado', v)} options={PIPELINE_COLS} />
         </F>
         <F label="Responsable">
-          <select value={form.responsable||''} onChange={e => set('responsable', e.target.value)}>
-            {RESP.map(r=><option key={r}>{r}</option>)}
-          </select>
+          <CustomSelect value={form.responsable||RESP[0]||''} onChange={v => set('responsable', v)} options={RESP} />
         </F>
       </div>
       <div className="form-2col">
@@ -87,16 +81,10 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
         <div style={{display:'flex', flexDirection:'column', gap:10, padding:'14px', background:'rgba(62,207,142,0.06)', border:'1px solid rgba(62,207,142,0.2)', borderRadius:10}}>
           <div className="form-2col">
             <F label="Tipo de cliente">
-              <select value={form.tipo || 'Proyecto'} onChange={e => set('tipo', e.target.value)}>
-                <option value="Proyecto">Proyecto — pago único cerrado</option>
-                <option value="Recurrente">Recurrente — cuota periódica</option>
-              </select>
+              <CustomSelect value={form.tipo || 'Proyecto'} onChange={v => set('tipo', v)} options={[{value:'Proyecto',label:'Proyecto — pago único cerrado'},{value:'Recurrente',label:'Recurrente — cuota periódica'}]} />
             </F>
             <F label="¿Crear proyecto?">
-              <select value={form.crearProyecto ? 'si' : 'no'} onChange={e => set('crearProyecto', e.target.value === 'si')}>
-                <option value="no">No por ahora</option>
-                <option value="si">Sí — crear proyecto</option>
-              </select>
+              <CustomSelect value={form.crearProyecto ? 'si' : 'no'} onChange={v => set('crearProyecto', v === 'si')} options={[{value:'no',label:'No por ahora'},{value:'si',label:'Sí — crear proyecto'}]} />
             </F>
           </div>
           {form.tipo === 'Recurrente' && (
@@ -105,11 +93,7 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
                 <input type="number" min="0" placeholder="30" value={form.montoRecurrente||''} onChange={e => set('montoRecurrente', e.target.value)} />
               </F>
               <F label="Frecuencia">
-                <select value={form.frecuencia || 'Mensual'} onChange={e => set('frecuencia', e.target.value)}>
-                  <option>Mensual</option>
-                  <option>Semanal</option>
-                  <option>Trimestral</option>
-                </select>
+                <CustomSelect value={form.frecuencia || 'Mensual'} onChange={v => set('frecuencia', v)} options={['Mensual','Semanal','Trimestral']} />
               </F>
             </div>
           )}
@@ -188,9 +172,7 @@ function ClienteModal({ cliente, onClose, onSave, onDelete }) {
           <SelectOrText value={form.servicio||''} onChange={v => set('servicio', v)} options={SERVICIOS} placeholder="Ej: Web + Chatbot…" />
         </F>
         <F label="Responsable">
-          <select value={form.responsable||''} onChange={e => set('responsable', e.target.value)}>
-            {RESP.map(r=><option key={r}>{r}</option>)}
-          </select>
+          <CustomSelect value={form.responsable||RESP[0]||''} onChange={v => set('responsable', v)} options={RESP} />
         </F>
       </div>
       <div className="form-2col">
@@ -199,15 +181,10 @@ function ClienteModal({ cliente, onClose, onSave, onDelete }) {
       </div>
       <div className="form-2col">
         <F label="Tipo">
-          <select value={form.tipo || 'Proyecto'} onChange={e => set('tipo', e.target.value)}>
-            <option value="Proyecto">Proyecto — pago único</option>
-            <option value="Recurrente">Recurrente — cuota periódica</option>
-          </select>
+          <CustomSelect value={form.tipo || 'Proyecto'} onChange={v => set('tipo', v)} options={[{value:'Proyecto',label:'Proyecto — pago único'},{value:'Recurrente',label:'Recurrente — cuota periódica'}]} />
         </F>
         <F label="Estado">
-          <select value={form.estado||''} onChange={e => set('estado', e.target.value)}>
-            {['En curso','En revisión','Pagado · ajustes','Cerrado','Recurrente'].map(s=><option key={s}>{s}</option>)}
-          </select>
+          <CustomSelect value={form.estado||'En curso'} onChange={v => set('estado', v)} options={['En curso','En revisión','Pagado · ajustes','Cerrado','Recurrente']} />
         </F>
       </div>
       <div className="form-2col">

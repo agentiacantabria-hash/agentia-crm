@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { I } from './Icons'
-import { Modal, F, SelectOrText } from './Modal'
+import { Modal, F, SelectOrText, CustomSelect } from './Modal'
 import { PIPELINE_COLS, STATE_COLORS, eur } from './data'
 
 // ── Finanzas ─────────────────────────────────────────────────────
@@ -23,14 +23,9 @@ function CobroModal({ cobro, onClose, onSave }) {
       </div>
       <div className="form-2col">
         <F label="Estado">
-          <select value={form.pagado?'pagado':form.vencida?'vencida':'pendiente'} onChange={e => {
-            const val = e.target.value
-            setForm(f => ({ ...f, pagado: val === 'pagado', vencida: val === 'vencida' }))
-          }}>
-            <option value="pendiente">Pendiente</option>
-            <option value="vencida">Vencida</option>
-            <option value="pagado">Pagada</option>
-          </select>
+          <CustomSelect value={form.pagado?'pagado':form.vencida?'vencida':'pendiente'}
+            onChange={v => setForm(f => ({ ...f, pagado: v==='pagado', vencida: v==='vencida' }))}
+            options={[{value:'pendiente',label:'Pendiente'},{value:'vencida',label:'Vencida'},{value:'pagado',label:'Pagada'}]} />
         </F>
       </div>
     </Modal>
@@ -58,10 +53,8 @@ function GastoModal({ gasto, onClose, onSave, onDelete }) {
       <div className="form-2col">
         <F label="Fecha"><input type="date" value={form.fecha||''} onChange={e => set('fecha', e.target.value)} /></F>
         <F label="Recurrente">
-          <select value={form.recurrente?'si':'no'} onChange={e => set('recurrente', e.target.value==='si')}>
-            <option value="no">No — pago único</option>
-            <option value="si">Sí — mensual</option>
-          </select>
+          <CustomSelect value={form.recurrente?'si':'no'} onChange={v => set('recurrente', v==='si')}
+            options={[{value:'no',label:'No — pago único'},{value:'si',label:'Sí — mensual'}]} />
         </F>
       </div>
       {!isNew && (
@@ -320,10 +313,8 @@ function ServicioModal({ servicio, onClose, onSave }) {
         </div>
       </F>
       <F label="Activo">
-        <select value={form.activo?'si':'no'} onChange={e => set('activo', e.target.value==='si')}>
-          <option value="si">Sí</option>
-          <option value="no">No (desactivado)</option>
-        </select>
+        <CustomSelect value={form.activo?'si':'no'} onChange={v => set('activo', v==='si')}
+          options={[{value:'si',label:'Sí'},{value:'no',label:'No (desactivado)'}]} />
       </F>
     </Modal>
   )
@@ -364,17 +355,11 @@ function UsuarioModal({ usuario, onClose, onSave, onDelete }) {
           <input value={form.email||''} onChange={e => set('email', e.target.value)} placeholder="unai@agentia.com" />
         </F>
         <F label="Rol">
-          <select value={form.rol||'Empleado'} onChange={e => set('rol', e.target.value)}>
-            <option value="Admin">Admin</option>
-            <option value="Empleado">Empleado</option>
-          </select>
+          <CustomSelect value={form.rol||'Empleado'} onChange={v => set('rol', v)} options={['Admin','Empleado']} />
         </F>
       </div>
       <F label="Estado">
-        <select value={form.estado||'activo'} onChange={e => set('estado', e.target.value)}>
-          <option value="activo">Activo</option>
-          <option value="inactivo">Inactivo</option>
-        </select>
+        <CustomSelect value={form.estado||'activo'} onChange={v => set('estado', v)} options={[{value:'activo',label:'Activo'},{value:'inactivo',label:'Inactivo'}]} />
       </F>
       {!isNew && (
         <div className="modal-danger-zone">
