@@ -272,19 +272,21 @@ export function Finanzas({ role, data }) {
                               : <span className="chip green"><span className="dot"/>Al día</span>
                             }
                           </td>
-                          <td style={{display:'flex', alignItems:'center', gap:6, justifyContent:'flex-end'}}>
-                            {s.vencido && s.next && (
-                              <button className="btn sm" style={{padding:'3px 10px', fontSize:12}}
-                                onClick={() => { data.updateCobro?.(s.next.id, { pagado: true, vencida: false }); showToast?.(`Cobro de ${s.cliente} marcado como pagado`) }}>
-                                ✓ Cobrado
-                              </button>
-                            )}
-                            {s.next && (
-                              <button className="icon-btn" style={{width:24, height:24, color:'var(--text-4)'}}
-                                onClick={() => { if (confirm(`¿Eliminar cobro pendiente de ${s.cliente}?`)) data.deleteCobro?.(s.next.id) }}>
-                                <I.Close size={11}/>
-                              </button>
-                            )}
+                          <td>
+                            <div style={{display:'flex', alignItems:'center', gap:6, justifyContent:'flex-end'}}>
+                              {s.vencido && s.next && (
+                                <button className="btn sm" style={{padding:'3px 10px', fontSize:12}}
+                                  onClick={() => { data.updateCobro?.(s.next.id, { pagado: true, vencida: false }); showToast?.(`Cobro de ${s.cliente} marcado como pagado`) }}>
+                                  ✓ Cobrado
+                                </button>
+                              )}
+                              {s.next && (
+                                <button className="icon-btn" style={{width:24, height:24, color:'var(--text-4)'}}
+                                  onClick={() => { if (confirm(`¿Eliminar cobro pendiente de ${s.cliente}?`)) data.deleteCobro?.(s.next.id) }}>
+                                  <I.Close size={11}/>
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -365,30 +367,73 @@ export function Finanzas({ role, data }) {
           })()}
         </div>
 
-        <div className="card">
-          <div className="card-head">
-            <h3>Gastos recientes</h3>
-            <div className="right"><button className="btn sm" onClick={() => setAddingGasto(true)}><I.Plus size={12}/></button></div>
-          </div>
-          <div>
-            {gastos.map(g => {
-              const typeColor = g.tipo==='IA'?'#9A7BFF':g.tipo==='Infra'?'#4F8BFF':g.tipo==='Personas'?'#FFB547':'#3ECF8E'
-              return (
-                <div className="task" key={g.id} style={{cursor:'pointer'}} onClick={() => setEditingGasto(g)}>
-                  <div style={{width:30, height:30, borderRadius:8, background:`${typeColor}22`, color:typeColor, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0}}><I.Receipt size={14}/></div>
-                  <div style={{flex:1, minWidth:0}}>
-                    <div className="title">{g.concepto}</div>
-                    <div className="sub">{g.tipo} · {g.fecha} {g.recurrente && <span style={{color:'var(--brand-3)'}}>· recurrente</span>}</div>
-                  </div>
-                  <div className="mono" style={{fontSize:13}}>€{eur(g.monto||0)}</div>
-                  <button className="icon-btn" style={{width:22, height:22, color:'var(--text-4)'}}
-                    onClick={e => { e.stopPropagation(); if (confirm(`¿Eliminar "${g.concepto}"?`)) data.deleteGasto?.(g.id) }}>
-                    <I.Close size={11}/>
-                  </button>
+        <div style={{display:'flex', flexDirection:'column', gap:16}}>
+          {/* ── Suscripciones (gastos recurrentes) ── */}
+          {(() => {
+            const subs = gastos.filter(g => g.recurrente)
+            const mrc  = subs.reduce((a, g) => a + (g.monto || 0), 0)
+            return (
+              <div className="card">
+                <div className="card-head">
+                  <h3>Suscripciones <span style={{fontSize:12, fontWeight:400, color:'var(--text-4)'}}>· MRC €{eur(mrc)}/mes</span></h3>
+                  <div className="right"><button className="btn sm" onClick={() => setAddingGasto(true)}><I.Plus size={12}/></button></div>
                 </div>
-              )
-            })}
-          </div>
+                {subs.length === 0
+                  ? <div className="small" style={{color:'var(--text-4)', textAlign:'center', padding:'16px 0'}}>Sin suscripciones activas</div>
+                  : subs.map(g => {
+                    const typeColor = g.tipo==='IA'?'#9A7BFF':g.tipo==='Infra'?'#4F8BFF':g.tipo==='Personas'?'#FFB547':'#3ECF8E'
+                    return (
+                      <div className="task" key={g.id} style={{cursor:'pointer'}} onClick={() => setEditingGasto(g)}>
+                        <div style={{width:30, height:30, borderRadius:8, background:`${typeColor}22`, color:typeColor, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0}}><I.Receipt size={14}/></div>
+                        <div style={{flex:1, minWidth:0}}>
+                          <div className="title">{g.concepto}</div>
+                          <div className="sub">{g.tipo} · <span style={{color:'var(--ok)'}}>↺ mensual</span></div>
+                        </div>
+                        <div className="mono" style={{fontSize:13}}>€{eur(g.monto||0)}<span style={{fontSize:10, color:'var(--text-4)'}}>/mes</span></div>
+                        <button className="icon-btn" style={{width:22, height:22, color:'var(--text-4)'}}
+                          onClick={e => { e.stopPropagation(); if (confirm(`¿Eliminar suscripción "${g.concepto}"?`)) data.deleteGasto?.(g.id) }}>
+                          <I.Close size={11}/>
+                        </button>
+                      </div>
+                    )
+                  })
+                }
+              </div>
+            )
+          })()}
+
+          {/* ── Gastos puntuales ── */}
+          {(() => {
+            const puntuales = gastos.filter(g => !g.recurrente)
+            return (
+              <div className="card">
+                <div className="card-head">
+                  <h3>Gastos puntuales</h3>
+                  <div className="right"><button className="btn sm" onClick={() => setAddingGasto(true)}><I.Plus size={12}/></button></div>
+                </div>
+                {puntuales.length === 0
+                  ? <div className="small" style={{color:'var(--text-4)', textAlign:'center', padding:'16px 0'}}>Sin gastos puntuales</div>
+                  : puntuales.map(g => {
+                    const typeColor = g.tipo==='IA'?'#9A7BFF':g.tipo==='Infra'?'#4F8BFF':g.tipo==='Personas'?'#FFB547':'#3ECF8E'
+                    return (
+                      <div className="task" key={g.id} style={{cursor:'pointer'}} onClick={() => setEditingGasto(g)}>
+                        <div style={{width:30, height:30, borderRadius:8, background:`${typeColor}22`, color:typeColor, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0}}><I.Receipt size={14}/></div>
+                        <div style={{flex:1, minWidth:0}}>
+                          <div className="title">{g.concepto}</div>
+                          <div className="sub">{g.tipo}{g.fecha ? ` · ${g.fecha}` : ''}</div>
+                        </div>
+                        <div className="mono" style={{fontSize:13}}>€{eur(g.monto||0)}</div>
+                        <button className="icon-btn" style={{width:22, height:22, color:'var(--text-4)'}}
+                          onClick={e => { e.stopPropagation(); if (confirm(`¿Eliminar "${g.concepto}"?`)) data.deleteGasto?.(g.id) }}>
+                          <I.Close size={11}/>
+                        </button>
+                      </div>
+                    )
+                  })
+                }
+              </div>
+            )
+          })()}
         </div>
       </div>
 
