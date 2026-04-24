@@ -103,18 +103,18 @@ export default function App() {
 
   // ── LEADS ──────────────────────────────────────────────────
   const addLead = async (lead) => {
-    const { crearProyecto, origenCustom, yaCobrado: _y, tipo, montoRecurrente, frecuencia, ...leadData } = lead
+    const { crearProyecto, origenCustom, yaCobrado: _y, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, ...leadData } = lead
     try {
       const { data: d, error } = await supabase.from('leads').insert([clean(leadData)]).select().single()
       if (!error && d) {
         setLeads(prev => [d, ...prev])
-        autoWinLead({ ...d, crearProyecto, tipo, montoRecurrente, frecuencia })
+        autoWinLead({ ...d, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct })
         return
       }
     } catch (_) {}
     const local = { ...leadData, id: `l${Date.now()}` }
     setLeads(prev => [local, ...prev])
-    autoWinLead({ ...local, crearProyecto, tipo, montoRecurrente, frecuencia })
+    autoWinLead({ ...local, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct })
   }
 
   const autoWinLead = (lead) => {
@@ -124,23 +124,31 @@ export default function App() {
     const montoRec       = parseFloat(lead.montoRecurrente) || 0
     const frecuencia     = lead.frecuencia || 'Mensual'
     const esRecurrente   = tipo === 'Recurrente'
+    const dividido       = !esRecurrente && lead.pagoDividido
+    const señalPct       = lead.señalPct || 50
+    const servicio       = lead.servicio || 'Servicio'
 
     const yaExiste = clientes.some(c => c.nombre === lead.empresa)
     if (!yaExiste) {
       const mes = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
       addCliente({
-        nombre: lead.empresa, servicio: lead.servicio || '',
+        nombre: lead.empresa, servicio,
         importe: esRecurrente ? montoRec : monto,
-        estado: esRecurrente ? 'Recurrente' : 'Pagado · ajustes',
+        estado: esRecurrente ? 'Recurrente' : (dividido ? 'En curso' : 'Pagado · ajustes'),
         tipo,
         ajustes: 0, responsable: lead.responsable || '', since: mes,
       })
     }
-    // Cobro inicial (pago único, siempre pagado)
-    if (monto > 0) {
-      addCobro({ cliente: lead.empresa, concepto: lead.servicio || 'Servicio', monto, vence: null, pagado: true, vencida: false, recurrente: false })
+
+    if (dividido && monto > 0) {
+      const señalMonto = Math.round(monto * señalPct / 100)
+      const restoMonto = monto - señalMonto
+      addCobro({ cliente: lead.empresa, concepto: `Señal (${señalPct}%) · ${servicio}`, monto: señalMonto, vence: null, pagado: true, vencida: false, recurrente: false })
+      addCobro({ cliente: lead.empresa, concepto: `Resto (${100 - señalPct}%) · ${servicio}`, monto: restoMonto, vence: null, pagado: false, vencida: false, recurrente: false })
+    } else if (!esRecurrente && monto > 0) {
+      addCobro({ cliente: lead.empresa, concepto: servicio, monto, vence: null, pagado: true, vencida: false, recurrente: false })
     }
-    // Primer cobro recurrente (siguiente período, pendiente)
+
     if (esRecurrente && montoRec > 0) {
       const next = new Date()
       if (frecuencia === 'Semanal') next.setDate(next.getDate() + 7)
@@ -148,13 +156,13 @@ export default function App() {
       else next.setMonth(next.getMonth() + 1)
       addCobro({
         cliente: lead.empresa,
-        concepto: `Mantenimiento ${frecuencia.toLowerCase()} · ${lead.servicio || 'Servicio'}`,
+        concepto: `Mantenimiento ${frecuencia.toLowerCase()} · ${servicio}`,
         monto: montoRec, vence: next.toISOString().slice(0,10),
         pagado: false, vencida: false, recurrente: true, frecuencia,
       })
     }
     if (lead.crearProyecto) {
-      addProyecto({ nombre: lead.empresa, cliente: lead.empresa, estado: 'En curso', responsable: lead.responsable || '' })
+      addProyecto({ cliente: lead.empresa, servicio, estado: 'En curso', progreso: 0, ajustes: 0, pago: dividido ? 'Señal cobrada' : 'Pagado', resp: lead.responsable || '' })
     }
   }
 
@@ -165,7 +173,7 @@ export default function App() {
 
   const updateLead = async (id, updates) => {
     const lead = leads.find(l => l.id === id)
-    const { crearProyecto, origenCustom, yaCobrado: _y, tipo, montoRecurrente, frecuencia, ...safeUpdates } = updates
+    const { crearProyecto, origenCustom, yaCobrado: _y, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, ...safeUpdates } = updates
     try {
       await supabase.from('leads').update(clean(safeUpdates)).eq('id', id)
     } catch (_) {}
@@ -176,7 +184,7 @@ export default function App() {
     const seraCobrado = nuevoEstado === 'Cobrado'
 
     if (seraCobrado && !eraCobrado) {
-      autoWinLead({ ...lead, ...safeUpdates, crearProyecto, tipo, montoRecurrente, frecuencia })
+      autoWinLead({ ...lead, ...safeUpdates, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct })
     } else if (eraCobrado && nuevoEstado && !seraCobrado) {
       // Deja de ser Cobrado → eliminar cobro automático
       const c = findCobroAuto(lead)

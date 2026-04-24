@@ -228,7 +228,7 @@ export function Tareas({ data }) {
 
 // ── Proyectos ────────────────────────────────────────────────────
 
-function ProyectoModal({ proyecto, onClose, onSave, onDelete }) {
+function ProyectoModal({ proyecto, onClose, onSave, onDelete, cobros = [], updateCobro }) {
   const isNew = !proyecto?.id
   const users    = getUsers()
   const servList = getServicios()
@@ -265,9 +265,45 @@ function ProyectoModal({ proyecto, onClose, onSave, onDelete }) {
       <div className="form-2col">
         <F label="Ajustes pendientes"><input type="number" min="0" value={form.ajustes||0} onChange={e => set('ajustes', Number(e.target.value))} /></F>
         <F label="Pago">
-          <SelectOrText value={form.pago||'Pendiente'} onChange={v => set('pago', v)} options={['Pendiente','Parcial 40%','Parcial 50%','Pagado']} placeholder="Ej: Parcial 30%…" />
+          <SelectOrText value={form.pago||'Pendiente'} onChange={v => set('pago', v)} options={['Pendiente','Señal cobrada','Pagado']} placeholder="Ej: Parcial 30%…" />
         </F>
       </div>
+
+      {(() => {
+        const cobrosProy = cobros.filter(c => c.cliente === form.cliente)
+        if (!cobrosProy.length) return null
+        const cobrado = cobrosProy.filter(c => c.pagado).reduce((a,c) => a+(c.monto||0), 0)
+        const pendiente = cobrosProy.filter(c => !c.pagado).reduce((a,c) => a+(c.monto||0), 0)
+        return (
+          <div style={{border:'1px solid var(--line-2)', borderRadius:10, overflow:'hidden'}}>
+            <div style={{padding:'10px 14px', borderBottom:'1px solid var(--line-1)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+              <span style={{fontSize:11.5, fontWeight:600, color:'var(--text-2)', textTransform:'uppercase', letterSpacing:'0.05em'}}>Cobros del proyecto</span>
+              <span style={{fontSize:12, color:'var(--text-3)'}}>
+                <b style={{color:'var(--ok)'}}>€{cobrado.toLocaleString('es-ES')}</b> cobrado
+                {pendiente > 0 && <> · <b style={{color:'var(--warn)'}}>€{pendiente.toLocaleString('es-ES')}</b> pendiente</>}
+              </span>
+            </div>
+            {cobrosProy.map(c => (
+              <div key={c.id} style={{display:'flex', alignItems:'center', gap:10, padding:'9px 14px', borderBottom:'1px solid rgba(255,255,255,0.03)'}}>
+                <div style={{width:8, height:8, borderRadius:'50%', background: c.pagado ? 'var(--ok)' : 'var(--warn)', flexShrink:0}} />
+                <div style={{flex:1, minWidth:0}}>
+                  <div style={{fontSize:13, color:'var(--text-1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{c.concepto}</div>
+                  {c.vence && <div style={{fontSize:11, color:'var(--text-4)'}}>Vence: {c.vence}</div>}
+                </div>
+                <span style={{fontSize:13, fontFamily:'var(--font-mono)', color:'var(--text-1)'}}>€{(c.monto||0).toLocaleString('es-ES')}</span>
+                {c.pagado
+                  ? <span style={{fontSize:11, color:'var(--ok)', minWidth:60, textAlign:'right'}}>✓ cobrado</span>
+                  : <button className="btn sm primary" style={{fontSize:11, minWidth:60}}
+                      onMouseDown={e => { e.preventDefault(); updateCobro?.(c.id, { pagado: true }) }}>
+                      Cobrar
+                    </button>
+                }
+              </div>
+            ))}
+          </div>
+        )
+      })()}
+
       {!isNew && (
         <div className="modal-danger-zone">
           <span>Zona peligrosa</span>
@@ -283,6 +319,7 @@ function ProyectoModal({ proyecto, onClose, onSave, onDelete }) {
 
 export function Proyectos({ data }) {
   const proyectos = data?.proyectos || []
+  const cobros    = data?.cobros    || []
   const [editing, setEditing]   = useState(null)
   const [creating, setCreating] = useState(false)
 
@@ -295,6 +332,21 @@ export function Proyectos({ data }) {
     if (form.id) data.updateProyecto?.(form.id, form)
     else data.addProyecto?.(form)
     setEditing(null); setCreating(false)
+  }
+
+  const handleUpdateCobro = (id, updates) => {
+    data.updateCobro?.(id, updates)
+    // Si se acaba de pagar el último cobro pendiente de un proyecto, marcar como pagado
+    if (updates.pagado && editing) {
+      const cliente = editing.cliente
+      const pendientesTrasUpdate = cobros.filter(c => c.cliente === cliente && !c.pagado && c.id !== id)
+      if (pendientesTrasUpdate.length === 0) {
+        data.updateProyecto?.(editing.id, { pago: 'Pagado' })
+        setEditing(p => ({ ...p, pago: 'Pagado' }))
+      } else {
+        setEditing(p => ({ ...p, pago: 'Señal cobrada' }))
+      }
+    }
   }
 
   return (
@@ -333,7 +385,20 @@ export function Proyectos({ data }) {
               </div>
               <div>{p.ajustes>0 ? <span className="pend"><I.Bolt size={10}/> {p.ajustes} ajuste{p.ajustes>1?'s':''}</span> : <span className="muted small">sin pendientes</span>}</div>
               <div style={{display:'flex', alignItems:'center', gap:8, justifyContent:'flex-end'}}>
-                <span className="small" style={{color: p.pago==='Pagado'?'var(--ok)':p.pago==='Pendiente'?'var(--warn)':'var(--text-2)'}}>{p.pago}</span>
+                {(() => {
+                  const cp = cobros.filter(c => c.cliente === p.cliente)
+                  if (cp.length > 0) {
+                    const cobrado = cp.filter(c => c.pagado).reduce((a,c) => a+(c.monto||0), 0)
+                    const total   = cp.reduce((a,c) => a+(c.monto||0), 0)
+                    const pend    = cp.some(c => !c.pagado)
+                    return (
+                      <span className="small mono" style={{color: pend ? 'var(--warn)' : 'var(--ok)'}}>
+                        €{cobrado.toLocaleString('es-ES')}/{total.toLocaleString('es-ES')}
+                      </span>
+                    )
+                  }
+                  return <span className="small" style={{color: p.pago==='Pagado'?'var(--ok)':p.pago==='Pendiente'?'var(--warn)':'var(--text-2)'}}>{p.pago}</span>
+                })()}
                 <button className="icon-btn" style={{width:28, height:28}} onClick={e => { e.stopPropagation(); setEditing(p) }}><I.ChevronR size={14}/></button>
               </div>
             </div>
@@ -352,6 +417,8 @@ export function Proyectos({ data }) {
           onClose={() => { setEditing(null); setCreating(false) }}
           onSave={handleSave}
           onDelete={id => data.deleteProyecto?.(id)}
+          cobros={cobros}
+          updateCobro={handleUpdateCobro}
         />
       )}
     </div>

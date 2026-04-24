@@ -25,11 +25,11 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
   const isNew = !lead?.id
   const SERVICIOS = getServicios()
   const RESP = getResp()
-  const [form, setForm] = useState(lead ? { ...lead, monto: lead.monto ?? '', crearProyecto: false, tipo: lead.tipo || 'Proyecto', montoRecurrente: '', frecuencia: 'Mensual' } : {
+  const [form, setForm] = useState(lead ? { ...lead, monto: lead.monto ?? '', crearProyecto: false, tipo: lead.tipo || 'Proyecto', montoRecurrente: '', frecuencia: 'Mensual', pagoDividido: false, señalPct: 50 } : {
     empresa:'', sector:'', ciudad:'', contacto:'', telefono:'', email:'',
     responsable: RESP[0] || 'LP', servicio: SERVICIOS[0] || 'Web premium',
     estado:'Cliente Nuevo', next:'', monto:'', origen:'Instagram', origenCustom:'', notas:'',
-    crearProyecto: false, tipo: 'Proyecto', montoRecurrente: '', frecuencia: 'Mensual',
+    crearProyecto: false, tipo: 'Proyecto', montoRecurrente: '', frecuencia: 'Mensual', pagoDividido: false, señalPct: 50,
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const [confirmDel, setConfirmDel] = useState(false)
@@ -87,6 +87,29 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
               <CustomSelect value={form.crearProyecto ? 'si' : 'no'} onChange={v => set('crearProyecto', v === 'si')} options={[{value:'no',label:'No por ahora'},{value:'si',label:'Sí — crear proyecto'}]} />
             </F>
           </div>
+
+          {form.tipo === 'Proyecto' && (
+            <div>
+              <F label="Estructura de cobro">
+                <CustomSelect value={form.pagoDividido ? 'dividido' : 'unico'}
+                  onChange={v => set('pagoDividido', v === 'dividido')}
+                  options={[{value:'unico',label:'Pago único — cobrar todo ahora'},{value:'dividido',label:'En dos partes — señal ahora · resto al entregar'}]} />
+              </F>
+              {form.pagoDividido && (
+                <div style={{marginTop:10, padding:'10px 12px', background:'rgba(62,207,142,0.06)', border:'1px solid rgba(62,207,142,0.15)', borderRadius:8}}>
+                  <div style={{fontSize:11.5, color:'var(--text-3)', marginBottom:8}}>Señal ahora: <b style={{color:'var(--text-1)'}}>{form.señalPct}%</b></div>
+                  <input type="range" min="10" max="90" step="5" value={form.señalPct||50}
+                    onChange={e => set('señalPct', Number(e.target.value))}
+                    style={{width:'100%', accentColor:'var(--brand)', marginBottom:8}} />
+                  <div style={{display:'flex', justifyContent:'space-between', fontSize:12.5}}>
+                    <span>Señal: <b style={{color:'var(--ok)'}}>€{Math.round((parseFloat(form.monto)||0) * (form.señalPct||50) / 100).toLocaleString('es-ES')}</b> · cobrada ya</span>
+                    <span>Resto: <b style={{color:'var(--warn)'}}>€{((parseFloat(form.monto)||0) - Math.round((parseFloat(form.monto)||0) * (form.señalPct||50) / 100)).toLocaleString('es-ES')}</b> · al entregar</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {form.tipo === 'Recurrente' && (
             <div className="form-2col">
               <F label="Cuota (€)">
