@@ -119,7 +119,13 @@ export function Finanzas({ role, data }) {
     )
   }
 
-  const pendientes  = cobros.filter(c => !c.pagado)
+  const hoyBase = new Date(); hoyBase.setHours(0,0,0,0)
+  // Recurrentes futuros (vence > hoy) no cuentan como "por cobrar"
+  const pendientes  = cobros.filter(c => {
+    if (c.pagado) return false
+    if (c.recurrente && c.vence) return new Date(c.vence + 'T00:00:00') <= hoyBase
+    return true
+  })
   const pagados     = cobros.filter(c => c.pagado)
   const ingresosMes = pagados.reduce((a,c) => a + (c.monto||0), 0)
   const cobrosPend  = pendientes.reduce((a,c) => a + (c.monto||0), 0)
@@ -204,59 +210,75 @@ export function Finanzas({ role, data }) {
 
       <div className="grid-main-side">
         <div style={{display:'flex', flexDirection:'column', gap:16}}>
-          {/* ── Recurrentes ── */}
+          {/* ── Recurrentes: una fila por cliente (vista suscripción) ── */}
           {(() => {
-            const recurrentes = cobros.filter(c => c.recurrente)
-            const mrr = recurrentes.filter(c => !c.pagado).reduce((a,c) => a + (c.monto||0), 0)
+            const hoy = new Date(); hoy.setHours(0,0,0,0)
+            const todosRec = cobros.filter(c => c.recurrente)
+            const clientesRec = [...new Set(todosRec.map(c => c.cliente))]
+
+            const suscripciones = clientesRec.map(cliente => {
+              const all = todosRec.filter(c => c.cliente === cliente)
+              const pendSorted = all.filter(c => !c.pagado).sort((a,b) => (a.vence||'') < (b.vence||'') ? -1 : 1)
+              const pagSorted  = all.filter(c => c.pagado).sort((a,b) => (a.vence||'') > (b.vence||'') ? -1 : 1)
+              const next   = pendSorted[0]
+              const ultimo = pagSorted[0]
+              const rep    = next || ultimo
+              const venceDate = next?.vence ? new Date(next.vence + 'T00:00:00') : null
+              const dias = venceDate ? Math.floor((venceDate - hoy) / 86400000) : null
+              const vencido = dias !== null && dias <= 0
+              return { cliente, concepto: rep?.concepto, frecuencia: rep?.frecuencia || 'Mensual', monto: rep?.monto || 0, next, ultimo, dias, vencido }
+            })
+
+            const mrr      = suscripciones.reduce((a, s) => a + s.monto, 0)
+            const vencidas = suscripciones.filter(s => s.vencido).length
+
             return (
               <div className="card">
                 <div className="card-head">
-                  <h3>↺ Recurrentes <span style={{fontSize:12, fontWeight:400, color:'var(--text-4)'}}>· €{eur(mrr)}/mes por cobrar</span></h3>
+                  <h3>
+                    ↺ Recurrentes
+                    <span style={{fontSize:12, fontWeight:400, color:'var(--text-4)'}}> · MRR €{eur(mrr)}/mes</span>
+                    {vencidas > 0 && <span style={{fontSize:12, fontWeight:600, color:'var(--danger)', marginLeft:8}}>⚠ {vencidas} vencida{vencidas>1?'s':''}</span>}
+                  </h3>
                   <div className="right">
                     <button className="btn sm" onClick={() => setAddingCobro(true)}><I.Plus size={12}/></button>
                   </div>
                 </div>
-                {recurrentes.length === 0 ? (
-                  <div className="small" style={{color:'var(--text-4)', textAlign:'center', padding:'20px 0'}}>Sin cobros recurrentes</div>
+                {suscripciones.length === 0 ? (
+                  <div className="small" style={{color:'var(--text-4)', textAlign:'center', padding:'20px 0'}}>Sin suscripciones recurrentes</div>
                 ) : (
                   <div style={{overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
                   <table className="table">
-                    <thead><tr><th>Cliente</th><th>Concepto</th><th>Frecuencia</th><th style={{textAlign:'right'}}>Importe</th><th>Próximo venc.</th><th>Estado</th><th></th></tr></thead>
+                    <thead>
+                      <tr><th>Cliente</th><th>Concepto</th><th>Frecuencia</th><th style={{textAlign:'right'}}>Importe</th><th>Último pago</th><th>Próximo</th><th>Estado</th><th></th></tr>
+                    </thead>
                     <tbody>
-                      {recurrentes.map(c => (
-                        <tr key={c.id} style={{cursor:'pointer'}} onClick={() => setEditingCobro(c)}>
-                          <td><span className="primary">{c.cliente}</span></td>
-                          <td className="muted small">{c.concepto}</td>
-                          <td><span style={{fontSize:10, fontWeight:600, color:'var(--ok)', background:'rgba(62,207,142,0.12)', padding:'2px 8px', borderRadius:12}}>↺ {c.frecuencia || 'Mensual'}</span></td>
-                          <td className="mono" style={{textAlign:'right'}}>€{eur(c.monto||0)}</td>
+                      {suscripciones.map(s => (
+                        <tr key={s.cliente}>
+                          <td><span className="primary">{s.cliente}</span></td>
+                          <td className="muted small">{s.concepto}</td>
+                          <td><span style={{fontSize:10, fontWeight:600, color:'var(--ok)', background:'rgba(62,207,142,0.12)', padding:'2px 8px', borderRadius:12}}>↺ {s.frecuencia}</span></td>
+                          <td className="mono" style={{textAlign:'right'}}>€{eur(s.monto)}</td>
+                          <td className="muted small">{s.ultimo?.vence || '—'}</td>
                           <td className="muted">
-                            {c.vence || '—'}
-                            {!c.pagado && c.vence && (() => {
-                              const dias = Math.floor((Date.now() - new Date(c.vence + 'T00:00:00')) / 86400000)
-                              if (dias < 0) return null
-                              const col = dias < 15 ? '#FFB547' : dias < 30 ? '#FF8050' : '#FF5A6A'
-                              return <span style={{marginLeft:6, fontSize:10.5, fontWeight:600, color:col, fontFamily:'var(--font-mono)'}}>{dias === 0 ? 'Hoy' : `+${dias}d`}</span>
-                            })()}
+                            {s.next?.vence || '—'}
+                            {s.vencido && <span style={{marginLeft:6, fontSize:10.5, fontWeight:600, color:'var(--danger)', fontFamily:'var(--font-mono)'}}>
+                              {s.dias === 0 ? ' · Hoy' : ` · ${Math.abs(s.dias)}d`}
+                            </span>}
                           </td>
                           <td>
-                            {c.pagado
-                              ? <span className="chip green"><span className="dot"/>Pagada</span>
-                              : c.vencida
-                                ? <span className="chip red"><span className="dot"/>Vencida</span>
-                                : <span className="chip amber"><span className="dot"/>Pendiente</span>
+                            {s.vencido
+                              ? <span className="chip red"><span className="dot"/>Vencida</span>
+                              : <span className="chip green"><span className="dot"/>Al día</span>
                             }
                           </td>
-                          <td style={{display:'flex', alignItems:'center', gap:6, justifyContent:'flex-end'}}>
-                            {!c.pagado && (
+                          <td style={{textAlign:'right'}}>
+                            {s.vencido && s.next && (
                               <button className="btn sm" style={{padding:'3px 10px', fontSize:12}}
-                                onClick={e => { e.stopPropagation(); data.updateCobro?.(c.id, { pagado: true, vencida: false }); showToast?.(`Cobro de ${c.cliente} marcado como pagado`) }}>
+                                onClick={() => { data.updateCobro?.(s.next.id, { pagado: true, vencida: false }); showToast?.(`Cobro de ${s.cliente} marcado como pagado`) }}>
                                 ✓ Cobrado
                               </button>
                             )}
-                            <button className="icon-btn" style={{width:24, height:24, color:'var(--text-4)'}}
-                              onClick={e => { e.stopPropagation(); if (confirm(`¿Eliminar factura de ${c.cliente}?`)) data.deleteCobro?.(c.id) }}>
-                              <I.Close size={11}/>
-                            </button>
                           </td>
                         </tr>
                       ))}
