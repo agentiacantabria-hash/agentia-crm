@@ -178,6 +178,80 @@ function CalendarioView({ tasks, onEdit, onAdd }) {
   )
 }
 
+function MesView({ tasks, onEdit, onAdd }) {
+  const [month, setMonth] = useState(() => { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d })
+  const today = new Date().toISOString().slice(0,10)
+
+  const prevMonth = () => setMonth(d => { const n = new Date(d); n.setMonth(n.getMonth()-1); return n })
+  const nextMonth = () => setMonth(d => { const n = new Date(d); n.setMonth(n.getMonth()+1); return n })
+  const goToday   = () => { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); setMonth(d) }
+
+  const startDay = getMonday(new Date(month.getFullYear(), month.getMonth(), 1))
+  const days = useMemo(() => {
+    const arr = []
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(startDay); d.setDate(startDay.getDate() + i); arr.push(d)
+    }
+    // Trim to minimum weeks needed
+    while (arr.length > 35 && arr[arr.length - 7].getMonth() !== month.getMonth()) arr.splice(-7)
+    return arr
+  }, [month])
+
+  const prioColor = p => p==='alta' ? '#FF8FA0' : p==='media' ? '#FFD080' : 'var(--text-3)'
+  const prioBg    = p => p==='alta' ? 'rgba(255,90,106,0.13)' : p==='media' ? 'rgba(255,181,71,0.11)' : 'rgba(107,117,144,0.1)'
+  const DOW = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+  const monthLabel = month.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+
+  return (
+    <div>
+      <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
+        <button className="btn sm ghost" onClick={prevMonth} style={{padding:'4px 10px'}}>←</button>
+        <button className="btn sm ghost" onClick={goToday}>Hoy</button>
+        <button className="btn sm ghost" onClick={nextMonth} style={{padding:'4px 10px'}}>→</button>
+        <span style={{fontSize:13, color:'var(--text-2)', fontWeight:500, textTransform:'capitalize'}}>{monthLabel}</span>
+      </div>
+      <div style={{display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:4}}>
+        {DOW.map(d => (
+          <div key={d} style={{fontSize:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-4)', textAlign:'center', padding:'2px 0 8px'}}>{d}</div>
+        ))}
+        {days.map(d => {
+          const key = d.toISOString().slice(0,10)
+          const isCurrentMonth = d.getMonth() === month.getMonth()
+          const isToday = key === today
+          const dayTasks  = tasks.filter(t => taskDisplayDate(t) === key)
+          const pendientes = dayTasks.filter(t => !t.done)
+          const MAX = 3
+          return (
+            <div key={key} onClick={() => onAdd(key)} style={{
+              background: isToday ? 'rgba(45,107,255,0.07)' : 'rgba(255,255,255,0.015)',
+              border: `1px solid ${isToday ? 'rgba(45,107,255,0.35)' : 'var(--line-1)'}`,
+              borderRadius: 10, padding:'6px 6px 8px', minHeight: 76,
+              opacity: isCurrentMonth ? 1 : 0.3, cursor:'pointer',
+            }}
+            onMouseEnter={e => { if (!isToday) e.currentTarget.style.background='rgba(255,255,255,0.03)' }}
+            onMouseLeave={e => { if (!isToday) e.currentTarget.style.background = isToday ? 'rgba(45,107,255,0.07)' : 'rgba(255,255,255,0.015)' }}
+            >
+              <div style={{fontSize:12, fontWeight: isToday?700:500, color: isToday?'var(--brand-2)':'var(--text-3)', textAlign:'right', marginBottom:4}}>{d.getDate()}</div>
+              <div style={{display:'flex', flexDirection:'column', gap:2}}>
+                {pendientes.slice(0, MAX).map(t => (
+                  <div key={t.id} onClick={e => { e.stopPropagation(); onEdit(t) }} style={{
+                    padding:'2px 5px', borderRadius:4, fontSize:10.5, fontWeight:500, lineHeight:1.3,
+                    background: prioBg(t.prio), color: prioColor(t.prio),
+                    borderLeft:`2px solid ${prioColor(t.prio)}`,
+                    whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', cursor:'pointer',
+                  }}>{t.title}</div>
+                ))}
+                {pendientes.length > MAX && <div style={{fontSize:10, color:'var(--text-4)', padding:'1px 4px'}}>+{pendientes.length - MAX} más</div>}
+                {pendientes.length === 0 && dayTasks.some(t => t.done) && <div style={{fontSize:10, color:'var(--text-4)', padding:'1px 4px'}}>✓ {dayTasks.filter(t=>t.done).length}</div>}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ── Tareas ───────────────────────────────────────────────────────
 
 function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [] }) {
@@ -295,18 +369,18 @@ export function Tareas({ data, openItem, onItemOpened }) {
         <div className="page-actions">
           <div className="segmented">
             <button className={view==='lista'?'active':''} onClick={()=>setView('lista')}>Lista</button>
-            <button className={view==='calendario'?'active':''} onClick={()=>setView('calendario')}>Calendario</button>
+            <button className={view==='calendario'?'active':''} onClick={()=>setView('calendario')}>Semana</button>
+            <button className={view==='mes'?'active':''} onClick={()=>setView('mes')}>Mes</button>
           </div>
           <button className="btn primary" onClick={() => setCreating(true)}><I.Plus size={13}/> Nueva tarea</button>
         </div>
       </div>
 
       {view === 'calendario' && (
-        <CalendarioView
-          tasks={tasks}
-          onEdit={setEditing}
-          onAdd={handleCalendarAdd}
-        />
+        <CalendarioView tasks={tasks} onEdit={setEditing} onAdd={handleCalendarAdd} />
+      )}
+      {view === 'mes' && (
+        <MesView tasks={tasks} onEdit={setEditing} onAdd={handleCalendarAdd} />
       )}
 
       {view === 'lista' && <div className="grid-main-side">
