@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { I } from './Icons'
 import { STATE_COLORS, PIPELINE_COLS, eur } from './data'
 
@@ -31,10 +31,25 @@ function getEmpleadoName() {
   } catch { return 'Empleado' }
 }
 
-function buildMonthlyData(cobros) {
+function buildChartData(cobros, period) {
   const now = new Date()
+  const paid = cobros.filter(c => c.pagado)
+  if (period === 'semana') {
+    const days = []
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now); d.setDate(d.getDate() - i); d.setHours(0,0,0,0)
+      days.push({ key: d.toISOString().slice(0,10), label: d.toLocaleDateString('es-ES', { weekday:'short' }), value: 0 })
+    }
+    paid.forEach(c => {
+      const key = new Date(c.created_at || Date.now()).toISOString().slice(0,10)
+      const m = days.find(m => m.key === key)
+      if (m) m.value += (c.monto || 0)
+    })
+    return days
+  }
+  const count = period === 'año' ? 12 : 6
   const months = []
-  for (let i = 5; i >= 0; i--) {
+  for (let i = count - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
     months.push({
       key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,
@@ -42,7 +57,7 @@ function buildMonthlyData(cobros) {
       value: 0,
     })
   }
-  cobros.filter(c => c.pagado).forEach(c => {
+  paid.forEach(c => {
     const d = new Date(c.created_at || Date.now())
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
     const m = months.find(m => m.key === key)
@@ -51,11 +66,11 @@ function buildMonthlyData(cobros) {
   return months
 }
 
-function RevenueChart({ cobros }) {
-  const months = buildMonthlyData(cobros)
-  const data   = months.map(m => m.value)
-  const labels = months.map(m => m.label)
-  const total  = data.reduce((a,v) => a+v, 0)
+function RevenueChart({ cobros, period }) {
+  const months  = buildChartData(cobros, period)
+  const data    = months.map(m => m.value)
+  const labels  = months.map(m => m.label)
+  const total   = data.reduce((a,v) => a+v, 0)
   const hasData = total > 0
 
   const W=720, H=220, P={l:44,r:12,t:16,b:26}
@@ -145,6 +160,7 @@ function PipelineFunnel({ leads }) {
 
 export default function Dashboard({ role, setPage, openQuick, data }) {
   const { leads = [], tasks = [], proyectos = [], clientes = [], gastos = [], cobros = [], updateTask } = data || {}
+  const [chartPeriod, setChartPeriod] = useState('mes')
 
   // ── computed ────────────────────────────────────────────────
   const ingresosMes   = cobros.filter(c => c.pagado).reduce((a,c) => a + (c.monto||0), 0)
@@ -325,11 +341,13 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
             <span className="sub">· total €{eur(ingresosMes)}</span>
             <div className="right">
               <div className="segmented">
-                <button>Semana</button><button className="active">Mes</button><button>Año</button>
+                {[['semana','Semana'],['mes','Mes'],['año','Año']].map(([k,v]) => (
+                  <button key={k} className={chartPeriod===k?'active':''} onClick={() => setChartPeriod(k)}>{v}</button>
+                ))}
               </div>
             </div>
           </div>
-          <div className="card-body"><RevenueChart cobros={cobros} /></div>
+          <div className="card-body"><RevenueChart cobros={cobros} period={chartPeriod} /></div>
         </div>
         <div className="card">
           <div className="card-head">
@@ -394,7 +412,7 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
         <div className="card">
           <div className="card-head">
             <h3>Leads recientes</h3>
-            <div className="right"><button className="btn sm ghost" onClick={() => setPage('leads')}>Ver todos</button></div>
+            <div className="right"><button className="btn sm ghost" onClick={() => setPage('pipeline')}>Ver todos</button></div>
           </div>
           <table className="table">
             <thead><tr><th>Empresa</th><th>Servicio</th><th>Estado</th><th>Próximo paso</th><th style={{textAlign:'right'}}>Importe</th></tr></thead>
