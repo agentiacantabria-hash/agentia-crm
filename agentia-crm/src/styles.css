@@ -721,10 +721,17 @@ input, textarea, select { font-family: inherit; }
 /* Kanban */
 .kanban {
   display: grid;
-  grid-template-columns: repeat(7, 230px);
+  grid-template-columns: repeat(5, 1fr);
   gap: 10px;
-  overflow-x: auto;
   padding-bottom: 8px;
+}
+.kanban-closed {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line-1);
 }
 .kanban-col {
   background: linear-gradient(180deg, #0E1320 0%, #0A0E18 100%);
@@ -1159,8 +1166,9 @@ label.lbl {
   /* Ocultar columnas menos importantes en móvil */
   .table .hide-mobile { display: none; }
 
-  /* Kanban: scroll horizontal */
-  .kanban { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 16px; scroll-snap-type: x mandatory; grid-template-columns: repeat(7, 240px); }
+  /* Kanban: scroll horizontal en móvil */
+  .kanban { grid-template-columns: repeat(5, 240px); overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 16px; scroll-snap-type: x mandatory; }
+  .kanban-closed { grid-template-columns: repeat(2, 240px); overflow-x: auto; }
   .kanban-col { scroll-snap-align: start; }
 
   /* Pipeline funnel */
