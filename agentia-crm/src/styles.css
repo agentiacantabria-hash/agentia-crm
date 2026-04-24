@@ -1041,6 +1041,11 @@ label.lbl {
 }
 .fade-in { animation: fadeUp 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
 
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @keyframes pulseGlow {
   0%, 100% { box-shadow: 0 0 0 0 rgba(45,107,255,0.4); }
   50%      { box-shadow: 0 0 0 6px rgba(45,107,255,0); }

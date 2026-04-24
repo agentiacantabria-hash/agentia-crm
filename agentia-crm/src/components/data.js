@@ -64,6 +64,19 @@ export const STATE_COLORS = {
   'Denegado':           { chip:'red',    color:'#FF5A6A' },
 }
 
-export const PIPELINE_COLS = ['Cliente Nuevo','Cliente Potencial','Cliente Interesado','En Revisión','Señal pagada','Cobrado','Denegado']
+// Constantes de etapas — usar siempre estas, nunca strings literales
+export const STAGE = {
+  NUEVO:      'Cliente Nuevo',
+  POTENCIAL:  'Cliente Potencial',
+  INTERESADO: 'Cliente Interesado',
+  EN_REVISION:'En Revisión',
+  SEÑAL:      'Señal pagada',
+  COBRADO:    'Cobrado',
+  DENEGADO:   'Denegado',
+}
+export const STAGES_CLOSED  = [STAGE.COBRADO, STAGE.DENEGADO]
+export const STAGES_ACTIVE  = [STAGE.NUEVO, STAGE.POTENCIAL, STAGE.INTERESADO, STAGE.EN_REVISION, STAGE.SEÑAL]
+
+export const PIPELINE_COLS = [STAGE.NUEVO, STAGE.POTENCIAL, STAGE.INTERESADO, STAGE.EN_REVISION, STAGE.SEÑAL, STAGE.COBRADO, STAGE.DENEGADO]
 
 export const eur = (n) => n.toLocaleString('es-ES', { minimumFractionDigits: 0 })

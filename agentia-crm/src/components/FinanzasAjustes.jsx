@@ -3,6 +3,23 @@ import { I } from './Icons'
 import { Modal, F, SelectOrText, CustomSelect } from './Modal'
 import { PIPELINE_COLS, STATE_COLORS, eur } from './data'
 
+// ── CSV export helper ────────────────────────────────────────────
+function downloadCSV(rows, filename) {
+  if (!rows.length) return
+  const headers = Object.keys(rows[0])
+  const csv = [
+    headers.join(';'),
+    ...rows.map(r => headers.map(h => {
+      const v = r[h] == null ? '' : String(r[h])
+      return v.includes(';') || v.includes('"') || v.includes('\n') ? `"${v.replace(/"/g,'""')}"` : v
+    }).join(';'))
+  ].join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a'); a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
+
 // ── Finanzas ─────────────────────────────────────────────────────
 
 function CobroModal({ cobro, onClose, onSave }) {
@@ -178,6 +195,10 @@ export function Finanzas({ role, data }) {
           <div className="card-head">
             <h3>Todas las facturas</h3>
             <div className="right">
+              <button className="btn sm ghost" onClick={() => downloadCSV(
+                cobros.map(c => ({ Cliente: c.cliente, Concepto: c.concepto||'', Importe: c.monto||0, Vencimiento: c.vence||'', Estado: c.pagado?'Pagada':c.vencida?'Vencida':'Pendiente', Recurrente: c.recurrente?'Sí':'No' })),
+                `facturas-${new Date().toISOString().slice(0,10)}.csv`
+              )}>↓ CSV</button>
               <button className="btn sm" onClick={() => setAddingCobro(true)}><I.Plus size={12}/></button>
             </div>
           </div>
@@ -397,6 +418,11 @@ export function Ajustes({ role }) {
 
   const [tab, setTab] = useState('servicios')
 
+  const [ivaConfig, setIvaConfig] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('agentia_iva') || 'null') || { enabled: false, rate: 21, incluido: true } } catch { return { enabled: false, rate: 21, incluido: true } }
+  })
+  const saveIva = (cfg) => { setIvaConfig(cfg); localStorage.setItem('agentia_iva', JSON.stringify(cfg)) }
+
   const [servicios, setServicios] = useState(() => {
     try { const s = localStorage.getItem('agentia_servicios'); return s ? JSON.parse(s) : DEFAULT_SERVICIOS } catch { return DEFAULT_SERVICIOS }
   })
@@ -439,6 +465,7 @@ export function Ajustes({ role }) {
       <div className="segmented" style={{marginBottom:16}}>
         <button className={tab==='servicios'?'active':''} onClick={()=>setTab('servicios')}>Servicios</button>
         <button className={tab==='usuarios'?'active':''} onClick={()=>setTab('usuarios')}>Usuarios y roles</button>
+        <button className={tab==='finanzas'?'active':''} onClick={()=>setTab('finanzas')}>Finanzas</button>
         <button className={tab==='estados'?'active':''} onClick={()=>setTab('estados')}>Estados y etiquetas</button>
         <button className={tab==='marca'?'active':''} onClick={()=>setTab('marca')}>Marca</button>
       </div>
@@ -517,6 +544,39 @@ export function Ajustes({ role }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {tab === 'finanzas' && (
+        <div className="card">
+          <div className="card-head"><h3>Configuración de IVA</h3></div>
+          <div style={{display:'flex', flexDirection:'column', gap:16, padding:'4px 0'}}>
+            <div className="form-row" style={{alignItems:'center', justifyContent:'space-between', flexDirection:'row'}}>
+              <label style={{margin:0}}>Aplicar IVA en los importes</label>
+              <div className={`toggle ${ivaConfig.enabled?'on':''}`} style={{cursor:'pointer', flexShrink:0}} onClick={() => saveIva({...ivaConfig, enabled:!ivaConfig.enabled})}/>
+            </div>
+            {ivaConfig.enabled && (
+              <>
+                <div className="form-row">
+                  <label>Tipo de IVA</label>
+                  <CustomSelect value={String(ivaConfig.rate)} onChange={v => saveIva({...ivaConfig, rate: Number(v)})}
+                    options={[{value:'21',label:'21% — General'},{value:'10',label:'10% — Reducido'},{value:'4',label:'4% — Superreducido'},{value:'0',label:'0% — Exento'}]} />
+                </div>
+                <div className="form-row">
+                  <label>Los importes actuales son</label>
+                  <CustomSelect value={ivaConfig.incluido?'incluido':'base'} onChange={v => saveIva({...ivaConfig, incluido: v==='incluido'})}
+                    options={[{value:'base',label:'Base imponible (sin IVA)'},{value:'incluido',label:'Con IVA incluido'}]} />
+                </div>
+                <div style={{padding:'12px 14px', background:'rgba(62,207,142,0.06)', border:'1px solid rgba(62,207,142,0.2)', borderRadius:10, fontSize:12.5, color:'var(--text-3)'}}>
+                  {ivaConfig.incluido
+                    ? `Los importes ya incluyen IVA. Base imponible = importe ÷ 1.${String(ivaConfig.rate).padStart(2,'0')}`
+                    : `Los importes son base. Total con IVA = importe × 1.${String(ivaConfig.rate).padStart(2,'0')}`
+                  }
+                  <div style={{marginTop:6, color:'var(--text-4)'}}>Este ajuste es informativo — los importes almacenados no cambian.</div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 

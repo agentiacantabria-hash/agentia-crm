@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Sidebar, Topbar, SearchModal } from './components/Shell'
 import { QuickLeadDrawer } from './components/Drawer'
 import Dashboard from './components/Dashboard'
@@ -6,6 +6,7 @@ import { Clientes, Pipeline } from './components/LeadsClientesPipeline'
 import { Tareas, Proyectos } from './components/TareasProyectos'
 import { Finanzas, Ajustes } from './components/FinanzasAjustes'
 import { supabase } from './lib/supabase'
+import { STAGE, STAGES_CLOSED } from './components/data'
 
 const PAGES = [
   ['dashboard','Inicio'],
@@ -41,6 +42,24 @@ export default function App() {
   const [proyectos, setProyectos] = useState([])
   const [gastos,    setGastos]    = useState([])
   const [cobros,    setCobros]    = useState([])
+
+  // Refs para siempre tener el valor actual en callbacks sin stale closures
+  const clientesRef  = useRef(clientes)
+  const cobrosRef    = useRef(cobros)
+  const tasksRef     = useRef(tasks)
+  const proyectosRef = useRef(proyectos)
+  useEffect(() => { clientesRef.current  = clientes  }, [clientes])
+  useEffect(() => { cobrosRef.current    = cobros    }, [cobros])
+  useEffect(() => { tasksRef.current     = tasks     }, [tasks])
+  useEffect(() => { proyectosRef.current = proyectos }, [proyectos])
+
+  // Toast notifications
+  const [toasts, setToasts] = useState([])
+  const showToast = useCallback((msg, type = 'ok') => {
+    const id = Date.now() + Math.random()
+    setToasts(prev => [...prev, { id, msg, type }])
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3200)
+  }, [])
 
   useEffect(() => { localStorage.setItem('agentia_page', page) }, [page])
   useEffect(() => { localStorage.setItem('agentia_role', role) }, [role])
@@ -109,16 +128,18 @@ export default function App() {
       if (!error && d) {
         setLeads(prev => [d, ...prev])
         autoWinLead({ ...d, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, vence_resto })
+        showToast(`Lead «${leadData.empresa}» creado`)
         return
       }
     } catch (_) {}
     const local = { ...leadData, id: `l${Date.now()}` }
     setLeads(prev => [local, ...prev])
     autoWinLead({ ...local, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, vence_resto })
+    showToast(`Lead «${leadData.empresa}» creado`)
   }
 
   const autoWinLead = (lead) => {
-    if (lead.estado !== 'Cobrado') return
+    if (lead.estado !== STAGE.COBRADO) return
     const monto          = parseFloat(lead.monto) || 0
     const tipo           = lead.tipo || 'Proyecto'
     const montoRec       = parseFloat(lead.montoRecurrente) || 0
@@ -130,7 +151,7 @@ export default function App() {
     const señalCobrada   = parseFloat(lead.señal_cobrada) || 0
     const tieneSeñal     = señalCobrada > 0 && !esRecurrente
 
-    const yaExiste = clientes.some(c => c.nombre === lead.empresa)
+    const yaExiste = clientesRef.current.some(c => c.nombre === lead.empresa)
     if (!yaExiste) {
       const mes = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
       addCliente({
@@ -191,8 +212,16 @@ export default function App() {
   }
 
   const findCobroAuto = (lead) => {
-    const monto = parseFloat(lead.monto) || 0
-    return cobros.find(c => c.cliente === lead.empresa && c.monto === monto)
+    const monto    = parseFloat(lead.monto) || 0
+    const servicio = lead.servicio || ''
+    const list     = cobrosRef.current
+    // Primary: match by concepto exacto + monto (cobros creados por autoWinLead)
+    const byConcepto = list.find(c =>
+      c.cliente === lead.empresa && c.concepto === servicio && c.monto === monto && !c.recurrente
+    )
+    if (byConcepto) return byConcepto
+    // Fallback: monto + cliente (compatibilidad con cobros antiguos)
+    return list.find(c => c.cliente === lead.empresa && c.monto === monto && !c.recurrente)
   }
 
   const updateLead = async (id, updates) => {
@@ -203,11 +232,21 @@ export default function App() {
     } catch (_) {}
     setLeads(prev => prev.map(l => l.id === id ? { ...l, ...safeUpdates } : l))
 
+    // Cascade: si cambia el nombre de empresa, actualizar cobros, tareas, proyectos y clientes
+    if (safeUpdates.empresa && lead?.empresa && safeUpdates.empresa !== lead.empresa) {
+      const oldName = lead.empresa
+      const newName = safeUpdates.empresa
+      cobrosRef.current.filter(c => c.cliente === oldName).forEach(c => updateCobro(c.id, { cliente: newName }))
+      tasksRef.current.filter(t => t.cliente === oldName).forEach(t => updateTask(t.id, { cliente: newName }))
+      proyectosRef.current.filter(p => p.cliente === oldName).forEach(p => updateProyecto(p.id, { cliente: newName }))
+      clientesRef.current.filter(c => c.nombre === oldName).forEach(c => updateCliente(c.id, { nombre: newName }))
+    }
+
     const nuevoEstado  = safeUpdates.estado
-    const eraCobrado   = lead?.estado === 'Cobrado'
-    const eraSeñal     = lead?.estado === 'Señal pagada'
-    const seraCobrado  = nuevoEstado === 'Cobrado'
-    const seraDenegado = nuevoEstado === 'Denegado'
+    const eraCobrado   = lead?.estado === STAGE.COBRADO
+    const eraSeñal     = lead?.estado === STAGE.SEÑAL
+    const seraCobrado  = nuevoEstado === STAGE.COBRADO
+    const seraDenegado = nuevoEstado === STAGE.DENEGADO
 
     if (seraCobrado && !eraCobrado) {
       autoWinLead({ ...lead, ...safeUpdates, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, vence_resto })
@@ -257,7 +296,7 @@ export default function App() {
     setLeads(prev => prev.filter(l => l.id !== id))
 
     // Leads cerrados: solo eliminar la fila. Cobros y clientes se preservan.
-    if (['Cobrado', 'Denegado'].includes(lead?.estado)) return
+    if (STAGES_CLOSED.includes(lead?.estado)) return
 
     // Leads activos: limpiar cobro automático si lo había
     const c = findCobroAuto(lead)
@@ -273,9 +312,10 @@ export default function App() {
   const addCliente = async (cliente) => {
     try {
       const { data: d, error } = await supabase.from('clientes').insert([clean(cliente)]).select().single()
-      if (!error && d) { setClientes(prev => [d, ...prev]); return }
+      if (!error && d) { setClientes(prev => [d, ...prev]); showToast(`Cliente «${cliente.nombre}» creado`); return }
     } catch (_) {}
     setClientes(prev => [{ ...cliente, id: `c${Date.now()}` }, ...prev])
+    showToast(`Cliente «${cliente.nombre}» creado`)
   }
 
   const updateCliente = async (id, updates) => {
@@ -306,9 +346,10 @@ export default function App() {
   const addTask = async (tarea) => {
     try {
       const { data: d, error } = await supabase.from('tareas').insert([clean(tarea)]).select().single()
-      if (!error && d) { setTasks(prev => [d, ...prev]); return }
+      if (!error && d) { setTasks(prev => [d, ...prev]); showToast('Tarea creada'); return }
     } catch (_) {}
     setTasks(prev => [{ ...tarea, id: `t${Date.now()}`, done: false }, ...prev])
+    showToast('Tarea creada')
   }
 
   const updateTask = async (id, updates) => {
@@ -337,11 +378,18 @@ export default function App() {
   }
 
   const updateProyecto = async (id, updates) => {
+    // Si ajustes baja a 0 y el proyecto estaba en revisión por ajustes, avanzar estado
+    const proyecto = proyectosRef.current.find(p => p.id === id)
+    let extra = {}
+    if (updates.ajustes === 0 && proyecto?.ajustes > 0 && proyecto?.estado === 'Pagado · ajustes') {
+      extra = { estado: 'Cerrado', progreso: 100 }
+    }
+    const merged = { ...updates, ...extra }
     try {
-      const { error } = await supabase.from('proyectos').update(clean(updates)).eq('id', id)
-      if (!error) { setProyectos(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p)); return }
+      const { error } = await supabase.from('proyectos').update(clean(merged)).eq('id', id)
+      if (!error) { setProyectos(prev => prev.map(p => p.id === id ? { ...p, ...merged } : p)); return }
     } catch (_) {}
-    setProyectos(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
+    setProyectos(prev => prev.map(p => p.id === id ? { ...p, ...merged } : p))
   }
 
   const deleteProyecto = async (id) => {
@@ -397,6 +445,17 @@ export default function App() {
     } catch (_) {
       setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
     }
+    // Auto-update proyecto: si todos los cobros del cliente quedan pagados, marcar progreso 100%
+    if (updates.pagado === true && cobro && !cobro.pagado) {
+      const allCobros = cobrosRef.current
+      const clienteCobros = allCobros.filter(c => c.cliente === cobro.cliente && c.id !== id)
+      const todoPagado = clienteCobros.every(c => c.pagado)
+      if (todoPagado) {
+        const proyecto = proyectosRef.current.find(p => p.cliente === cobro.cliente && p.estado !== 'Cerrado')
+        if (proyecto) updateProyecto(proyecto.id, { progreso: 100, pago: 'Pagado' })
+      }
+    }
+
     // Si es un cobro recurrente que acaba de pagarse, generar el siguiente período
     if (updates.pagado === true && cobro && !cobro.pagado && cobro.recurrente) {
       const base = new Date(cobro.vence || Date.now())
@@ -422,7 +481,7 @@ export default function App() {
 
   // ──────────────────────────────────────────────────────────
   const counts = {
-    leads:     leads.filter(l => !['Cobrado','Denegado'].includes(l.estado)).length,
+    leads:     leads.filter(l => !STAGES_CLOSED.includes(l.estado)).length,
     clientes:  clientes.length,
     tareas:    tasks.filter(t => !t.done).length,
     proyectos: proyectos.filter(p => p.estado !== 'Cerrado').length,
@@ -430,11 +489,12 @@ export default function App() {
 
   const _today = new Date(); _today.setHours(0,0,0,0)
   const notifCount =
-    tasks.filter(t => !t.done && (
-      t.when_group === 'vencida' ||
-      (t.due_date && new Date(t.due_date + 'T00:00:00') < _today)
-    )).length +
-    cobros.filter(c => !c.pagado && (c.vencida || (c.vence && new Date(c.vence) < _today))).length
+    tasks.filter(t => {
+      if (t.done) return false
+      if (t.due_date) return new Date(t.due_date + 'T00:00:00') < _today
+      return t.when_group === 'vencida'
+    }).length +
+    cobros.filter(c => !c.pagado && (c.vencida || (c.vence && new Date(c.vence + 'T00:00:00') < _today))).length
 
   const data = {
     leads, clientes, tasks, proyectos, gastos, cobros,
@@ -444,6 +504,7 @@ export default function App() {
     addProyecto, updateProyecto, deleteProyecto,
     addGasto, updateGasto, deleteGasto,
     addCobro, updateCobro, deleteCobro,
+    showToast,
   }
 
   const pageEl = (() => {
@@ -471,6 +532,24 @@ export default function App() {
 
       <QuickLeadDrawer open={drawer} onClose={() => setDrawer(false)} onSave={addLead} />
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} data={data} setPage={setPage} />
+
+      {/* Toast notifications */}
+      <div style={{position:'fixed', bottom:24, right:24, display:'flex', flexDirection:'column', gap:8, zIndex:9999, pointerEvents:'none'}}>
+        {toasts.map(t => (
+          <div key={t.id} style={{
+            background: t.type === 'error' ? 'rgba(255,90,106,0.15)' : 'rgba(15,28,50,0.97)',
+            border: `1px solid ${t.type === 'error' ? 'rgba(255,90,106,0.4)' : 'rgba(62,207,142,0.35)'}`,
+            color: t.type === 'error' ? '#FF8FA0' : 'var(--text-1)',
+            padding: '10px 16px', borderRadius: 10, fontSize: 13, fontWeight: 500,
+            boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', gap: 8,
+            animation: 'toastIn 0.2s ease',
+          }}>
+            <span style={{color: t.type === 'error' ? '#FF5A6A' : '#3ECF8E', fontSize:15}}>{t.type === 'error' ? '✕' : '✓'}</span>
+            {t.msg}
+          </div>
+        ))}
+      </div>
     </>
   )
 }

@@ -1,7 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { I } from './Icons'
 import { Modal, F, SelectOrText, CustomSelect } from './Modal'
-import { STATE_COLORS, PIPELINE_COLS, eur } from './data'
+import { STATE_COLORS, PIPELINE_COLS, STAGE, STAGES_CLOSED, eur } from './data'
+
+function downloadCSV(rows, filename) {
+  if (!rows.length) return
+  const headers = Object.keys(rows[0])
+  const csv = [
+    headers.join(';'),
+    ...rows.map(r => headers.map(h => {
+      const v = r[h] == null ? '' : String(r[h])
+      return v.includes(';') || v.includes('"') ? `"${v.replace(/"/g,'""')}"` : v
+    }).join(';'))
+  ].join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a'); a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
 
 function getServicios() {
   try {
@@ -300,29 +316,37 @@ export function Clientes({ data }) {
 // ── SeñalPagadaModal ─────────────────────────────────────────────
 
 function SeñalPagadaModal({ lead, onClose, onConfirm }) {
-  const total = parseFloat(lead.monto) || 0
+  const total  = parseFloat(lead.monto) || 0
   const [señal, setSeñal] = useState(Math.round(total / 2))
-  const resto = total - (parseFloat(señal) || 0)
-  const pct   = total > 0 ? Math.round((parseFloat(señal) || 0) / total * 100) : 0
+  const señalNum = parseFloat(señal) || 0
+  const resto  = total - señalNum
+  const pct    = total > 0 ? Math.round(señalNum / total * 100) : 0
+  const invalid = señalNum <= 0 || señalNum >= total
 
   return (
     <Modal open title={`Señal cobrada — ${lead.empresa}`} onClose={onClose}
-      onSave={() => onConfirm(parseFloat(señal) || 0)} saveLabel="Confirmar señal">
+      onSave={() => !invalid && onConfirm(señalNum)} saveLabel="Confirmar señal">
       <div style={{padding:'14px 16px', background:'rgba(46,196,182,0.07)', border:'1px solid rgba(46,196,182,0.2)', borderRadius:10, marginBottom:4}}>
         <div style={{fontSize:12, color:'var(--text-3)', marginBottom:2}}>Total del proyecto</div>
         <div style={{fontSize:26, fontWeight:700}}>€{eur(total)}</div>
       </div>
       <F label="Importe de la señal (€)">
-        <input type="number" min="0" max={total} value={señal}
-          onChange={e => setSeñal(e.target.value)} autoFocus />
+        <input type="number" min="1" max={total - 1} value={señal}
+          onChange={e => setSeñal(e.target.value)} autoFocus
+          style={invalid ? {borderColor:'var(--danger)'} : {}} />
       </F>
+      {invalid && (
+        <div style={{fontSize:12, color:'var(--danger)', marginTop:-6, marginBottom:4}}>
+          {señalNum <= 0 ? 'La señal debe ser mayor que 0' : `La señal no puede ser igual o mayor al total (€${eur(total)})`}
+        </div>
+      )}
       <div style={{padding:'12px 14px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--line-2)', borderRadius:10}}>
         <div style={{display:'flex', justifyContent:'space-between', fontSize:12.5, marginBottom:8}}>
-          <span style={{color:'#2EC4B6', fontWeight:600}}>Cobras hoy: €{eur(parseFloat(señal)||0)}</span>
-          <span style={{color:'var(--text-3)'}}>Al entregar: €{eur(resto < 0 ? 0 : resto)}</span>
+          <span style={{color:'#2EC4B6', fontWeight:600}}>Cobras hoy: €{eur(señalNum)}</span>
+          <span style={{color:'var(--text-3)'}}>Al entregar: €{eur(Math.max(0, resto))}</span>
         </div>
         <div style={{height:6, background:'rgba(255,255,255,0.06)', borderRadius:3}}>
-          <div style={{width:`${Math.min(pct,100)}%`, height:'100%', background:'#2EC4B6', borderRadius:3, transition:'width 0.2s'}}/>
+          <div style={{width:`${Math.min(100, pct)}%`, height:'100%', background:'#2EC4B6', borderRadius:3, transition:'width 0.2s'}}/>
         </div>
         <div style={{fontSize:11, color:'var(--text-4)', marginTop:6}}>{pct}% cobrado ahora · {100-pct}% al cerrar</div>
       </div>
@@ -385,6 +409,7 @@ export function Pipeline({ data, openQuick }) {
   const leads = data?.leads || []
   const [view,     setView]     = useState('kanban')
   const [filter,   setFilter]   = useState('todos')
+  const [filterResp, setFilterResp] = useState('todos')
   const [movingId,       setMovingId]       = useState(null)
   const [editing,        setEditing]        = useState(null)
   const [creating,       setCreating]       = useState(false)
@@ -392,27 +417,39 @@ export function Pipeline({ data, openQuick }) {
   const [señalLead,      setSeñalLead]      = useState(null)
   const [cobrarRestoLead,setCobrarRestoLead] = useState(null)
 
-  const activeLeads = leads.filter(l => !['Cobrado','Denegado'].includes(l.estado))
-  const closedLeads = leads.filter(l =>  ['Cobrado','Denegado'].includes(l.estado))
+  const allResp = [...new Set(leads.map(l => l.responsable).filter(Boolean))]
+
+  const activeLeads = leads.filter(l => !STAGES_CLOSED.includes(l.estado))
+  const closedLeads = leads.filter(l =>  STAGES_CLOSED.includes(l.estado))
   const base     = filter === 'cerrados' ? closedLeads : activeLeads
   const filtered = (filter === 'todos' || filter === 'cerrados') ? base : base.filter(l => l.temp === filter)
+
+  const applyRespFilter = (items) => filterResp === 'todos' ? items : items.filter(l => l.responsable === filterResp)
 
   const cols = PIPELINE_COLS.map(label => ({
     label,
     color: STATE_COLORS[label]?.color || '#6B7590',
-    items: leads.filter(l => l.estado === label),
+    items: applyRespFilter(leads.filter(l => l.estado === label)),
   }))
+
+  // Métricas de conversión
+  const totalCreados  = leads.length
+  const totalCobrados = leads.filter(l => l.estado === STAGE.COBRADO).length
+  const convRate      = totalCreados > 0 ? Math.round(totalCobrados / totalCreados * 100) : 0
 
   const moveCard = (leadId, newEstado) => {
     const lead = leads.find(l => l.id === leadId)
-    if (newEstado === 'Señal pagada') {
+    if (newEstado === STAGE.DENEGADO) {
+      if (!confirm(`¿Mover "${lead?.empresa}" a Denegado? Esta acción es difícil de revertir.`)) return
+    }
+    if (newEstado === STAGE.SEÑAL) {
       if (lead) { setSeñalLead(lead); setMovingId(null); return }
     }
-    if (newEstado === 'Cobrado') {
-      if (lead?.estado === 'Señal pagada') {
+    if (newEstado === STAGE.COBRADO) {
+      if (lead?.estado === STAGE.SEÑAL) {
         setCobrarRestoLead(lead); setMovingId(null); return
       }
-      if (lead) { setCobradoLead({ ...lead, estado: 'Cobrado' }); setMovingId(null); return }
+      if (lead) { setCobradoLead({ ...lead, estado: STAGE.COBRADO }); setMovingId(null); return }
     }
     data.updateLead?.(leadId, { estado: newEstado })
     setMovingId(null)
@@ -432,7 +469,7 @@ export function Pipeline({ data, openQuick }) {
       recurrente: false,
     })
     data.updateLead?.(lead.id, {
-      estado: 'Señal pagada',
+      estado: STAGE.SEÑAL,
       señal_cobrada: señalMonto,
       señal_fecha: today,
     })
@@ -442,7 +479,7 @@ export function Pipeline({ data, openQuick }) {
   const handleRestoConfirm = ({ vence_resto, tipo, crearProyecto }) => {
     const lead = cobrarRestoLead
     data.updateLead?.(lead.id, {
-      estado: 'Cobrado',
+      estado: STAGE.COBRADO,
       tipo,
       crearProyecto,
       vence_resto,
@@ -482,6 +519,12 @@ export function Pipeline({ data, openQuick }) {
             <button className={view==='kanban'?'active':''} onClick={()=>setView('kanban')}>Kanban</button>
             <button className={view==='lista'?'active':''} onClick={()=>setView('lista')}>Lista</button>
           </div>
+          {view === 'lista' && (
+            <button className="btn ghost" onClick={() => downloadCSV(
+              filtered.map(l => ({ Empresa: l.empresa, Sector: l.sector||'', Ciudad: l.ciudad||'', Servicio: l.servicio||'', Estado: l.estado, Origen: l.origen||'', Responsable: l.responsable||'', Importe: l.monto||0, ProximoPaso: l.next||'' })),
+              `leads-${new Date().toISOString().slice(0,10)}.csv`
+            )}>↓ CSV</button>
+          )}
           <button className="btn primary" onClick={() => setCreating(true)}><I.Plus size={13}/> Nuevo lead</button>
         </div>
       </div>
@@ -490,10 +533,10 @@ export function Pipeline({ data, openQuick }) {
         <>
           <div className="pipe-summary">
             {[
-              {label:'Abiertas',       v: activeLeads.length,                                   sub:'oportunidades'},
-              {label:'Valor potencial',v: `€${eur(totalAbierto)}`,                              sub:'suma total'},
-              {label:'Cobradas',       v: leads.filter(l=>l.estado==='Cobrado').length,         sub:'este pipeline'},
-              {label:'Denegadas',      v: leads.filter(l=>l.estado==='Denegado').length,        sub:'este pipeline'},
+              {label:'Abiertas',       v: activeLeads.length,                                   sub:'oportunidades activas'},
+              {label:'Valor potencial',v: `€${eur(totalAbierto)}`,                              sub:'en el pipeline'},
+              {label:'Cobradas',       v: totalCobrados,                                        sub:`${convRate}% conversión`},
+              {label:'Denegadas',      v: leads.filter(l=>l.estado===STAGE.DENEGADO).length,   sub:'leads perdidos'},
             ].map((s,i)=>(
               <div key={i} className="stat" style={{padding:'14px 16px'}}>
                 <div className="label" style={{fontSize:11}}>{s.label}</div>
@@ -502,6 +545,17 @@ export function Pipeline({ data, openQuick }) {
               </div>
             ))}
           </div>
+
+          {allResp.length > 1 && (
+            <div style={{display:'flex', gap:6, marginBottom:10, flexWrap:'wrap'}}>
+              {['todos', ...allResp].map(r => (
+                <button key={r} className={`btn sm ${filterResp === r ? 'primary' : 'ghost'}`}
+                  onClick={() => setFilterResp(r)}>
+                  {r === 'todos' ? 'Todos' : r}
+                </button>
+              ))}
+            </div>
+          )}
 
           {movingId && (() => {
             const lead = leads.find(l => l.id === movingId)
@@ -532,9 +586,14 @@ export function Pipeline({ data, openQuick }) {
                   <div className="bar" style={{'--col-color': col.color}}/>
                   <span className="title">{col.label}</span>
                   <span className="count">{col.items.length}</span>
+                  {col.items.length > 0 && (
+                    <span style={{fontSize:10, color:'var(--text-4)', fontFamily:'var(--font-mono)', marginLeft:4}}>
+                      €{eur(col.items.reduce((a,l) => a + (l.monto||0), 0))}
+                    </span>
+                  )}
                 </div>
                 {col.items.map(l=>{
-                  const isSeñal      = l.estado === 'Señal pagada'
+                  const isSeñal      = l.estado === STAGE.SEÑAL
                   const señalCobrada = parseFloat(l.señal_cobrada) || 0
                   const total        = parseFloat(l.monto) || 0
                   const pct          = total > 0 ? Math.round(señalCobrada / total * 100) : 0
@@ -608,7 +667,7 @@ export function Pipeline({ data, openQuick }) {
                     <td onClick={e => e.stopPropagation()}>
                       <RowMenu
                         onEdit={() => setEditing(l)}
-                        onDelete={() => { if (confirm(`¿${['Cobrado','Denegado'].includes(l.estado) ? 'Quitar del pipeline' : 'Eliminar'} "${l.empresa}"?`)) data.deleteLead?.(l.id) }}
+                        onDelete={() => { if (confirm(`¿${STAGES_CLOSED.includes(l.estado) ? 'Quitar del pipeline' : 'Eliminar'} "${l.empresa}"?`)) data.deleteLead?.(l.id) }}
                       />
                     </td>
                   </tr>

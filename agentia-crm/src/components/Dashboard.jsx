@@ -1,13 +1,13 @@
 import React, { useState } from 'react'
 import { I } from './Icons'
-import { STATE_COLORS, PIPELINE_COLS, eur } from './data'
+import { STATE_COLORS, PIPELINE_COLS, STAGE, STAGES_CLOSED, eur } from './data'
 
 function effectiveGroup(task) {
   if (task.due_date) {
     const today = new Date(); today.setHours(0,0,0,0)
-    const due = new Date(task.due_date); due.setHours(0,0,0,0)
-    const diff = Math.floor((due - today) / 86400000)
-    if (diff < 0) return 'vencida'
+    const due   = new Date(task.due_date + 'T00:00:00'); due.setHours(0,0,0,0)
+    const diff  = Math.floor((due - today) / 86400000)
+    if (diff < 0)  return 'vencida'
     if (diff === 0) return 'hoy'
     if (diff === 1) return 'mañana'
     return 'semana'
@@ -124,7 +124,7 @@ function RevenueChart({ cobros, period }) {
 }
 
 function PipelineFunnel({ leads }) {
-  const active = PIPELINE_COLS.filter(c => !['Cobrado','Denegado'].includes(c))
+  const active = PIPELINE_COLS.filter(c => !STAGES_CLOSED.includes(c))
   const stages = active.map(col => {
     const group = leads.filter(l => l.estado === col)
     return {
@@ -159,7 +159,7 @@ function PipelineFunnel({ leads }) {
 }
 
 export default function Dashboard({ role, setPage, openQuick, data }) {
-  const { leads = [], tasks = [], proyectos = [], clientes = [], gastos = [], cobros = [], updateTask } = data || {}
+  const { leads = [], tasks = [], proyectos = [], clientes = [], gastos = [], cobros = [], updateTask, showToast } = data || {}
   const [chartPeriod, setChartPeriod] = useState('mes')
 
   // ── computed ────────────────────────────────────────────────
@@ -180,10 +180,10 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
   }, 0)
   const clientesRecurrentesN = clientes.filter(c => (c.tipo || c.estado) === 'Recurrente').length
 
-  const leadsActivos  = leads.filter(l => !['Cobrado','Denegado'].includes(l.estado))
+  const leadsActivos  = leads.filter(l => !STAGES_CLOSED.includes(l.estado))
   const leadsCalientes = leads.filter(l => l.temp === 'hot')
   const leadesTibios  = leads.filter(l => l.temp === 'warm')
-  const urgentes      = tasks.filter(t => t.prio === 'alta' && !t.done && ['hoy','vencida'].includes(t.when_group))
+  const urgentes      = tasks.filter(t => t.prio === 'alta' && !t.done && ['hoy','vencida'].includes(effectiveGroup(t)))
 
   const clientesActivos    = clientes.length
   const clientesEnCurso    = clientes.filter(c => c.estado === 'En curso').length
@@ -198,7 +198,7 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
   const pipelineTotal = leadsActivos.reduce((a,l) => a + (l.monto||0), 0)
 
   const seguimientos = leads
-    .filter(l => l.next && l.next !== '—' && !['Cobrado','Denegado'].includes(l.estado))
+    .filter(l => l.next && l.next !== '—' && !STAGES_CLOSED.includes(l.estado))
     .slice(0, 4)
     .map(l => ({
       name: l.empresa,
@@ -303,7 +303,7 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
               <div className="mini"><div className="label">Leads activos</div><div className="value">{leadsActivos.length}</div><div className="trend" style={{color:'var(--brand-3)'}}>{leadsCalientes.length} calientes</div></div>
               <div className="mini"><div className="label">Tareas hoy</div><div className="value">{tasks.filter(t=>t.when_group==='hoy'&&!t.done).length}</div><div className="trend" style={{color: urgentes.length>0?'var(--warn)':'var(--ok)'}}>{urgentes.length>0?`${urgentes.length} urgente${urgentes.length!==1?'s':''}`:'Sin urgentes'}</div></div>
               <div className="mini"><div className="label">En proyecto</div><div className="value">{proyectos.filter(p=>p.estado!=='Cerrado').length}</div><div className="trend" style={{color:'var(--text-3)'}}>{proyectos.filter(p=>p.ajustes>0).length} con ajustes</div></div>
-              <div className="mini"><div className="label">Cobrados</div><div className="value">{leads.filter(l=>l.estado==='Cobrado').length}</div><div className="trend trend-up">leads cerrados</div></div>
+              <div className="mini"><div className="label">Cobrados</div><div className="value">{leads.filter(l=>l.estado===STAGE.COBRADO).length}</div><div className="trend trend-up">leads cerrados</div></div>
             </div>
           )}
         </div>
@@ -450,6 +450,41 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
                       ? <span className="chip red"><span className="dot"/>+30 días</span>
                       : <span className="chip teal"><span className="dot"/>Activo</span>
                     }
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
+
+      {role === 'admin' && (() => {
+        const today = new Date(); today.setHours(0,0,0,0)
+        const recVencidos = cobros.filter(c => c.recurrente && !c.pagado && c.vence && new Date(c.vence + 'T00:00:00') < today)
+        if (!recVencidos.length) return null
+        return (
+          <div className="card" style={{marginBottom:16, borderColor:'rgba(255,181,71,0.3)'}}>
+            <div className="card-head">
+              <h3>Cuotas recurrentes vencidas</h3>
+              <span className="sub">· {recVencidos.length} sin cobrar</span>
+              <div className="right"><button className="btn sm ghost" onClick={() => setPage('finanzas')}>Ver finanzas <I.ChevronR size={12}/></button></div>
+            </div>
+            <div>
+              {recVencidos.map(c => {
+                const dias = Math.floor((today - new Date(c.vence + 'T00:00:00')) / 86400000)
+                return (
+                  <div key={c.id} className="task">
+                    <div style={{width:30, height:30, borderRadius:8, background:'rgba(255,181,71,0.12)', display:'inline-flex', alignItems:'center', justifyContent:'center', color:'#FFB547', flexShrink:0}}>
+                      <I.Receipt size={14}/>
+                    </div>
+                    <div style={{minWidth:0, flex:1}}>
+                      <div className="title">{c.cliente}</div>
+                      <div className="sub">{c.concepto} · Venció hace {dias}d · €{eur(c.monto||0)}</div>
+                    </div>
+                    <button className="btn sm" style={{fontSize:11}}
+                      onClick={() => { data.updateCobro?.(c.id, { pagado: true, vencida: false }); showToast?.(`Cobro de ${c.cliente} marcado como pagado`) }}>
+                      ✓ Cobrar
+                    </button>
                   </div>
                 )
               })}
