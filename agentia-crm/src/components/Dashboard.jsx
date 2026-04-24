@@ -41,8 +41,9 @@ function buildChartData(cobros, period) {
       days.push({ key: d.toISOString().slice(0,10), label: d.toLocaleDateString('es-ES', { weekday:'short' }), value: 0 })
     }
     paid.forEach(c => {
-      const key = new Date(c.created_at || Date.now()).toISOString().slice(0,10)
-      const m = days.find(m => m.key === key)
+      const raw = c.vence || c.created_at
+      const key = raw ? new Date(raw.length === 10 ? raw + 'T00:00:00' : raw).toISOString().slice(0,10) : null
+      const m = key ? days.find(m => m.key === key) : null
       if (m) m.value += (c.monto || 0)
     })
     return days
@@ -58,7 +59,8 @@ function buildChartData(cobros, period) {
     })
   }
   paid.forEach(c => {
-    const d = new Date(c.created_at || Date.now())
+    const raw = c.vence || c.created_at
+    const d = raw ? new Date(raw.length === 10 ? raw + 'T00:00:00' : raw) : new Date()
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
     const m = months.find(m => m.key === key)
     if (m) m.value += (c.monto || 0)
@@ -178,7 +180,7 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
     const factor = freq === 'Semanal' ? 4.33 : freq === 'Trimestral' ? 1/3 : 1
     return acc + (c.monto || 0) * factor
   }, 0)
-  const clientesRecurrentesN = clientes.filter(c => (c.tipo || c.estado) === 'Recurrente').length
+  const clientesRecurrentesN = clientes.filter(c => c.tipo === 'Recurrente' || c.estado === 'Recurrente').length
 
   const leadsActivos  = leads.filter(l => !STAGES_CLOSED.includes(l.estado))
   const leadsCalientes = leads.filter(l => l.temp === 'hot')
@@ -238,7 +240,7 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
     if (role !== 'admin') {
       // Empleado: solo info operativa, sin finanzas
       const parts = []
-      const tareasHoy = tasks.filter(t => t.when_group === 'hoy' && !t.done).length
+      const tareasHoy = tasks.filter(t => effectiveGroup(t) === 'hoy' && !t.done).length
       if (tareasHoy > 0) parts.push(`${tareasHoy} tarea${tareasHoy!==1?'s':''} para hoy`)
       if (leadsActivos.length > 0) parts.push(`${leadsActivos.length} lead${leadsActivos.length!==1?'s':''} activo${leadsActivos.length!==1?'s':''}`)
       return parts.length ? parts.join(' · ') : 'Sin tareas ni leads pendientes.'
@@ -301,7 +303,7 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
           ) : (
             <div className="hero-kpi">
               <div className="mini"><div className="label">Leads activos</div><div className="value">{leadsActivos.length}</div><div className="trend" style={{color:'var(--brand-3)'}}>{leadsCalientes.length} calientes</div></div>
-              <div className="mini"><div className="label">Tareas hoy</div><div className="value">{tasks.filter(t=>t.when_group==='hoy'&&!t.done).length}</div><div className="trend" style={{color: urgentes.length>0?'var(--warn)':'var(--ok)'}}>{urgentes.length>0?`${urgentes.length} urgente${urgentes.length!==1?'s':''}`:'Sin urgentes'}</div></div>
+              <div className="mini"><div className="label">Tareas hoy</div><div className="value">{tasks.filter(t=>effectiveGroup(t)==='hoy'&&!t.done).length}</div><div className="trend" style={{color: urgentes.length>0?'var(--warn)':'var(--ok)'}}>{urgentes.length>0?`${urgentes.length} urgente${urgentes.length!==1?'s':''}`:'Sin urgentes'}</div></div>
               <div className="mini"><div className="label">En proyecto</div><div className="value">{proyectos.filter(p=>p.estado!=='Cerrado').length}</div><div className="trend" style={{color:'var(--text-3)'}}>{proyectos.filter(p=>p.ajustes>0).length} con ajustes</div></div>
               <div className="mini"><div className="label">Cobrados</div><div className="value">{leads.filter(l=>l.estado===STAGE.COBRADO).length}</div><div className="trend trend-up">leads cerrados</div></div>
             </div>
@@ -416,7 +418,7 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
       <div style={{height:16}}/>
 
       {role === 'admin' && (() => {
-        const señalLeads = leads.filter(l => l.estado === 'Señal pagada')
+        const señalLeads = leads.filter(l => l.estado === STAGE.SEÑAL)
         if (!señalLeads.length) return null
         return (
           <div className="card" style={{marginBottom:16}}>

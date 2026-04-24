@@ -26,6 +26,7 @@ function CobroModal({ cobro, onClose, onSave }) {
   const isNew = !cobro?.id
   const [form, setForm] = useState(cobro ? { ...cobro, monto: cobro.monto ?? '' } : {
     cliente:'', concepto:'', monto:'', vence:'', vencida:false, pagado:false,
+    recurrente:false, frecuencia:'Mensual',
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -44,7 +45,17 @@ function CobroModal({ cobro, onClose, onSave }) {
             onChange={v => setForm(f => ({ ...f, pagado: v==='pagado', vencida: v==='vencida' }))}
             options={[{value:'pendiente',label:'Pendiente'},{value:'vencida',label:'Vencida'},{value:'pagado',label:'Pagada'}]} />
         </F>
+        <F label="Recurrente">
+          <CustomSelect value={form.recurrente?'si':'no'} onChange={v => set('recurrente', v==='si')}
+            options={[{value:'no',label:'No — único'},{value:'si',label:'Sí — se repite'}]} />
+        </F>
       </div>
+      {form.recurrente && (
+        <F label="Frecuencia">
+          <CustomSelect value={form.frecuencia||'Mensual'} onChange={v => set('frecuencia', v)}
+            options={['Mensual','Semanal','Trimestral']} />
+        </F>
+      )}
     </Modal>
   )
 }
@@ -118,7 +129,7 @@ export function Finanzas({ role, data }) {
   const gastoPerso  = gastos.filter(g => g.tipo === 'Personas').reduce((a,g) => a + (g.monto||0), 0)
   const margen      = (ingresosMes + cobrosPend) > 0
     ? Math.round((ingresosMes - gastosMes) / (ingresosMes + cobrosPend) * 100)
-    : 100
+    : (gastosMes === 0 ? 100 : 0)
 
   const handleSaveCobro = (form) => {
     if (form.id) data.updateCobro?.(form.id, form)
@@ -238,8 +249,9 @@ export function Finanzas({ role, data }) {
                       {!c.pagado && c.vence && (() => {
                         const dias = Math.floor((Date.now() - new Date(c.vence + 'T00:00:00')) / 86400000)
                         if (dias < 0) return null
-                        const col = dias < 15 ? '#3ECF8E' : dias < 30 ? '#FFB547' : '#FF5A6A'
-                        return <span style={{marginLeft:6, fontSize:10.5, fontWeight:600, color:col, fontFamily:'var(--font-mono)'}}>+{dias}d</span>
+                        const col = dias < 15 ? '#FFB547' : dias < 30 ? '#FF8050' : '#FF5A6A'
+                        const label = dias === 0 ? 'Hoy' : `+${dias}d`
+                        return <span style={{marginLeft:6, fontSize:10.5, fontWeight:600, color:col, fontFamily:'var(--font-mono)'}}>{label}</span>
                       })()}
                     </td>
                     <td>

@@ -91,12 +91,16 @@ export default function App() {
             'Interesado': 'Cliente Interesado',
             'Propuesta enviada': 'En Revisión', 'En seguimiento': 'En Revisión',
           }
-          const migrated = l.data.map(lead => {
+          const toMigrate = l.data.filter(lead => stateMap[lead.estado])
+          if (toMigrate.length > 0) {
+            await Promise.all(toMigrate.map(lead =>
+              supabase.from('leads').update({ estado: stateMap[lead.estado] }).eq('id', lead.id)
+            ))
+          }
+          setLeads(l.data.map(lead => {
             const newEstado = stateMap[lead.estado]
-            if (newEstado) supabase.from('leads').update({ estado: newEstado }).eq('id', lead.id)
             return newEstado ? { ...lead, estado: newEstado } : lead
-          })
-          setLeads(migrated)
+          }))
         }
         if (!c.error && c.data)  setClientes(c.data)
         if (!t.error && t.data)  setTasks(t.data)
@@ -264,7 +268,7 @@ export default function App() {
     if (eraSeñal && nuevoEstado && !seraCobrado && !seraDenegado) {
       const señalVal = parseFloat(lead.señal_cobrada) || 0
       if (señalVal > 0) {
-        const señalCobro = cobros.find(c =>
+        const señalCobro = cobrosRef.current.find(c =>
           c.cliente === lead.empresa &&
           (c.concepto || '').startsWith('Señal ·') &&
           c.monto === señalVal
@@ -302,9 +306,9 @@ export default function App() {
     const c = findCobroAuto(lead)
     if (c) deleteCobro(c.id)
     // Cascade tareas/proyectos si no hay cliente activo con ese nombre
-    if (lead && !clientes.some(c => c.nombre === lead.empresa)) {
-      tasks.filter(t => t.cliente === lead.empresa).forEach(t => deleteTask(t.id))
-      proyectos.filter(p => p.cliente === lead.empresa).forEach(p => deleteProyecto(p.id))
+    if (lead && !clientesRef.current.some(c => c.nombre === lead.empresa)) {
+      tasksRef.current.filter(t => t.cliente === lead.empresa).forEach(t => deleteTask(t.id))
+      proyectosRef.current.filter(p => p.cliente === lead.empresa).forEach(p => deleteProyecto(p.id))
     }
   }
 
@@ -438,7 +442,7 @@ export default function App() {
   }
 
   const updateCobro = async (id, updates) => {
-    const cobro = cobros.find(c => c.id === id)
+    const cobro = cobrosRef.current.find(c => c.id === id)
     try {
       const { error } = await supabase.from('cobros').update(clean(updates)).eq('id', id)
       if (!error) { setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c)); }

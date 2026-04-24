@@ -16,7 +16,7 @@ function getServicios() {
 function computeWhenGroup(due_date) {
   if (!due_date) return null
   const today = new Date(); today.setHours(0,0,0,0)
-  const due   = new Date(due_date); due.setHours(0,0,0,0)
+  const due   = new Date(due_date + 'T00:00:00'); due.setHours(0,0,0,0)
   const diff  = Math.floor((due - today) / 86400000)
   if (diff < 0)  return 'vencida'
   if (diff === 0) return 'hoy'
@@ -41,6 +41,16 @@ function tomorrowIso() {
 function weekIso() {
   const d = new Date(); d.setDate(d.getDate()+3)
   return d.toISOString().slice(0,10)
+}
+
+function taskDisplayDate(task) {
+  if (task.due_date) return task.due_date
+  const t = new Date(); t.setHours(0,0,0,0)
+  const tomorrow = new Date(t); tomorrow.setDate(t.getDate() + 1)
+  if (task.when_group === 'hoy')     return t.toISOString().slice(0,10)
+  if (task.when_group === 'mañana')  return tomorrow.toISOString().slice(0,10)
+  if (task.when_group === 'vencida') return t.toISOString().slice(0,10)
+  return null
 }
 
 // ── Calendario ──────────────────────────────────────────────────
@@ -90,7 +100,7 @@ function CalendarioView({ tasks, onEdit, onAdd }) {
           const key   = d.toISOString().slice(0,10)
           const isToday = key === today
           const isPast  = key < today
-          const dayTasks = tasks.filter(t => t.due_date === key).sort((a,b) => {
+          const dayTasks = tasks.filter(t => taskDisplayDate(t) === key).sort((a,b) => {
             const order = {alta:0, media:1, baja:2}
             return (order[a.prio]||1) - (order[b.prio]||1)
           })
@@ -119,9 +129,11 @@ function CalendarioView({ tasks, onEdit, onAdd }) {
                     padding:'4px 7px', borderRadius:6, cursor:'pointer', fontSize:11.5, fontWeight:500, lineHeight:1.3,
                     background: prioColor(t.prio, 'bg'), color: prioColor(t.prio, 'text'),
                     borderLeft: `2px solid ${prioColor(t.prio, 'text')}`,
+                    opacity: !t.due_date ? 0.75 : 1,
                   }}>
                     {t.title}
                     {t.time && <span style={{fontSize:10, opacity:0.65, marginLeft:4}}>{t.time}</span>}
+                    {!t.due_date && <span style={{fontSize:9, opacity:0.55, marginLeft:4}}>sin fecha</span>}
                   </div>
                 ))}
                 {hechas.map(t => (
@@ -403,7 +415,7 @@ function ProyectoModal({ proyecto, onClose, onSave, onDelete, cobros = [], updat
         return (
           <div style={{border:'1px solid var(--line-2)', borderRadius:10, overflow:'hidden'}}>
             <div style={{padding:'10px 14px', borderBottom:'1px solid var(--line-1)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-              <span style={{fontSize:11.5, fontWeight:600, color:'var(--text-2)', textTransform:'uppercase', letterSpacing:'0.05em'}}>Cobros del proyecto</span>
+              <span style={{fontSize:11.5, fontWeight:600, color:'var(--text-2)', textTransform:'uppercase', letterSpacing:'0.05em'}}>Cobros del cliente</span>
               <span style={{fontSize:12, color:'var(--text-3)'}}>
                 <b style={{color:'var(--ok)'}}>€{cobrado.toLocaleString('es-ES')}</b> cobrado
                 {pendiente > 0 && <> · <b style={{color:'var(--warn)'}}>€{pendiente.toLocaleString('es-ES')}</b> pendiente</>}
