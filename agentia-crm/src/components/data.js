@@ -1,12 +1,12 @@
 export const LEADS = [
-  { id:'l1', empresa:'Clínica Marbella', sector:'Salud', ciudad:'Málaga', responsable:'LP', servicio:'Web + Chatbot', estado:'Propuesta enviada', next:'Llamar el 26 abr', monto:3800, origen:'Instagram', temp:'hot' },
-  { id:'l2', empresa:'Aceite del Sur', sector:'Alimentación', ciudad:'Sevilla', responsable:'AR', servicio:'Automatización ventas', estado:'Interesado', next:'Enviar caso de éxito', monto:2400, origen:'Referido', temp:'warm' },
-  { id:'l3', empresa:'Estudio Nácar', sector:'Arquitectura', ciudad:'Valencia', responsable:'LP', servicio:'Web premium', estado:'Contactado', next:'Reunión miércoles', monto:5200, origen:'LinkedIn', temp:'warm' },
-  { id:'l4', empresa:'Kumō Sushi Bar', sector:'Restauración', ciudad:'Madrid', responsable:'AR', servicio:'Chatbot reservas', estado:'Nuevo', next:'Primer contacto', monto:1600, origen:'Formulario', temp:'cold' },
-  { id:'l5', empresa:'Gym Pulse', sector:'Fitness', ciudad:'Barcelona', responsable:'LP', servicio:'Mantenimiento web', estado:'En seguimiento', next:'Recordatorio 30 abr', monto:900, origen:'Instagram', temp:'warm' },
-  { id:'l6', empresa:'Notaría Vega', sector:'Legal', ciudad:'Madrid', responsable:'LP', servicio:'Web corporativa', estado:'Propuesta enviada', next:'Seguimiento viernes', monto:4100, origen:'Referido', temp:'hot' },
-  { id:'l7', empresa:'Bodegas Altura', sector:'Vinos', ciudad:'La Rioja', responsable:'AR', servicio:'E-commerce', estado:'Ganado', next:'—', monto:7200, origen:'Evento', temp:'won' },
-  { id:'l8', empresa:'Dental Luna', sector:'Salud', ciudad:'Granada', responsable:'AR', servicio:'Chatbot citas', estado:'Perdido', next:'—', monto:0, origen:'Formulario', temp:'lost' },
+  { id:'l1', empresa:'Clínica Marbella', sector:'Salud', ciudad:'Málaga', responsable:'LP', servicio:'Web + Chatbot', estado:'En Revisión', next:'Llamar el 26 abr', monto:3800, origen:'Instagram', temp:'hot' },
+  { id:'l2', empresa:'Aceite del Sur', sector:'Alimentación', ciudad:'Sevilla', responsable:'AR', servicio:'Automatización ventas', estado:'Cliente Interesado', next:'Enviar caso de éxito', monto:2400, origen:'Referido', temp:'warm' },
+  { id:'l3', empresa:'Estudio Nácar', sector:'Arquitectura', ciudad:'Valencia', responsable:'LP', servicio:'Web premium', estado:'Cliente Potencial', next:'Reunión miércoles', monto:5200, origen:'LinkedIn', temp:'warm' },
+  { id:'l4', empresa:'Kumō Sushi Bar', sector:'Restauración', ciudad:'Madrid', responsable:'AR', servicio:'Chatbot reservas', estado:'Cliente Nuevo', next:'Primer contacto', monto:1600, origen:'Formulario', temp:'cold' },
+  { id:'l5', empresa:'Gym Pulse', sector:'Fitness', ciudad:'Barcelona', responsable:'LP', servicio:'Mantenimiento web', estado:'Cliente Potencial', next:'Recordatorio 30 abr', monto:900, origen:'Instagram', temp:'warm' },
+  { id:'l6', empresa:'Notaría Vega', sector:'Legal', ciudad:'Madrid', responsable:'LP', servicio:'Web corporativa', estado:'En Revisión', next:'Seguimiento viernes', monto:4100, origen:'Referido', temp:'hot' },
+  { id:'l7', empresa:'Bodegas Altura', sector:'Vinos', ciudad:'La Rioja', responsable:'AR', servicio:'E-commerce', estado:'Cobrado', next:'—', monto:7200, origen:'Evento', temp:'won' },
+  { id:'l8', empresa:'Dental Luna', sector:'Salud', ciudad:'Granada', responsable:'AR', servicio:'Chatbot citas', estado:'Denegado', next:'—', monto:0, origen:'Formulario', temp:'lost' },
 ]
 
 export const CLIENTES = [
@@ -55,15 +55,14 @@ export const GASTOS = [
 ]
 
 export const STATE_COLORS = {
-  'Nuevo':             { chip:'gray',   color:'#6B7590' },
-  'Contactado':        { chip:'blue',   color:'#4F8BFF' },
-  'Interesado':        { chip:'violet', color:'#9A7BFF' },
-  'Propuesta enviada': { chip:'amber',  color:'#FFB547' },
-  'En seguimiento':    { chip:'blue',   color:'#7BA8FF' },
-  'Ganado':            { chip:'green',  color:'#3ECF8E' },
-  'Perdido':           { chip:'red',    color:'#FF5A6A' },
+  'Cliente Nuevo':      { chip:'gray',   color:'#6B7590' },
+  'Cliente Potencial':  { chip:'blue',   color:'#4F8BFF' },
+  'Cliente Interesado': { chip:'violet', color:'#9A7BFF' },
+  'En Revisión':        { chip:'amber',  color:'#FFB547' },
+  'Cobrado':            { chip:'green',  color:'#3ECF8E' },
+  'Denegado':           { chip:'red',    color:'#FF5A6A' },
 }
 
-export const PIPELINE_COLS = ['Nuevo','Contactado','Interesado','Propuesta enviada','En seguimiento','Ganado','Perdido']
+export const PIPELINE_COLS = ['Cliente Nuevo','Cliente Potencial','Cliente Interesado','En Revisión','Cobrado','Denegado']
 
 export const eur = (n) => n.toLocaleString('es-ES', { minimumFractionDigits: 0 })

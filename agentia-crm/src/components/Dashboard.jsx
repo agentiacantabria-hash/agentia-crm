@@ -109,7 +109,7 @@ function RevenueChart({ cobros }) {
 }
 
 function PipelineFunnel({ leads }) {
-  const active = PIPELINE_COLS.filter(c => !['Ganado','Perdido'].includes(c))
+  const active = PIPELINE_COLS.filter(c => !['Cobrado','Denegado'].includes(c))
   const stages = active.map(col => {
     const group = leads.filter(l => l.estado === col)
     return {
@@ -157,7 +157,7 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
     ? Math.round((ingresosMes - gastosMes) / (ingresosMes + pendientesMes) * 100)
     : (gastosMes === 0 ? 100 : 0)
 
-  const leadsActivos  = leads.filter(l => !['Ganado','Perdido'].includes(l.estado))
+  const leadsActivos  = leads.filter(l => !['Cobrado','Denegado'].includes(l.estado))
   const leadsCalientes = leads.filter(l => l.temp === 'hot')
   const leadesTibios  = leads.filter(l => l.temp === 'warm')
   const urgentes      = tasks.filter(t => t.prio === 'alta' && !t.done && ['hoy','vencida'].includes(t.when_group))
@@ -175,7 +175,7 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
   const pipelineTotal = leadsActivos.reduce((a,l) => a + (l.monto||0), 0)
 
   const seguimientos = leads
-    .filter(l => l.next && l.next !== '—' && !['Ganado','Perdido'].includes(l.estado))
+    .filter(l => l.next && l.next !== '—' && !['Cobrado','Denegado'].includes(l.estado))
     .slice(0, 4)
     .map(l => ({
       name: l.empresa,
@@ -280,7 +280,7 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
               <div className="mini"><div className="label">Leads activos</div><div className="value">{leadsActivos.length}</div><div className="trend" style={{color:'var(--brand-3)'}}>{leadsCalientes.length} calientes</div></div>
               <div className="mini"><div className="label">Tareas hoy</div><div className="value">{tasks.filter(t=>t.when_group==='hoy'&&!t.done).length}</div><div className="trend" style={{color: urgentes.length>0?'var(--warn)':'var(--ok)'}}>{urgentes.length>0?`${urgentes.length} urgente${urgentes.length!==1?'s':''}`:'Sin urgentes'}</div></div>
               <div className="mini"><div className="label">En proyecto</div><div className="value">{proyectos.filter(p=>p.estado!=='Cerrado').length}</div><div className="trend" style={{color:'var(--text-3)'}}>{proyectos.filter(p=>p.ajustes>0).length} con ajustes</div></div>
-              <div className="mini"><div className="label">Ganados</div><div className="value">{leads.filter(l=>l.estado==='Ganado').length}</div><div className="trend trend-up">leads cerrados</div></div>
+              <div className="mini"><div className="label">Cobrados</div><div className="value">{leads.filter(l=>l.estado==='Cobrado').length}</div><div className="trend trend-up">leads cerrados</div></div>
             </div>
           )}
         </div>

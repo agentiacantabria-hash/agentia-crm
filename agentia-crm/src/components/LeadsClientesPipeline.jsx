@@ -28,7 +28,7 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
   const [form, setForm] = useState(lead ? { ...lead, monto: lead.monto ?? '', yaCobrado: true, crearProyecto: false } : {
     empresa:'', sector:'', ciudad:'', contacto:'', telefono:'', email:'',
     responsable: RESP[0] || 'LP', servicio: SERVICIOS[0] || 'Web premium',
-    estado:'Nuevo', next:'', monto:'', origen:'Instagram', origenCustom:'', notas:'',
+    estado:'Cliente Nuevo', next:'', monto:'', origen:'Instagram', origenCustom:'', notas:'',
     yaCobrado: true, crearProyecto: false,
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -85,7 +85,7 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
       </div>
       <F label="Notas"><textarea value={form.notas||''} onChange={e => set('notas', e.target.value)} placeholder="Detalles adicionales…" /></F>
 
-      {form.estado === 'Ganado' && parseFloat(form.monto) > 0 && (
+      {form.estado === 'Cobrado' && parseFloat(form.monto) > 0 && (
         <div className="form-2col" style={{padding:'12px 14px', background:'rgba(62,207,142,0.06)', border:'1px solid rgba(62,207,142,0.2)', borderRadius:10}}>
           <F label="¿Ya han pagado?">
             <select value={form.yaCobrado !== false ? 'si' : 'no'} onChange={e => set('yaCobrado', e.target.value === 'si')}>
@@ -149,8 +149,8 @@ export function Leads({ data, openQuick }) {
   const [editing, setEditing] = useState(null)
   const [creating, setCreating] = useState(false)
   const leads = data?.leads || []
-  const activeLeads = leads.filter(l => !['Ganado','Perdido'].includes(l.estado))
-  const closedLeads = leads.filter(l => ['Ganado','Perdido'].includes(l.estado))
+  const activeLeads = leads.filter(l => !['Cobrado','Denegado'].includes(l.estado))
+  const closedLeads = leads.filter(l => ['Cobrado','Denegado'].includes(l.estado))
   const base = filter === 'cerrados' ? closedLeads : activeLeads
   const filtered = (filter === 'todos' || filter === 'cerrados') ? base : base.filter(l => l.temp === filter)
 
@@ -375,7 +375,7 @@ export function Pipeline({ data }) {
     setMovingId(null)
   }
 
-  const totalAbierto = leads.filter(l => !['Ganado','Perdido'].includes(l.estado)).reduce((a,l)=>a+(l.monto||0),0)
+  const totalAbierto = leads.filter(l => !['Cobrado','Denegado'].includes(l.estado)).reduce((a,l)=>a+(l.monto||0),0)
 
   const handleSave = (form) => {
     if (form.id) data.updateLead?.(form.id, form)
@@ -397,10 +397,10 @@ export function Pipeline({ data }) {
 
       <div className="pipe-summary">
         {[
-          {label:'Total abiertas', v:leads.filter(l=>!['Ganado','Perdido'].includes(l.estado)).length, sub:'oportunidades'},
+          {label:'Total abiertas', v:leads.filter(l=>!['Cobrado','Denegado'].includes(l.estado)).length, sub:'oportunidades'},
           {label:'Valor potencial', v:`€${eur(totalAbierto)}`, sub:'suma total'},
-          {label:'Ganadas', v:leads.filter(l=>l.estado==='Ganado').length, sub:'este pipeline'},
-          {label:'Perdidas', v:leads.filter(l=>l.estado==='Perdido').length, sub:'este pipeline'},
+          {label:'Ganadas', v:leads.filter(l=>l.estado==='Cobrado').length, sub:'este pipeline'},
+          {label:'Perdidas', v:leads.filter(l=>l.estado==='Denegado').length, sub:'este pipeline'},
         ].map((s,i)=>(
           <div key={i} className="stat" style={{padding:'14px 16px'}}>
             <div className="label" style={{fontSize:11}}>{s.label}</div>

@@ -107,7 +107,7 @@ export default function App() {
   }
 
   const autoWinLead = (lead) => {
-    if (lead.estado !== 'Ganado') return
+    if (lead.estado !== 'Cobrado') return
     const monto = parseFloat(lead.monto) || 0
     const yaCobrado = lead.yaCobrado !== false
     const yaExiste = clientes.some(c => c.nombre === lead.empresa)
@@ -142,18 +142,18 @@ export default function App() {
     setLeads(prev => prev.map(l => l.id === id ? { ...l, ...safeUpdates } : l))
 
     const nuevoEstado = safeUpdates.estado
-    const eraGanado  = lead?.estado === 'Ganado'
-    const seraGanado = nuevoEstado === 'Ganado'
+    const eraCobrado  = lead?.estado === 'Cobrado'
+    const seraCobrado = nuevoEstado === 'Cobrado'
 
-    if (seraGanado && !eraGanado) {
-      // Pasa a Ganado → crear cobro y cliente
+    if (seraCobrado && !eraCobrado) {
+      // Pasa a Cobrado → crear cobro y cliente
       autoWinLead({ ...lead, ...safeUpdates, yaCobrado, crearProyecto })
-    } else if (eraGanado && nuevoEstado && !seraGanado) {
-      // Deja de ser Ganado → eliminar cobro automático
+    } else if (eraCobrado && nuevoEstado && !seraCobrado) {
+      // Deja de ser Cobrado → eliminar cobro automático
       const c = findCobroAuto(lead)
       if (c) deleteCobro(c.id)
-    } else if (eraGanado && !nuevoEstado && updates.monto !== undefined) {
-      // Sigue Ganado pero cambia el importe → actualizar cobro
+    } else if (eraCobrado && !nuevoEstado && updates.monto !== undefined) {
+      // Sigue Cobrado pero cambia el importe → actualizar cobro
       const c = findCobroAuto(lead)
       if (c) updateCobro(c.id, { monto: parseFloat(updates.monto) || 0 })
     }
@@ -166,7 +166,7 @@ export default function App() {
     } catch (_) {}
     setLeads(prev => prev.filter(l => l.id !== id))
 
-    if (lead?.estado === 'Ganado') {
+    if (lead?.estado === 'Cobrado') {
       // Eliminar cobro automático del lead ganado
       const c = findCobroAuto(lead)
       if (c) deleteCobro(c.id)
@@ -316,7 +316,7 @@ export default function App() {
 
   // ──────────────────────────────────────────────────────────
   const counts = {
-    leads:     leads.filter(l => !['Ganado','Perdido'].includes(l.estado)).length,
+    leads:     leads.filter(l => !['Cobrado','Denegado'].includes(l.estado)).length,
     clientes:  clientes.length,
     tareas:    tasks.filter(t => !t.done).length,
     proyectos: proyectos.filter(p => p.estado !== 'Cerrado').length,
