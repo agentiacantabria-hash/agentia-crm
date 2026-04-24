@@ -65,7 +65,20 @@ export default function App() {
           supabase.from('gastos').select('*').order('created_at', { ascending: false }),
           supabase.from('cobros').select('*').order('created_at', { ascending: false }),
         ])
-        if (!l.error && l.data)  setLeads(l.data)
+        if (!l.error && l.data) {
+          const stateMap = {
+            'Ganado': 'Cobrado', 'Perdido': 'Denegado',
+            'Nuevo': 'Cliente Nuevo', 'Contactado': 'Cliente Potencial',
+            'Interesado': 'Cliente Interesado',
+            'Propuesta enviada': 'En Revisión', 'En seguimiento': 'En Revisión',
+          }
+          const migrated = l.data.map(lead => {
+            const newEstado = stateMap[lead.estado]
+            if (newEstado) supabase.from('leads').update({ estado: newEstado }).eq('id', lead.id)
+            return newEstado ? { ...lead, estado: newEstado } : lead
+          })
+          setLeads(migrated)
+        }
         if (!c.error && c.data)  setClientes(c.data)
         if (!t.error && t.data)  setTasks(t.data)
         if (!p.error && p.data)  setProyectos(p.data)
