@@ -203,87 +203,138 @@ export function Finanzas({ role, data }) {
       </div>
 
       <div className="grid-main-side">
-        <div className="card">
-          <div className="card-head">
-            <h3>Todas las facturas</h3>
-            <div className="right">
-              <button className="btn sm ghost" onClick={() => downloadCSV(
-                cobros.map(c => ({ Cliente: c.cliente, Concepto: c.concepto||'', Importe: c.monto||0, Vencimiento: c.vence||'', Estado: c.pagado?'Pagada':c.vencida?'Vencida':'Pendiente', Recurrente: c.recurrente?'Sí':'No' })),
-                `facturas-${new Date().toISOString().slice(0,10)}.csv`
-              )}>↓ CSV</button>
-              <button className="btn sm" onClick={() => setAddingCobro(true)}><I.Plus size={12}/></button>
-            </div>
-          </div>
-          {cobros.length === 0 ? (
-            <div className="small" style={{color:'var(--text-4)', textAlign:'center', padding:'24px 0'}}>
-              Sin facturas — añade tu primera factura con el botón de arriba
-            </div>
-          ) : (
-            <div style={{overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Cliente</th>
-                  <th>Concepto</th>
-                  <th style={{textAlign:'right'}}>Importe</th>
-                  <th>Vencimiento</th>
-                  <th>Estado</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {cobros.map(c => (
-                  <tr key={c.id} style={{cursor:'pointer'}} onClick={() => setEditingCobro(c)}>
-                    <td>
-                      <div style={{display:'flex', alignItems:'center', gap:7}}>
-                        <span className="primary">{c.cliente}</span>
-                        {c.recurrente && (
-                          <span style={{fontSize:10, fontWeight:600, color:'var(--ok)', background:'rgba(62,207,142,0.12)', padding:'1px 6px', borderRadius:12}}>
-                            ↺ {c.frecuencia || 'Recurrente'}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="muted small">{c.concepto}</td>
-                    <td className="mono" style={{textAlign:'right'}}>€{eur(c.monto||0)}</td>
-                    <td className="muted">
-                      {c.vence || '—'}
-                      {!c.pagado && c.vence && (() => {
-                        const dias = Math.floor((Date.now() - new Date(c.vence + 'T00:00:00')) / 86400000)
-                        if (dias < 0) return null
-                        const col = dias < 15 ? '#FFB547' : dias < 30 ? '#FF8050' : '#FF5A6A'
-                        const label = dias === 0 ? 'Hoy' : `+${dias}d`
-                        return <span style={{marginLeft:6, fontSize:10.5, fontWeight:600, color:col, fontFamily:'var(--font-mono)'}}>{label}</span>
-                      })()}
-                    </td>
-                    <td>
-                      {c.pagado && (c.concepto || '').startsWith('Señal ·')
-                        ? <span className="chip amber"><span className="dot"/>Señal pagada</span>
-                        : c.pagado
-                          ? <span className="chip green"><span className="dot"/>Pagada</span>
-                          : c.vencida
-                            ? <span className="chip red"><span className="dot"/>Vencida</span>
-                            : <span className="chip amber"><span className="dot"/>Pendiente</span>
-                      }
-                    </td>
-                    <td style={{display:'flex', alignItems:'center', gap:6, justifyContent:'flex-end'}}>
-                      {!c.pagado && (
-                        <button className="btn sm" style={{padding:'3px 10px', fontSize:12}}
-                          onClick={e => { e.stopPropagation(); data.updateCobro?.(c.id, { pagado: true, vencida: false }); showToast?.(`Cobro de ${c.cliente} marcado como pagado`) }}>
-                          ✓ Cobrado
-                        </button>
-                      )}
-                      <button className="icon-btn" style={{width:24, height:24, color:'var(--text-4)'}}
-                        onClick={e => { e.stopPropagation(); if (confirm(`¿Eliminar factura de ${c.cliente}?`)) data.deleteCobro?.(c.id) }}>
-                        <I.Close size={11}/>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
-          )}
+        <div style={{display:'flex', flexDirection:'column', gap:16}}>
+          {/* ── Recurrentes ── */}
+          {(() => {
+            const recurrentes = cobros.filter(c => c.recurrente)
+            const mrr = recurrentes.filter(c => !c.pagado).reduce((a,c) => a + (c.monto||0), 0)
+            return (
+              <div className="card">
+                <div className="card-head">
+                  <h3>↺ Recurrentes <span style={{fontSize:12, fontWeight:400, color:'var(--text-4)'}}>· €{eur(mrr)}/mes por cobrar</span></h3>
+                  <div className="right">
+                    <button className="btn sm" onClick={() => setAddingCobro(true)}><I.Plus size={12}/></button>
+                  </div>
+                </div>
+                {recurrentes.length === 0 ? (
+                  <div className="small" style={{color:'var(--text-4)', textAlign:'center', padding:'20px 0'}}>Sin cobros recurrentes</div>
+                ) : (
+                  <div style={{overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
+                  <table className="table">
+                    <thead><tr><th>Cliente</th><th>Concepto</th><th>Frecuencia</th><th style={{textAlign:'right'}}>Importe</th><th>Próximo venc.</th><th>Estado</th><th></th></tr></thead>
+                    <tbody>
+                      {recurrentes.map(c => (
+                        <tr key={c.id} style={{cursor:'pointer'}} onClick={() => setEditingCobro(c)}>
+                          <td><span className="primary">{c.cliente}</span></td>
+                          <td className="muted small">{c.concepto}</td>
+                          <td><span style={{fontSize:10, fontWeight:600, color:'var(--ok)', background:'rgba(62,207,142,0.12)', padding:'2px 8px', borderRadius:12}}>↺ {c.frecuencia || 'Mensual'}</span></td>
+                          <td className="mono" style={{textAlign:'right'}}>€{eur(c.monto||0)}</td>
+                          <td className="muted">
+                            {c.vence || '—'}
+                            {!c.pagado && c.vence && (() => {
+                              const dias = Math.floor((Date.now() - new Date(c.vence + 'T00:00:00')) / 86400000)
+                              if (dias < 0) return null
+                              const col = dias < 15 ? '#FFB547' : dias < 30 ? '#FF8050' : '#FF5A6A'
+                              return <span style={{marginLeft:6, fontSize:10.5, fontWeight:600, color:col, fontFamily:'var(--font-mono)'}}>{dias === 0 ? 'Hoy' : `+${dias}d`}</span>
+                            })()}
+                          </td>
+                          <td>
+                            {c.pagado
+                              ? <span className="chip green"><span className="dot"/>Pagada</span>
+                              : c.vencida
+                                ? <span className="chip red"><span className="dot"/>Vencida</span>
+                                : <span className="chip amber"><span className="dot"/>Pendiente</span>
+                            }
+                          </td>
+                          <td style={{display:'flex', alignItems:'center', gap:6, justifyContent:'flex-end'}}>
+                            {!c.pagado && (
+                              <button className="btn sm" style={{padding:'3px 10px', fontSize:12}}
+                                onClick={e => { e.stopPropagation(); data.updateCobro?.(c.id, { pagado: true, vencida: false }); showToast?.(`Cobro de ${c.cliente} marcado como pagado`) }}>
+                                ✓ Cobrado
+                              </button>
+                            )}
+                            <button className="icon-btn" style={{width:24, height:24, color:'var(--text-4)'}}
+                              onClick={e => { e.stopPropagation(); if (confirm(`¿Eliminar factura de ${c.cliente}?`)) data.deleteCobro?.(c.id) }}>
+                              <I.Close size={11}/>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* ── Facturas puntuales ── */}
+          {(() => {
+            const puntuales = cobros.filter(c => !c.recurrente)
+            return (
+              <div className="card">
+                <div className="card-head">
+                  <h3>Facturas</h3>
+                  <div className="right">
+                    <button className="btn sm ghost" onClick={() => downloadCSV(
+                      cobros.map(c => ({ Cliente: c.cliente, Concepto: c.concepto||'', Importe: c.monto||0, Vencimiento: c.vence||'', Estado: c.pagado?'Pagada':c.vencida?'Vencida':'Pendiente', Recurrente: c.recurrente?'Sí':'No' })),
+                      `facturas-${new Date().toISOString().slice(0,10)}.csv`
+                    )}>↓ CSV</button>
+                    <button className="btn sm" onClick={() => setAddingCobro(true)}><I.Plus size={12}/></button>
+                  </div>
+                </div>
+                {puntuales.length === 0 ? (
+                  <div className="small" style={{color:'var(--text-4)', textAlign:'center', padding:'20px 0'}}>Sin facturas puntuales</div>
+                ) : (
+                  <div style={{overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
+                  <table className="table">
+                    <thead><tr><th>Cliente</th><th>Concepto</th><th style={{textAlign:'right'}}>Importe</th><th>Vencimiento</th><th>Estado</th><th></th></tr></thead>
+                    <tbody>
+                      {puntuales.map(c => (
+                        <tr key={c.id} style={{cursor:'pointer'}} onClick={() => setEditingCobro(c)}>
+                          <td><span className="primary">{c.cliente}</span></td>
+                          <td className="muted small">{c.concepto}</td>
+                          <td className="mono" style={{textAlign:'right'}}>€{eur(c.monto||0)}</td>
+                          <td className="muted">
+                            {c.vence || '—'}
+                            {!c.pagado && c.vence && (() => {
+                              const dias = Math.floor((Date.now() - new Date(c.vence + 'T00:00:00')) / 86400000)
+                              if (dias < 0) return null
+                              const col = dias < 15 ? '#FFB547' : dias < 30 ? '#FF8050' : '#FF5A6A'
+                              return <span style={{marginLeft:6, fontSize:10.5, fontWeight:600, color:col, fontFamily:'var(--font-mono)'}}>{dias === 0 ? 'Hoy' : `+${dias}d`}</span>
+                            })()}
+                          </td>
+                          <td>
+                            {c.pagado && (c.concepto || '').startsWith('Señal ·')
+                              ? <span className="chip amber"><span className="dot"/>Señal pagada</span>
+                              : c.pagado
+                                ? <span className="chip green"><span className="dot"/>Pagada</span>
+                                : c.vencida
+                                  ? <span className="chip red"><span className="dot"/>Vencida</span>
+                                  : <span className="chip amber"><span className="dot"/>Pendiente</span>
+                            }
+                          </td>
+                          <td style={{display:'flex', alignItems:'center', gap:6, justifyContent:'flex-end'}}>
+                            {!c.pagado && (
+                              <button className="btn sm" style={{padding:'3px 10px', fontSize:12}}
+                                onClick={e => { e.stopPropagation(); data.updateCobro?.(c.id, { pagado: true, vencida: false }); showToast?.(`Cobro de ${c.cliente} marcado como pagado`) }}>
+                                ✓ Cobrado
+                              </button>
+                            )}
+                            <button className="icon-btn" style={{width:24, height:24, color:'var(--text-4)'}}
+                              onClick={e => { e.stopPropagation(); if (confirm(`¿Eliminar factura de ${c.cliente}?`)) data.deleteCobro?.(c.id) }}>
+                              <I.Close size={11}/>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
 
         <div className="card">
