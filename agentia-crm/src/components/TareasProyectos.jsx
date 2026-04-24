@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { I } from './Icons'
-import { Modal, F } from './Modal'
+import { Modal, F, SelectOrText } from './Modal'
 
 // ── helpers ─────────────────────────────────────────────────────
 function getUsers() {
@@ -101,9 +101,7 @@ function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [] }) {
           </select>
         </F>
         <F label="Etiqueta">
-          <select value={form.tag||'Operativo'} onChange={e => set('tag', e.target.value)}>
-            {['Comercial','Operativo','Entrega','Finanzas'].map(t=><option key={t}>{t}</option>)}
-          </select>
+          <SelectOrText value={form.tag||'Operativo'} onChange={v => set('tag', v)} options={['Comercial','Operativo','Entrega','Finanzas']} placeholder="Ej: Marketing…" />
         </F>
       </div>
       {!isNew && (
@@ -259,9 +257,7 @@ function ProyectoModal({ proyecto, onClose, onSave, onDelete }) {
       <div className="form-2col">
         <F label="Cliente"><input value={form.cliente} onChange={e => set('cliente', e.target.value)} autoFocus /></F>
         <F label="Servicio">
-          <select value={form.servicio||''} onChange={e => set('servicio', e.target.value)}>
-            {servicios.map(s=><option key={s}>{s}</option>)}
-          </select>
+          <SelectOrText value={form.servicio||''} onChange={v => set('servicio', v)} options={servicios} placeholder="Ej: Web + Chatbot…" />
         </F>
       </div>
       <div className="form-2col">
@@ -282,9 +278,7 @@ function ProyectoModal({ proyecto, onClose, onSave, onDelete }) {
       <div className="form-2col">
         <F label="Ajustes pendientes"><input type="number" min="0" value={form.ajustes||0} onChange={e => set('ajustes', Number(e.target.value))} /></F>
         <F label="Pago">
-          <select value={form.pago||'Pendiente'} onChange={e => set('pago', e.target.value)}>
-            {['Pendiente','Parcial 40%','Parcial 50%','Pagado'].map(p=><option key={p}>{p}</option>)}
-          </select>
+          <SelectOrText value={form.pago||'Pendiente'} onChange={v => set('pago', v)} options={['Pendiente','Parcial 40%','Parcial 50%','Pagado']} placeholder="Ej: Parcial 30%…" />
         </F>
       </div>
       {!isNew && (

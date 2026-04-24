@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { I } from './Icons'
-import { Modal, F } from './Modal'
+import { Modal, F, SelectOrText } from './Modal'
 import { PIPELINE_COLS, STATE_COLORS, eur } from './data'
 
 // ── Finanzas ─────────────────────────────────────────────────────
@@ -8,7 +8,7 @@ import { PIPELINE_COLS, STATE_COLORS, eur } from './data'
 function CobroModal({ cobro, onClose, onSave }) {
   const isNew = !cobro?.id
   const [form, setForm] = useState(cobro ? { ...cobro, monto: cobro.monto ?? '' } : {
-    cliente:'', monto:'', vence:'', vencida:false, pagado:false,
+    cliente:'', concepto:'', monto:'', vence:'', vencida:false, pagado:false,
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -16,6 +16,7 @@ function CobroModal({ cobro, onClose, onSave }) {
     <Modal open title={isNew ? 'Nueva factura' : 'Editar factura'}
       onClose={onClose} onSave={() => onSave({ ...form, monto: parseFloat(form.monto) || 0 })} saveLabel={isNew ? 'Añadir factura' : 'Guardar'}>
       <F label="Cliente"><input value={form.cliente} onChange={e => set('cliente', e.target.value)} placeholder="Ej: Bodegas Altura" autoFocus /></F>
+      <F label="Concepto"><input value={form.concepto||''} onChange={e => set('concepto', e.target.value)} placeholder="Ej: Mantenimiento mensual" /></F>
       <div className="form-2col">
         <F label="Importe (€)"><input type="number" min="0" placeholder="0" value={form.monto ?? ''} onChange={e => set('monto', e.target.value)} /></F>
         <F label="Fecha de vencimiento"><input type="date" value={form.vence||''} onChange={e => set('vence', e.target.value)} /></F>
@@ -50,9 +51,7 @@ function GastoModal({ gasto, onClose, onSave, onDelete }) {
       <F label="Concepto"><input value={form.concepto} onChange={e => set('concepto', e.target.value)} placeholder="Ej: OpenAI — API" autoFocus /></F>
       <div className="form-2col">
         <F label="Tipo">
-          <select value={form.tipo||'Herramienta'} onChange={e => set('tipo', e.target.value)}>
-            {['IA','Infra','Herramienta','Personas','Otro'].map(t=><option key={t}>{t}</option>)}
-          </select>
+          <SelectOrText value={form.tipo||'Herramienta'} onChange={v => set('tipo', v)} options={['IA','Infra','Herramienta','Personas','Otro']} placeholder="Ej: Marketing…" />
         </F>
         <F label="Importe (€)"><input type="number" min="0" placeholder="0" value={form.monto ?? ''} onChange={e => set('monto', e.target.value)} /></F>
       </div>

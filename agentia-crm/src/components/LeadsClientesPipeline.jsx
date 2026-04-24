@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { I } from './Icons'
-import { Modal, F } from './Modal'
+import { Modal, F, SelectOrText } from './Modal'
 import { STATE_COLORS, PIPELINE_COLS, eur } from './data'
 
 function getServicios() {
@@ -54,9 +54,7 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
       </div>
       <div className="form-2col">
         <F label="Servicio">
-          <select value={form.servicio||''} onChange={e => set('servicio', e.target.value)}>
-            {SERVICIOS.map(s=><option key={s}>{s}</option>)}
-          </select>
+          <SelectOrText value={form.servicio||''} onChange={v => set('servicio', v)} options={SERVICIOS} placeholder="Ej: Web + Chatbot…" />
         </F>
         <F label="Origen">
           <select value={form.origen||''} onChange={e => set('origen', e.target.value)}>
@@ -162,96 +160,6 @@ function RowMenu({ onEdit, onDelete }) {
   )
 }
 
-export function Leads({ data, openQuick }) {
-  const [filter, setFilter] = useState('todos')
-  const [editing, setEditing] = useState(null)
-  const [creating, setCreating] = useState(false)
-  const leads = data?.leads || []
-  const activeLeads = leads.filter(l => !['Cobrado','Denegado'].includes(l.estado))
-  const closedLeads = leads.filter(l => ['Cobrado','Denegado'].includes(l.estado))
-  const base = filter === 'cerrados' ? closedLeads : activeLeads
-  const filtered = (filter === 'todos' || filter === 'cerrados') ? base : base.filter(l => l.temp === filter)
-
-  const handleSave = (form) => {
-    if (form.id) {
-      data.updateLead?.(form.id, form)
-    } else {
-      data.addLead?.(form)
-    }
-    setEditing(null)
-    setCreating(false)
-  }
-
-  return (
-    <div className="fade-in">
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">Leads</h1>
-          <p className="page-subtitle">
-            {filter === 'cerrados'
-              ? `Leads cerrados · ${closedLeads.length} totales`
-              : `Oportunidades activas · ${activeLeads.length} totales · €${eur(activeLeads.reduce((a,l)=>a+(l.monto||0),0))} en juego`}
-          </p>
-        </div>
-        <div className="page-actions">
-          <div className="segmented">
-            {[['todos','Todos'],['hot','Calientes'],['warm','Tibios'],['cold','Fríos'],['cerrados','Cerrados']].map(([k,v])=>(
-              <button key={k} className={filter===k?'active':''} onClick={()=>setFilter(k)}>{v}</button>
-            ))}
-          </div>
-          <button className="btn primary" onClick={() => setCreating(true)}><I.Plus size={13}/> Nuevo lead</button>
-        </div>
-      </div>
-
-      <div className="card">
-        <table className="table">
-          <thead>
-            <tr><th>Empresa</th><th>Sector</th><th>Servicio</th><th>Estado</th><th>Origen</th><th>Próximo paso</th><th>Resp.</th><th style={{textAlign:'right'}}>Importe</th><th></th></tr>
-          </thead>
-          <tbody>
-            {filtered.map(l => {
-              const sc = STATE_COLORS[l.estado] || { chip:'gray' }
-              const tempColor = l.temp==='hot'?'#FF5A6A':l.temp==='warm'?'#FFB547':l.temp==='cold'?'#6B7590':l.temp==='won'?'#3ECF8E':'#FF5A6A'
-              return (
-                <tr key={l.id} style={{cursor:'pointer'}} onClick={() => setEditing(l)}>
-                  <td>
-                    <div style={{display:'flex', alignItems:'center', gap:10}}>
-                      <div style={{width:8, height:8, borderRadius:'50%', background:tempColor, boxShadow:`0 0 8px ${tempColor}`, flexShrink:0}}/>
-                      <div><div className="primary">{l.empresa}</div><div className="muted" style={{fontSize:11.5}}>{l.ciudad}</div></div>
-                    </div>
-                  </td>
-                  <td className="muted">{l.sector}</td>
-                  <td className="muted">{l.servicio}</td>
-                  <td><span className={`chip ${sc.chip}`}><span className="dot"/>{l.estado}</span></td>
-                  <td className="muted small">{l.origen}</td>
-                  <td className="muted small">{l.next}</td>
-                  <td><div className="avatar sm">{l.responsable}</div></td>
-                  <td className="mono" style={{textAlign:'right'}}>{l.monto ? `€${eur(l.monto)}` : <span className="muted">—</span>}</td>
-                  <td onClick={e => e.stopPropagation()}>
-                    <RowMenu
-                      onEdit={() => setEditing(l)}
-                      onDelete={() => { if (confirm(`¿Eliminar "${l.empresa}"?`)) data.deleteLead?.(l.id) }}
-                    />
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {(editing || creating) && (
-        <LeadModal
-          lead={editing}
-          onClose={() => { setEditing(null); setCreating(false) }}
-          onSave={handleSave}
-          onDelete={id => data.deleteLead?.(id)}
-        />
-      )}
-    </div>
-  )
-}
-
 // ── Clientes ─────────────────────────────────────────────────────
 
 function ClienteModal({ cliente, onClose, onSave, onDelete }) {
@@ -261,7 +169,7 @@ function ClienteModal({ cliente, onClose, onSave, onDelete }) {
   const [form, setForm] = useState(cliente ? { ...cliente, importe: cliente.importe ?? '' } : {
     nombre:'', contacto:'', telefono:'', email:'',
     servicio: SERVICIOS[0] || 'Web premium', importe:'', estado:'En curso',
-    pagado:false, ajustes:0, responsable: RESP[0] || 'LP', since:'',
+    tipo:'Proyecto', pagado:false, ajustes:0, responsable: RESP[0] || 'LP', since:'',
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const [confirmDel, setConfirmDel] = useState(false)
@@ -277,9 +185,7 @@ function ClienteModal({ cliente, onClose, onSave, onDelete }) {
       <F label="Email"><input type="email" value={form.email||''} onChange={e => set('email', e.target.value)} placeholder="contacto@empresa.com" /></F>
       <div className="form-2col">
         <F label="Servicio">
-          <select value={form.servicio||''} onChange={e => set('servicio', e.target.value)}>
-            {SERVICIOS.map(s=><option key={s}>{s}</option>)}
-          </select>
+          <SelectOrText value={form.servicio||''} onChange={v => set('servicio', v)} options={SERVICIOS} placeholder="Ej: Web + Chatbot…" />
         </F>
         <F label="Responsable">
           <select value={form.responsable||''} onChange={e => set('responsable', e.target.value)}>
@@ -292,11 +198,19 @@ function ClienteModal({ cliente, onClose, onSave, onDelete }) {
         <F label="Desde (ej: Abr 2026)"><input value={form.since||''} onChange={e => set('since', e.target.value)} /></F>
       </div>
       <div className="form-2col">
+        <F label="Tipo">
+          <select value={form.tipo || 'Proyecto'} onChange={e => set('tipo', e.target.value)}>
+            <option value="Proyecto">Proyecto — pago único</option>
+            <option value="Recurrente">Recurrente — cuota periódica</option>
+          </select>
+        </F>
         <F label="Estado">
           <select value={form.estado||''} onChange={e => set('estado', e.target.value)}>
             {['En curso','En revisión','Pagado · ajustes','Cerrado','Recurrente'].map(s=><option key={s}>{s}</option>)}
           </select>
         </F>
+      </div>
+      <div className="form-2col">
         <F label="Ajustes pendientes"><input type="number" min="0" value={form.ajustes||0} onChange={e => set('ajustes', Number(e.target.value))} /></F>
       </div>
       {!isNew && (
@@ -389,9 +303,10 @@ export function Pipeline({ data, openQuick }) {
   const leads = data?.leads || []
   const [view,     setView]     = useState('kanban')
   const [filter,   setFilter]   = useState('todos')
-  const [movingId, setMovingId] = useState(null)
-  const [editing,  setEditing]  = useState(null)
-  const [creating, setCreating] = useState(false)
+  const [movingId,    setMovingId]    = useState(null)
+  const [editing,     setEditing]     = useState(null)
+  const [creating,    setCreating]    = useState(false)
+  const [cobradoLead, setCobradoLead] = useState(null) // lead pre-cargado para el modal de Cobrado
 
   const activeLeads = leads.filter(l => !['Cobrado','Denegado'].includes(l.estado))
   const closedLeads = leads.filter(l =>  ['Cobrado','Denegado'].includes(l.estado))
@@ -405,6 +320,10 @@ export function Pipeline({ data, openQuick }) {
   }))
 
   const moveCard = (leadId, newEstado) => {
+    if (newEstado === 'Cobrado') {
+      const lead = leads.find(l => l.id === leadId)
+      if (lead) { setCobradoLead({ ...lead, estado: 'Cobrado' }); setMovingId(null); return }
+    }
     data.updateLead?.(leadId, { estado: newEstado })
     setMovingId(null)
   }
@@ -563,6 +482,15 @@ export function Pipeline({ data, openQuick }) {
           onClose={() => { setEditing(null); setCreating(false) }}
           onSave={handleSave}
           onDelete={id => { data.deleteLead?.(id); setEditing(null) }}
+        />
+      )}
+
+      {cobradoLead && (
+        <LeadModal
+          lead={cobradoLead}
+          onClose={() => setCobradoLead(null)}
+          onSave={(form) => { data.updateLead?.(form.id, form); setCobradoLead(null) }}
+          onDelete={id => { data.deleteLead?.(id); setCobradoLead(null) }}
         />
       )}
     </div>

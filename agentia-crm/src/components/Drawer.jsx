@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { I } from './Icons'
 import { PIPELINE_COLS } from './data'
+import { SelectOrText } from './Modal'
 
 function getServicios() {
   try {
@@ -93,9 +94,7 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
               </div>
               <div className="field">
                 <label className="lbl">Servicio de interés</label>
-                <select className="select" value={form.servicio} onChange={e => set('servicio', e.target.value)}>
-                  {servicios.map(s => <option key={s}>{s}</option>)}
-                </select>
+                <SelectOrText value={form.servicio} onChange={v => set('servicio', v)} options={servicios} selectClass="select" inputClass="input" placeholder="Ej: Web + Chatbot…" />
               </div>
               <div className="field-row">
                 <div className="field">
@@ -158,9 +157,7 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
               </div>
               <div className="field-row">
                 <div className="field"><label className="lbl">Servicio de interés</label>
-                  <select className="select" value={form.servicio} onChange={e => set('servicio', e.target.value)}>
-                    {servicios.map(s => <option key={s}>{s}</option>)}
-                  </select>
+                  <SelectOrText value={form.servicio} onChange={v => set('servicio', v)} options={servicios} selectClass="select" inputClass="input" placeholder="Ej: Web + Chatbot…" />
                 </div>
                 <div className="field"><label className="lbl">Importe (€)</label>
                   <input className="input" type="number" min="0" placeholder="0" value={form.monto} onChange={e => set('monto', e.target.value)} />
