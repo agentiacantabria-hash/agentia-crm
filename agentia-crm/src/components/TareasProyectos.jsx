@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { I } from './Icons'
 import { Modal, F, SelectOrText, CustomSelect } from './Modal'
 
@@ -41,6 +41,113 @@ function tomorrowIso() {
 function weekIso() {
   const d = new Date(); d.setDate(d.getDate()+3)
   return d.toISOString().slice(0,10)
+}
+
+// ── Calendario ──────────────────────────────────────────────────
+
+function getMonday(date) {
+  const d = new Date(date); d.setHours(0,0,0,0)
+  const day = d.getDay()
+  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
+  return d
+}
+
+function CalendarioView({ tasks, onEdit, onAdd }) {
+  const [weekStart, setWeekStart] = useState(() => getMonday(new Date()))
+  const today = new Date().toISOString().slice(0,10)
+
+  const days = useMemo(() => Array.from({length: 7}, (_, i) => {
+    const d = new Date(weekStart); d.setDate(weekStart.getDate() + i)
+    return d
+  }), [weekStart])
+
+  const prevWeek = () => setWeekStart(d => { const n = new Date(d); n.setDate(n.getDate()-7); return n })
+  const nextWeek = () => setWeekStart(d => { const n = new Date(d); n.setDate(n.getDate()+7); return n })
+  const goToday  = () => setWeekStart(getMonday(new Date()))
+
+  const rangeLabel = (() => {
+    const from = days[0].toLocaleDateString('es-ES', {day:'numeric', month:'short'})
+    const to   = days[6].toLocaleDateString('es-ES', {day:'numeric', month:'short', year:'numeric'})
+    return `${from} — ${to}`
+  })()
+
+  const prioColor = (p, type) => {
+    if (type === 'bg') return p==='alta' ? 'rgba(255,90,106,0.13)' : p==='media' ? 'rgba(255,181,71,0.11)' : 'rgba(107,117,144,0.1)'
+    return p==='alta' ? '#FF8FA0' : p==='media' ? '#FFD080' : 'var(--text-3)'
+  }
+
+  return (
+    <div>
+      <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16, flexWrap:'wrap'}}>
+        <button className="btn sm ghost" onClick={prevWeek} style={{padding:'4px 10px'}}>←</button>
+        <button className="btn sm ghost" onClick={goToday}>Hoy</button>
+        <button className="btn sm ghost" onClick={nextWeek} style={{padding:'4px 10px'}}>→</button>
+        <span style={{fontSize:13, color:'var(--text-2)', fontWeight:500}}>{rangeLabel}</span>
+      </div>
+
+      <div style={{display:'grid', gridTemplateColumns:'repeat(7, minmax(120px, 1fr))', gap:8, overflowX:'auto', paddingBottom:8}}>
+        {days.map(d => {
+          const key   = d.toISOString().slice(0,10)
+          const isToday = key === today
+          const isPast  = key < today
+          const dayTasks = tasks.filter(t => t.due_date === key).sort((a,b) => {
+            const order = {alta:0, media:1, baja:2}
+            return (order[a.prio]||1) - (order[b.prio]||1)
+          })
+          const pendientes = dayTasks.filter(t => !t.done)
+          const hechas     = dayTasks.filter(t => t.done)
+
+          return (
+            <div key={key} style={{
+              background: isToday ? 'rgba(45,107,255,0.07)' : 'rgba(255,255,255,0.015)',
+              border: `1px solid ${isToday ? 'rgba(45,107,255,0.35)' : 'var(--line-1)'}`,
+              borderRadius: 12, padding: '10px 8px', minHeight: 140,
+              opacity: isPast && !isToday ? 0.75 : 1,
+            }}>
+              <div style={{marginBottom:10}}>
+                <div style={{fontSize:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color: isToday ? 'var(--brand-2)' : 'var(--text-4)'}}>
+                  {d.toLocaleDateString('es-ES', {weekday:'short'})}
+                </div>
+                <div style={{fontSize:20, fontWeight:700, lineHeight:1.1, color: isToday ? 'var(--brand-2)' : isPast ? 'var(--text-3)' : 'var(--text-0)'}}>
+                  {d.getDate()}
+                </div>
+              </div>
+
+              <div style={{display:'flex', flexDirection:'column', gap:4}}>
+                {pendientes.map(t => (
+                  <div key={t.id} onClick={() => onEdit(t)} style={{
+                    padding:'4px 7px', borderRadius:6, cursor:'pointer', fontSize:11.5, fontWeight:500, lineHeight:1.3,
+                    background: prioColor(t.prio, 'bg'), color: prioColor(t.prio, 'text'),
+                    borderLeft: `2px solid ${prioColor(t.prio, 'text')}`,
+                  }}>
+                    {t.title}
+                    {t.time && <span style={{fontSize:10, opacity:0.65, marginLeft:4}}>{t.time}</span>}
+                  </div>
+                ))}
+                {hechas.map(t => (
+                  <div key={t.id} onClick={() => onEdit(t)} style={{
+                    padding:'4px 7px', borderRadius:6, cursor:'pointer', fontSize:11, lineHeight:1.3,
+                    color:'var(--text-4)', textDecoration:'line-through', background:'rgba(255,255,255,0.03)',
+                  }}>
+                    {t.title}
+                  </div>
+                ))}
+              </div>
+
+              <button onClick={() => onAdd(key)} style={{
+                marginTop: dayTasks.length ? 6 : 0, width:'100%', background:'transparent', border:'none',
+                color:'var(--text-4)', fontSize:18, cursor:'pointer', lineHeight:1, padding:'2px 0',
+                opacity: 0, transition:'opacity 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.opacity='1'}
+              onMouseLeave={e => e.currentTarget.style.opacity='0'}
+              >+</button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 // ── Tareas ───────────────────────────────────────────────────────
@@ -112,6 +219,8 @@ export function Tareas({ data }) {
   const { tasks = [], clientes = [], updateTask, addTask, deleteTask } = data || {}
   const [creating, setCreating] = useState(false)
   const [editing, setEditing]   = useState(null)
+  const [view, setView]         = useState('lista')
+  const [newTaskDate, setNewTaskDate] = useState(null)
 
   const toggle = (id) => {
     const task = tasks.find(t => t.id === id)
@@ -121,7 +230,12 @@ export function Tareas({ data }) {
   const handleSave = (form) => {
     if (form.id) updateTask?.(form.id, form)
     else addTask?.(form)
-    setCreating(false); setEditing(null)
+    setCreating(false); setEditing(null); setNewTaskDate(null)
+  }
+
+  const handleCalendarAdd = (isoDate) => {
+    setNewTaskDate(isoDate)
+    setCreating(true)
   }
 
   const groups = [
@@ -144,11 +258,23 @@ export function Tareas({ data }) {
           <p className="page-subtitle">No pierdas el hilo operativo · {tasks.filter(t=>!t.done).length} pendientes</p>
         </div>
         <div className="page-actions">
+          <div className="segmented">
+            <button className={view==='lista'?'active':''} onClick={()=>setView('lista')}>Lista</button>
+            <button className={view==='calendario'?'active':''} onClick={()=>setView('calendario')}>Calendario</button>
+          </div>
           <button className="btn primary" onClick={() => setCreating(true)}><I.Plus size={13}/> Nueva tarea</button>
         </div>
       </div>
 
-      <div className="grid-main-side">
+      {view === 'calendario' && (
+        <CalendarioView
+          tasks={tasks}
+          onEdit={setEditing}
+          onAdd={handleCalendarAdd}
+        />
+      )}
+
+      {view === 'lista' && <div className="grid-main-side">
         <div style={{display:'flex', flexDirection:'column', gap:14}}>
           {groups.map(g => {
             const list = tasks.filter(t => effectiveGroup(t) === g.key)
@@ -211,12 +337,12 @@ export function Tareas({ data }) {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
 
       {(creating || editing) && (
         <TareaModal
-          tarea={editing}
-          onClose={() => { setCreating(false); setEditing(null) }}
+          tarea={editing ? editing : (newTaskDate ? { due_date: newTaskDate } : undefined)}
+          onClose={() => { setCreating(false); setEditing(null); setNewTaskDate(null) }}
           onSave={handleSave}
           onDelete={deleteTask}
           clientes={clientes}

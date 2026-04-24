@@ -416,6 +416,10 @@ export function Pipeline({ data, openQuick }) {
   const [cobradoLead,    setCobradoLead]    = useState(null)
   const [señalLead,      setSeñalLead]      = useState(null)
   const [cobrarRestoLead,setCobrarRestoLead] = useState(null)
+  const [touchDrag, setTouchDrag] = useState(null)
+  const kanbanRef    = useRef(null)
+  const touchDragRef = useRef(null)
+  const moveCardRef  = useRef(null)
 
   const allResp = [...new Set(leads.map(l => l.responsable).filter(Boolean))]
 
@@ -454,6 +458,60 @@ export function Pipeline({ data, openQuick }) {
     data.updateLead?.(leadId, { estado: newEstado })
     setMovingId(null)
   }
+
+  moveCardRef.current = moveCard
+
+  const handleCardTouchStart = (e, lead) => {
+    if (e.touches.length !== 1) return
+    const touch = e.touches[0]
+    const rect  = e.currentTarget.getBoundingClientRect()
+    touchDragRef.current = {
+      leadId: lead.id,
+      leadName: lead.empresa,
+      leadEstado: lead.estado,
+      offsetX: touch.clientX - rect.left,
+      offsetY: touch.clientY - rect.top,
+      ghostX: touch.clientX,
+      ghostY: touch.clientY,
+      targetCol: null,
+      moved: false,
+    }
+  }
+
+  useEffect(() => {
+    const el = kanbanRef.current
+    if (!el) return
+    const onTouchMove = (e) => {
+      const drag = touchDragRef.current
+      if (!drag) return
+      e.preventDefault()
+      const touch = e.touches[0]
+      const ghostX = touch.clientX - drag.offsetX
+      const ghostY = touch.clientY - drag.offsetY
+      const under  = document.elementFromPoint(touch.clientX, touch.clientY)
+      const colEl  = under?.closest('[data-col]')
+      const targetCol = colEl ? colEl.getAttribute('data-col') : null
+      touchDragRef.current = { ...drag, ghostX, ghostY, targetCol, moved: true }
+      setTouchDrag({ leadId: drag.leadId, leadName: drag.leadName, ghostX, ghostY, targetCol })
+    }
+    const onTouchEnd = () => {
+      const drag = touchDragRef.current
+      touchDragRef.current = null
+      setTouchDrag(null)
+      if (!drag?.moved) return
+      if (drag.targetCol && drag.targetCol !== drag.leadEstado) {
+        moveCardRef.current?.(drag.leadId, drag.targetCol)
+      }
+    }
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    el.addEventListener('touchend',    onTouchEnd)
+    el.addEventListener('touchcancel', onTouchEnd)
+    return () => {
+      el.removeEventListener('touchmove',   onTouchMove)
+      el.removeEventListener('touchend',    onTouchEnd)
+      el.removeEventListener('touchcancel', onTouchEnd)
+    }
+  }, [])
 
   const handleSeñalConfirm = (señalMonto) => {
     const lead = señalLead
@@ -577,9 +635,10 @@ export function Pipeline({ data, openQuick }) {
             )
           })()}
 
-          <div className="kanban">
+          <div className="kanban" ref={kanbanRef}>
             {cols.map(col=>(
-              <div className="kanban-col" key={col.label}
+              <div className="kanban-col" key={col.label} data-col={col.label}
+                style={touchDrag?.targetCol === col.label ? { outline: `2px solid ${col.color}`, borderRadius: 10 } : undefined}
                 onDragOver={e => e.preventDefault()}
                 onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('leadId'); if (id) moveCard(id, col.label) }}>
                 <div className="kanban-col-head">
@@ -603,6 +662,7 @@ export function Pipeline({ data, openQuick }) {
                   return (
                     <div className="kanban-card" key={l.id} draggable
                       onDragStart={e => e.dataTransfer.setData('leadId', l.id)}
+                      onTouchStart={e => handleCardTouchStart(e, l)}
                       onClick={() => setEditing(l)}>
                       <div className="name">{l.empresa}</div>
                       <div className="sub">{l.servicio}</div>
@@ -636,6 +696,24 @@ export function Pipeline({ data, openQuick }) {
               </div>
             ))}
           </div>
+
+          {touchDrag && (
+            <div style={{
+              position:'fixed', left:touchDrag.ghostX, top:touchDrag.ghostY,
+              width:160, background:'var(--surface-2)', border:'1px solid var(--line-1)',
+              borderRadius:10, padding:'10px 14px', pointerEvents:'none', zIndex:9999,
+              opacity:0.9, transform:'rotate(2deg) scale(1.03)',
+              boxShadow:'0 8px 24px rgba(0,0,0,0.4)', fontSize:13, fontWeight:600,
+              color:'var(--text-0)',
+            }}>
+              {touchDrag.leadName}
+              {touchDrag.targetCol && (
+                <div style={{fontSize:11, color:STATE_COLORS[touchDrag.targetCol]?.color||'var(--text-3)', marginTop:4}}>
+                  → {touchDrag.targetCol}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
 
