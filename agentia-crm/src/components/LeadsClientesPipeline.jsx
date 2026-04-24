@@ -308,15 +308,14 @@ export function Clientes({ data, openItem, onItemOpened }) {
             ) : (
               <>
                 <div style={{fontWeight:700, fontSize:15}}>€{eur(c.importe || 0)}</div>
-                <span className={`chip ${getChip(c.estado)}`} style={{marginTop:4, display:'inline-flex', fontSize:10}}>
-                  <span className="dot"/>{c.estado}
+                <span className="chip gray" style={{marginTop:4, display:'inline-flex', fontSize:10}}>
+                  <span className="dot"/>Cerrado
                 </span>
               </>
             )}
           </div>
         </div>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop: c.ajustes > 0 ? 8 : 0}}>
-          {c.ajustes > 0 && <span className="pend">{c.ajustes} ajuste{c.ajustes > 1 ? 's' : ''}</span>}
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:0}}>
           <div style={{marginLeft:'auto'}} onClick={e => e.stopPropagation()}>
             <RowMenu
               onEdit={() => setEditing(c)}
@@ -347,9 +346,9 @@ export function Clientes({ data, openItem, onItemOpened }) {
           <div style={{fontSize:12, color:'var(--text-4)', marginTop:2}}>{recurrentes.length} cliente{recurrentes.length !== 1 ? 's' : ''}</div>
         </div>
         <div className="card" style={{padding:'16px 20px'}}>
-          <div style={{fontSize:11, fontWeight:600, textTransform:'uppercase', color:'var(--text-4)', letterSpacing:.5, marginBottom:6}}>Proyectos</div>
+          <div style={{fontSize:11, fontWeight:600, textTransform:'uppercase', color:'var(--text-4)', letterSpacing:.5, marginBottom:6}}>Proyectos cerrados</div>
           <div style={{fontSize:26, fontWeight:700}}>€{eur(totalProyectos)}</div>
-          <div style={{fontSize:12, color:'var(--text-4)', marginTop:2}}>{proyectos.length} proyecto{proyectos.length !== 1 ? 's' : ''}</div>
+          <div style={{fontSize:12, color:'var(--text-4)', marginTop:2}}>{proyectos.length} cliente{proyectos.length !== 1 ? 's' : ''}</div>
         </div>
       </div>
 
@@ -366,10 +365,10 @@ export function Clientes({ data, openItem, onItemOpened }) {
 
         <div>
           <div style={{fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:.5, color:'var(--text-3)', marginBottom:10, display:'flex', alignItems:'center', gap:6}}>
-            Proyectos <span style={{fontWeight:400, color:'var(--text-4)'}}>· {proyectos.length}</span>
+            Cerrados <span style={{fontWeight:400, color:'var(--text-4)'}}>· {proyectos.length}</span>
           </div>
           {proyectos.length === 0
-            ? <div className="card" style={{padding:'24px 16px', textAlign:'center', color:'var(--text-4)', fontSize:13}}>Sin proyectos</div>
+            ? <div className="card" style={{padding:'24px 16px', textAlign:'center', color:'var(--text-4)', fontSize:13}}>Sin proyectos cerrados</div>
             : proyectos.map(c => <ClientCard key={c.id} c={c} isRecurrente={false} />)
           }
         </div>
