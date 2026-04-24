@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { I } from './Icons'
 
 export function Modal({ open, onClose, title, children, onSave, saveLabel = 'Guardar', danger }) {
@@ -26,11 +26,20 @@ export function F({ label, children }) {
 
 export function SelectOrText({ value, onChange, options, placeholder = 'Escribe el valor…', selectClass, inputClass }) {
   const [custom, setCustom] = useState(() => Boolean(value && !options.includes(value)))
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
   if (custom) {
     return (
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         <input
-          className={inputClass}
+          className={inputClass || selectClass}
           value={value || ''}
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
@@ -46,16 +55,52 @@ export function SelectOrText({ value, onChange, options, placeholder = 'Escribe 
       </div>
     )
   }
+
+  const displayed = options.includes(value) ? value : (options[0] || '')
+
   return (
-    <select
-      className={selectClass}
-      value={options.includes(value) ? value : options[0] || ''}
-      onChange={e => {
-        if (e.target.value === '__custom__') { setCustom(true); onChange('') }
-        else onChange(e.target.value)
-      }}>
-      {options.map(o => <option key={o} value={o}>{o}</option>)}
-      <option value="__custom__">✏ Personalizado…</option>
-    </select>
+    <div ref={ref} style={{ position: 'relative' }}>
+      <div
+        className={selectClass}
+        onClick={() => setOpen(o => !o)}
+        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', userSelect: 'none' }}>
+        <span>{displayed}</span>
+        <span style={{ fontSize: 10, opacity: 0.45, marginLeft: 6 }}>▾</span>
+      </div>
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 9999,
+          background: '#0F1520', border: '1px solid var(--line-2)', borderRadius: 8,
+          maxHeight: 200, overflowY: 'auto',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+        }}>
+          {options.map(o => (
+            <div key={o}
+              onMouseDown={e => { e.preventDefault(); onChange(o); setOpen(false) }}
+              style={{
+                padding: '8px 12px', cursor: 'pointer', fontSize: 13,
+                background: o === displayed ? 'rgba(45,107,255,0.15)' : 'transparent',
+                color: o === displayed ? 'var(--brand-2)' : 'var(--text-1)',
+              }}
+              onMouseEnter={e => { if (o !== displayed) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = o === displayed ? 'rgba(45,107,255,0.15)' : 'transparent' }}
+            >
+              {o}
+            </div>
+          ))}
+          <div
+            onMouseDown={e => { e.preventDefault(); setCustom(true); onChange(''); setOpen(false) }}
+            style={{
+              padding: '8px 12px', cursor: 'pointer', fontSize: 13,
+              color: 'var(--text-3)', borderTop: '1px solid var(--line-1)',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            ✏ Personalizado…
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
