@@ -149,7 +149,10 @@ export function Leads({ data, openQuick }) {
   const [editing, setEditing] = useState(null)
   const [creating, setCreating] = useState(false)
   const leads = data?.leads || []
-  const filtered = filter === 'todos' ? leads : leads.filter(l => l.temp === filter)
+  const activeLeads = leads.filter(l => !['Ganado','Perdido'].includes(l.estado))
+  const closedLeads = leads.filter(l => ['Ganado','Perdido'].includes(l.estado))
+  const base = filter === 'cerrados' ? closedLeads : activeLeads
+  const filtered = (filter === 'todos' || filter === 'cerrados') ? base : base.filter(l => l.temp === filter)
 
   const handleSave = (form) => {
     if (form.id) {
@@ -166,11 +169,15 @@ export function Leads({ data, openQuick }) {
       <div className="page-head">
         <div>
           <h1 className="page-title">Leads</h1>
-          <p className="page-subtitle">Oportunidades aún no cerradas · {leads.length} totales · €{eur(leads.reduce((a,l)=>a+(l.monto||0),0))} en juego</p>
+          <p className="page-subtitle">
+            {filter === 'cerrados'
+              ? `Leads cerrados · ${closedLeads.length} totales`
+              : `Oportunidades activas · ${activeLeads.length} totales · €${eur(activeLeads.reduce((a,l)=>a+(l.monto||0),0))} en juego`}
+          </p>
         </div>
         <div className="page-actions">
           <div className="segmented">
-            {[['todos','Todos'],['hot','Calientes'],['warm','Tibios'],['cold','Fríos']].map(([k,v])=>(
+            {[['todos','Todos'],['hot','Calientes'],['warm','Tibios'],['cold','Fríos'],['cerrados','Cerrados']].map(([k,v])=>(
               <button key={k} className={filter===k?'active':''} onClick={()=>setFilter(k)}>{v}</button>
             ))}
           </div>
