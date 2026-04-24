@@ -500,6 +500,10 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened }) {
   }
 
   useEffect(() => {
+    if (kanbanRef.current) kanbanRef.current.scrollLeft = 0
+  }, [])
+
+  useEffect(() => {
     const el = kanbanRef.current
     if (!el) return
     const onTouchMove = (e) => {
@@ -664,10 +668,7 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened }) {
               const isClosed = STAGES_CLOSED.includes(col.label)
               return (
                 <div className="kanban-col" key={col.label} data-col={col.label}
-                  style={{
-                    ...(touchDrag?.targetCol === col.label ? { outline: `2px solid ${col.color}`, borderRadius: 10 } : {}),
-                    ...(isClosed ? { opacity: 0.75, background: 'linear-gradient(180deg, #080C16 0%, #06091200 100%)' } : {}),
-                  }}
+                  style={touchDrag?.targetCol === col.label ? { outline: `2px solid ${col.color}`, borderRadius: 10 } : undefined}
                   onDragOver={e => e.preventDefault()}
                   onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('leadId'); if (id) moveCard(id, col.label) }}>
                   <div className="kanban-col-head">
