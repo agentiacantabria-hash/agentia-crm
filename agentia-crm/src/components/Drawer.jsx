@@ -26,7 +26,7 @@ const ORIGENES = ['Instagram', 'LinkedIn', 'Referido', 'Formulario web', 'Otro']
 const EMPTY = {
   empresa: '', servicio: '', contacto: '', origen: 'Instagram', origenCustom: '', notas: '',
   sector: '', ciudad: '', telefono: '', email: '', instagram: '', responsable: '',
-  estado: 'Nuevo', next_contact: '', monto: '',
+  estado: 'Cliente Nuevo', next_contact: '', monto: '',
 }
 
 export function QuickLeadDrawer({ open, onClose, onSave }) {
@@ -44,7 +44,7 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
       empresa:      form.empresa.trim(),
       servicio:     form.servicio || servicios[0] || '',
       origen:       origenFinal,
-      estado:       form.estado || 'Nuevo',
+      estado:       form.estado || 'Cliente Nuevo',
       monto:        parseFloat(form.monto) || 0,
       temp:         'cold',
       next:         (form.notas || '').trim() || 'Primer contacto',
@@ -121,7 +121,7 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'rgba(45,107,255,0.06)', border: '1px solid rgba(45,107,255,0.15)', borderRadius: 10 }}>
                 <I.Sparkle size={16} style={{ color: 'var(--brand-2)' }} />
-                <div style={{ fontSize: 12.5, color: 'var(--text-2)' }}>Se asignará automáticamente a <b style={{ color: 'var(--text-0)' }}>ti</b> y entrará en estado <b style={{ color: 'var(--brand-3)' }}>Nuevo</b>.</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-2)' }}>Se asignará automáticamente a <b style={{ color: 'var(--text-0)' }}>ti</b> y entrará en estado <b style={{ color: 'var(--brand-3)' }}>Cliente Nuevo</b>.</div>
               </div>
             </>
           ) : (
