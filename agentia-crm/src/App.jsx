@@ -310,8 +310,12 @@ export default function App() {
       const clienteAuto = clientesRef.current.find(c => c.nombre === lead.empresa)
       if (clienteAuto) deleteCliente(clienteAuto.id)
     }
-    // Señal pagada → Denegado: mantener cobro señal + crear tarea de revisión
+    // Señal pagada → Denegado: mantener cobro señal (dinero recibido), borrar resto pendiente
     if (eraSeñal && seraDenegado) {
+      const restoCobro = cobrosRef.current.find(c =>
+        c.cliente === lead.empresa && (c.concepto || '').startsWith('Resto ·') && !c.pagado
+      )
+      if (restoCobro) deleteCobro(restoCobro.id)
       const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1)
       addTask({
         title: `Revisar devolución señal · ${lead.empresa}`,
@@ -324,6 +328,19 @@ export default function App() {
         tag: 'Finanzas',
       })
     }
+
+    // Cualquier estado activo → Denegado (sin haber pasado por Cobrado ni Señal):
+    // borrar cobros pendientes y cliente si no tiene historial de cobros pagados
+    if (seraDenegado && !eraCobrado && !eraSeñal) {
+      cobrosRef.current
+        .filter(c => c.cliente === lead.empresa && !c.pagado && !c.recurrente)
+        .forEach(c => deleteCobro(c.id))
+      const client = clientesRef.current.find(c => c.nombre === lead.empresa)
+      if (client) {
+        const tienePagados = cobrosRef.current.some(c => c.cliente === lead.empresa && c.pagado)
+        if (!tienePagados) deleteCliente(client.id)
+      }
+    }
   }
 
   const deleteLead = async (id) => {
@@ -333,7 +350,7 @@ export default function App() {
     } catch (_) {}
     setLeads(prev => prev.filter(l => l.id !== id))
 
-    // Denegado: solo eliminar la fila, sin cascade
+    // Denegado: solo eliminar la fila. Si tenía señal cobrada, dejar el cobro (dinero real recibido)
     if (lead?.estado === STAGE.DENEGADO) return
 
     // Cobrado: "Quitar del pipeline" conserva el cliente (es historial real)
