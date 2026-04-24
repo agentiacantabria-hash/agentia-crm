@@ -442,10 +442,10 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened }) {
   const activeLeads = leads.filter(l => !STAGES_CLOSED.includes(l.estado))
   const closedLeads = leads.filter(l =>  STAGES_CLOSED.includes(l.estado))
   const base        = filter === 'cerrados' ? closedLeads : activeLeads
+  const applyRespFilter = (items) => filterResp === 'todos' ? items : items.filter(l => l.responsable === filterResp)
+
   const filteredBase = (filter === 'todos' || filter === 'cerrados') ? base : base.filter(l => l.temp === filter)
   const filtered    = applyRespFilter(filteredBase)
-
-  const applyRespFilter = (items) => filterResp === 'todos' ? items : items.filter(l => l.responsable === filterResp)
 
   const activeCols = PIPELINE_COLS.filter(l => !STAGES_CLOSED.includes(l)).map(label => ({
     label,
