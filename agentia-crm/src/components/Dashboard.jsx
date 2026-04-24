@@ -316,7 +316,7 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
           <div className="stat" style={{'--stat-glow':'rgba(45,107,255,0.22)','--stat-dot':'#4F8BFF'}}>
             <div className="label"><span className="dot"/>Total facturado</div>
             <div className="value"><span className="currency">€</span>{eur(totalFacturado)}</div>
-            <div className="foot">{cobros.length} factura{cobros.length!==1?'s':''} · €{eur(ingresosMes)} cobrados</div>
+            <div className="foot">{(() => { const n = cobros.filter(c=>c.pagado).length; const p = cobros.filter(c=>!c.pagado).length; return `${n} cobro${n!==1?'s':''}${p>0?` · ${p} pendiente${p!==1?'s':''}`:''}` })()}</div>
           </div>
           <div className="stat" style={{'--stat-glow':'rgba(62,207,142,0.18)','--stat-dot':'#3ECF8E'}}>
             <div className="label"><span className="dot"/>Clientes activos</div>

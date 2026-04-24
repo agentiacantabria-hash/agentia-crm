@@ -441,8 +441,9 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened }) {
 
   const activeLeads = leads.filter(l => !STAGES_CLOSED.includes(l.estado))
   const closedLeads = leads.filter(l =>  STAGES_CLOSED.includes(l.estado))
-  const base     = filter === 'cerrados' ? closedLeads : activeLeads
-  const filtered = (filter === 'todos' || filter === 'cerrados') ? base : base.filter(l => l.temp === filter)
+  const base        = filter === 'cerrados' ? closedLeads : activeLeads
+  const filteredBase = (filter === 'todos' || filter === 'cerrados') ? base : base.filter(l => l.temp === filter)
+  const filtered    = applyRespFilter(filteredBase)
 
   const applyRespFilter = (items) => filterResp === 'todos' ? items : items.filter(l => l.responsable === filterResp)
 
@@ -628,6 +629,37 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened }) {
         </div>
       </div>
 
+      {allResp.length > 1 && (
+        <div style={{display:'flex', gap:6, marginBottom:10, flexWrap:'wrap'}}>
+          {['todos', ...allResp].map(r => (
+            <button key={r} className={`btn sm ${filterResp === r ? 'primary' : 'ghost'}`}
+              onClick={() => setFilterResp(r)}>
+              {r === 'todos' ? 'Todos' : r}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {movingId && (() => {
+        const lead = leads.find(l => l.id === movingId)
+        return (
+          <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:300,display:'flex',alignItems:'flex-end'}} onClick={() => setMovingId(null)}>
+            <div style={{width:'100%',background:'var(--surface-1)',borderRadius:'20px 20px 0 0',padding:'20px 16px 32px'}} onClick={e=>e.stopPropagation()}>
+              <div style={{fontSize:13,color:'var(--text-3)',marginBottom:14}}>Mover <b style={{color:'var(--text-0)'}}>{lead?.empresa}</b> a…</div>
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {PIPELINE_COLS.map(col => (
+                  <button key={col} className="btn" style={{justifyContent:'flex-start',gap:10,opacity:lead?.estado===col?0.4:1}}
+                    disabled={lead?.estado===col} onClick={() => moveCard(movingId, col)}>
+                    <div style={{width:8,height:8,borderRadius:'50%',background:STATE_COLORS[col]?.color||'#6B7590',flexShrink:0}}/>
+                    {col}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       {view === 'kanban' && (
         <>
           <div className="pipe-summary">
@@ -644,37 +676,6 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened }) {
               </div>
             ))}
           </div>
-
-          {allResp.length > 1 && (
-            <div style={{display:'flex', gap:6, marginBottom:10, flexWrap:'wrap'}}>
-              {['todos', ...allResp].map(r => (
-                <button key={r} className={`btn sm ${filterResp === r ? 'primary' : 'ghost'}`}
-                  onClick={() => setFilterResp(r)}>
-                  {r === 'todos' ? 'Todos' : r}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {movingId && (() => {
-            const lead = leads.find(l => l.id === movingId)
-            return (
-              <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:300,display:'flex',alignItems:'flex-end'}} onClick={() => setMovingId(null)}>
-                <div style={{width:'100%',background:'var(--surface-1)',borderRadius:'20px 20px 0 0',padding:'20px 16px 32px'}} onClick={e=>e.stopPropagation()}>
-                  <div style={{fontSize:13,color:'var(--text-3)',marginBottom:14}}>Mover <b style={{color:'var(--text-0)'}}>{lead?.empresa}</b> a…</div>
-                  <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                    {PIPELINE_COLS.map(col => (
-                      <button key={col} className="btn" style={{justifyContent:'flex-start',gap:10,opacity:lead?.estado===col?0.4:1}}
-                        disabled={lead?.estado===col} onClick={() => moveCard(movingId, col)}>
-                        <div style={{width:8,height:8,borderRadius:'50%',background:STATE_COLORS[col]?.color||'#6B7590',flexShrink:0}}/>
-                        {col}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )
-          })()}
 
           <div className="kanban" ref={kanbanRef}>
             {activeCols.map(col=>(
@@ -795,38 +796,47 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened }) {
           <div style={{overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
           <table className="table">
             <thead>
-              <tr><th>Empresa</th><th>Sector</th><th>Servicio</th><th>Estado</th><th>Origen</th><th>Próximo paso</th><th>Resp.</th><th style={{textAlign:'right'}}>Importe</th><th></th></tr>
+              <tr><th>Empresa</th><th>Servicio</th><th>Estado</th><th>Próximo paso</th><th>Resp.</th><th style={{textAlign:'right'}}>Importe</th><th></th></tr>
             </thead>
             <tbody>
               {filtered.map(l => {
                 const sc = STATE_COLORS[l.estado] || { chip:'gray' }
                 const tempColor = l.temp==='hot'?'#FF5A6A':l.temp==='warm'?'#FFB547':l.temp==='cold'?'#6B7590':'#3ECF8E'
+                const tempLabel = l.temp==='hot'?'HOT':l.temp==='warm'?'TIBIO':l.temp==='cold'?'FRÍO':null
                 return (
                   <tr key={l.id} style={{cursor:'pointer'}} onClick={() => setEditing(l)}>
                     <td>
-                      <div style={{display:'flex', alignItems:'center', gap:10}}>
+                      <div style={{display:'flex', alignItems:'center', gap:8}}>
                         <div style={{width:8, height:8, borderRadius:'50%', background:tempColor, boxShadow:`0 0 8px ${tempColor}`, flexShrink:0}}/>
-                        <div><div className="primary">{l.empresa}</div><div className="muted" style={{fontSize:11.5}}>{l.ciudad}</div></div>
+                        <div>
+                          <div style={{display:'flex', alignItems:'center', gap:6}}>
+                            <span className="primary">{l.empresa}</span>
+                            {tempLabel && <span style={{fontSize:9.5, fontWeight:700, color:tempColor, background:`${tempColor}18`, padding:'1px 5px', borderRadius:3, letterSpacing:'0.04em'}}>{tempLabel}</span>}
+                          </div>
+                          <div className="muted" style={{fontSize:11}}>{l.ciudad}{l.sector ? ` · ${l.sector}` : ''}</div>
+                        </div>
                       </div>
                     </td>
-                    <td className="muted">{l.sector}</td>
-                    <td className="muted">{l.servicio}</td>
+                    <td className="muted small">{l.servicio}</td>
                     <td><span className={`chip ${sc.chip}`}><span className="dot"/>{l.estado}</span></td>
-                    <td className="muted small">{l.origen}</td>
-                    <td className="muted small">{l.next}</td>
+                    <td className="muted small" style={{maxWidth:180, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{l.next || <span style={{color:'var(--text-4)'}}>—</span>}</td>
                     <td><div className="avatar sm">{l.responsable}</div></td>
                     <td className="mono" style={{textAlign:'right'}}>{l.monto ? `€${eur(l.monto)}` : <span className="muted">—</span>}</td>
                     <td onClick={e => e.stopPropagation()}>
-                      <RowMenu
-                        onEdit={() => setEditing(l)}
-                        onDelete={() => { if (confirm(`¿${STAGES_CLOSED.includes(l.estado) ? 'Quitar del pipeline' : 'Eliminar'} "${l.empresa}"?`)) data.deleteLead?.(l.id) }}
-                      />
+                      <div style={{display:'flex', gap:4, justifyContent:'flex-end', alignItems:'center'}}>
+                        <button className="btn sm ghost" style={{fontSize:11, padding:'3px 8px', whiteSpace:'nowrap'}}
+                          onClick={() => setMovingId(l.id)}>Mover →</button>
+                        <RowMenu
+                          onEdit={() => setEditing(l)}
+                          onDelete={() => { if (confirm(`¿${STAGES_CLOSED.includes(l.estado) ? 'Quitar del pipeline' : 'Eliminar'} "${l.empresa}"?`)) data.deleteLead?.(l.id) }}
+                        />
+                      </div>
                     </td>
                   </tr>
                 )
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={9} style={{textAlign:'center', padding:'32px 0', color:'var(--text-4)', fontSize:13}}>Sin leads en esta vista</td></tr>
+                <tr><td colSpan={7} style={{textAlign:'center', padding:'32px 0', color:'var(--text-4)', fontSize:13}}>Sin leads en esta vista</td></tr>
               )}
             </tbody>
           </table>

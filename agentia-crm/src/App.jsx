@@ -168,6 +168,9 @@ export default function App() {
       const mes = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
       addCliente({
         nombre: lead.empresa, servicio,
+        contacto: lead.contacto || '',
+        telefono: lead.telefono || '',
+        email: lead.email || '',
         importe: esRecurrente ? montoRec : monto,
         estado: esRecurrente ? 'Recurrente' : (tieneSeñal || dividido ? 'En curso' : 'Pagado · ajustes'),
         tipo,
@@ -181,21 +184,31 @@ export default function App() {
         const venceResto = lead.vence_resto || (() => {
           const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0,10)
         })()
-        addCobro({
-          cliente: lead.empresa, concepto: `Resto · ${servicio}`,
-          monto: restoMonto, vence: venceResto,
-          pagado: false, vencida: false, recurrente: false,
-        })
-        addTask({
-          title: `Cobrar resto · ${lead.empresa}`,
-          cliente: lead.empresa,
-          when_group: 'semana',
-          due_date: venceResto,
-          prio: 'alta',
-          resp: lead.responsable || '',
-          done: false,
-          tag: 'Finanzas',
-        })
+        // El cobro Resto ya fue creado en handleSeñalConfirm — solo actualizar vence si cambió
+        const existingResto = cobrosRef.current.find(c =>
+          c.cliente === lead.empresa && (c.concepto || '').startsWith('Resto ·') && !c.pagado
+        )
+        if (existingResto) {
+          if (lead.vence_resto && lead.vence_resto !== existingResto.vence) {
+            updateCobro(existingResto.id, { vence: lead.vence_resto })
+          }
+        } else {
+          addCobro({
+            cliente: lead.empresa, concepto: `Resto · ${servicio}`,
+            monto: restoMonto, vence: venceResto,
+            pagado: false, vencida: false, recurrente: false,
+          })
+          addTask({
+            title: `Cobrar resto · ${lead.empresa}`,
+            cliente: lead.empresa,
+            when_group: 'semana',
+            due_date: venceResto,
+            prio: 'alta',
+            resp: lead.responsable || '',
+            done: false,
+            tag: 'Finanzas',
+          })
+        }
       }
     } else if (dividido && monto > 0) {
       const señalMonto = Math.round(monto * señalPct / 100)
@@ -263,9 +276,11 @@ export default function App() {
     if (seraCobrado && !eraCobrado) {
       autoWinLead({ ...lead, ...safeUpdates, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, vence_resto })
     } else if (eraCobrado && nuevoEstado && !seraCobrado) {
-      // Deja de ser Cobrado → eliminar cobro automático
+      // Deja de ser Cobrado → eliminar cobro automático y cliente auto-creado
       const c = findCobroAuto(lead)
       if (c) deleteCobro(c.id)
+      const clienteAuto = clientesRef.current.find(c => c.nombre === lead.empresa)
+      if (clienteAuto) deleteCliente(clienteAuto.id)
     } else if (eraCobrado && !nuevoEstado && updates.monto !== undefined) {
       // Sigue Cobrado pero cambia el importe → actualizar cobro
       const c = findCobroAuto(lead)
@@ -318,8 +333,26 @@ export default function App() {
     } catch (_) {}
     setLeads(prev => prev.filter(l => l.id !== id))
 
-    // Leads cerrados: solo eliminar la fila. Cobros y clientes se preservan.
-    if (STAGES_CLOSED.includes(lead?.estado)) return
+    // Denegado: solo eliminar la fila, sin cascade
+    if (lead?.estado === STAGE.DENEGADO) return
+
+    // Cobrado: "Quitar del pipeline" conserva el cliente (es historial real)
+    if (lead?.estado === STAGE.COBRADO) return
+
+    // Señal pagada: limpiar cobros de señal y resto creados al confirmar la señal
+    if (lead?.estado === STAGE.SEÑAL) {
+      const señalVal = parseFloat(lead.señal_cobrada) || 0
+      if (señalVal > 0) {
+        const señalCobro = cobrosRef.current.find(c =>
+          c.cliente === lead.empresa && (c.concepto || '').startsWith('Señal ·') && c.monto === señalVal
+        )
+        if (señalCobro) deleteCobro(señalCobro.id)
+      }
+      const restoCobro = cobrosRef.current.find(c =>
+        c.cliente === lead.empresa && (c.concepto || '').startsWith('Resto ·') && !c.pagado
+      )
+      if (restoCobro) deleteCobro(restoCobro.id)
+    }
 
     // Leads activos: limpiar cobro automático si lo había
     const c = findCobroAuto(lead)
