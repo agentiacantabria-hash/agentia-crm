@@ -173,6 +173,13 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
     ? Math.round((ingresosMes - gastosMes) / (ingresosMes + pendientesMes) * 100)
     : (gastosMes === 0 ? 100 : 0)
 
+  const mrr = cobros.filter(c => c.recurrente && !c.pagado).reduce((acc, c) => {
+    const freq = c.frecuencia || 'Mensual'
+    const factor = freq === 'Semanal' ? 4.33 : freq === 'Trimestral' ? 1/3 : 1
+    return acc + (c.monto || 0) * factor
+  }, 0)
+  const clientesRecurrentesN = clientes.filter(c => (c.tipo || c.estado) === 'Recurrente').length
+
   const leadsActivos  = leads.filter(l => !['Cobrado','Denegado'].includes(l.estado))
   const leadsCalientes = leads.filter(l => l.temp === 'hot')
   const leadesTibios  = leads.filter(l => l.temp === 'warm')
@@ -326,10 +333,10 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
               {leadsActivos.length === 0 && 'Sin leads activos'}
             </div>
           </div>
-          <div className="stat" style={{'--stat-glow':'rgba(255,181,71,0.18)','--stat-dot':'#FFB547'}}>
-            <div className="label"><span className="dot"/>Gasto IA · mes</div>
-            <div className="value"><span className="currency">€</span>{eur(gastoIA)}</div>
-            <div className="foot">{gastoIADetail}</div>
+          <div className="stat" style={{'--stat-glow':'rgba(62,207,142,0.18)','--stat-dot':'#3ECF8E'}}>
+            <div className="label"><span className="dot"/>MRR · recurrentes</div>
+            <div className="value"><span className="currency">€</span>{eur(Math.round(mrr))}</div>
+            <div className="foot">{clientesRecurrentesN > 0 ? `${clientesRecurrentesN} cliente${clientesRecurrentesN!==1?'s':''} recurrente${clientesRecurrentesN!==1?'s':''}` : 'Sin clientes recurrentes'}</div>
           </div>
         </div>
       )}

@@ -198,6 +198,7 @@ export function Finanzas({ role, data }) {
               <thead>
                 <tr>
                   <th>Cliente</th>
+                  <th>Concepto</th>
                   <th style={{textAlign:'right'}}>Importe</th>
                   <th>Vencimiento</th>
                   <th>Estado</th>
@@ -207,9 +208,19 @@ export function Finanzas({ role, data }) {
               <tbody>
                 {cobros.map(c => (
                   <tr key={c.id} style={{cursor:'pointer'}} onClick={() => setEditingCobro(c)}>
-                    <td><span className="primary">{c.cliente}</span></td>
+                    <td>
+                      <div style={{display:'flex', alignItems:'center', gap:7}}>
+                        <span className="primary">{c.cliente}</span>
+                        {c.recurrente && (
+                          <span style={{fontSize:10, fontWeight:600, color:'var(--ok)', background:'rgba(62,207,142,0.12)', padding:'1px 6px', borderRadius:12}}>
+                            ↺ {c.frecuencia || 'Recurrente'}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="muted small">{c.concepto}</td>
                     <td className="mono" style={{textAlign:'right'}}>€{eur(c.monto||0)}</td>
-                    <td className="muted">{c.vence}</td>
+                    <td className="muted">{c.vence || '—'}</td>
                     <td>
                       {c.pagado
                         ? <span className="chip green"><span className="dot"/>Pagada</span>
@@ -218,7 +229,7 @@ export function Finanzas({ role, data }) {
                           : <span className="chip amber"><span className="dot"/>Pendiente</span>
                       }
                     </td>
-                    <td style={{textAlign:'right', display:'flex', alignItems:'center', gap:6, justifyContent:'flex-end'}}>
+                    <td style={{display:'flex', alignItems:'center', gap:6, justifyContent:'flex-end'}}>
                       {!c.pagado && (
                         <button className="btn sm" style={{padding:'3px 10px', fontSize:12}}
                           onClick={e => { e.stopPropagation(); data.updateCobro?.(c.id, { pagado: true, vencida: false }) }}>

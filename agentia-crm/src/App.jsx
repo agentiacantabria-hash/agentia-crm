@@ -103,35 +103,55 @@ export default function App() {
 
   // ── LEADS ──────────────────────────────────────────────────
   const addLead = async (lead) => {
-    const { crearProyecto, origenCustom, yaCobrado: _y, ...leadData } = lead
+    const { crearProyecto, origenCustom, yaCobrado: _y, tipo, montoRecurrente, frecuencia, ...leadData } = lead
     try {
       const { data: d, error } = await supabase.from('leads').insert([clean(leadData)]).select().single()
       if (!error && d) {
         setLeads(prev => [d, ...prev])
-        autoWinLead({ ...d, crearProyecto })
+        autoWinLead({ ...d, crearProyecto, tipo, montoRecurrente, frecuencia })
         return
       }
     } catch (_) {}
     const local = { ...leadData, id: `l${Date.now()}` }
     setLeads(prev => [local, ...prev])
-    autoWinLead({ ...local, crearProyecto })
+    autoWinLead({ ...local, crearProyecto, tipo, montoRecurrente, frecuencia })
   }
 
   const autoWinLead = (lead) => {
     if (lead.estado !== 'Cobrado') return
-    const monto = parseFloat(lead.monto) || 0
-    // Cobrado = han pagado siempre. Crear cliente y cobro pagado automáticamente.
+    const monto          = parseFloat(lead.monto) || 0
+    const tipo           = lead.tipo || 'Proyecto'
+    const montoRec       = parseFloat(lead.montoRecurrente) || 0
+    const frecuencia     = lead.frecuencia || 'Mensual'
+    const esRecurrente   = tipo === 'Recurrente'
+
     const yaExiste = clientes.some(c => c.nombre === lead.empresa)
     if (!yaExiste) {
       const mes = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
       addCliente({
         nombre: lead.empresa, servicio: lead.servicio || '',
-        importe: monto, estado: 'Pagado · ajustes',
+        importe: esRecurrente ? montoRec : monto,
+        estado: esRecurrente ? 'Recurrente' : 'Pagado · ajustes',
+        tipo,
         ajustes: 0, responsable: lead.responsable || '', since: mes,
       })
     }
+    // Cobro inicial (pago único, siempre pagado)
     if (monto > 0) {
-      addCobro({ cliente: lead.empresa, concepto: lead.servicio || 'Servicio', monto, vence: null, pagado: true, vencida: false })
+      addCobro({ cliente: lead.empresa, concepto: lead.servicio || 'Servicio', monto, vence: null, pagado: true, vencida: false, recurrente: false })
+    }
+    // Primer cobro recurrente (siguiente período, pendiente)
+    if (esRecurrente && montoRec > 0) {
+      const next = new Date()
+      if (frecuencia === 'Semanal') next.setDate(next.getDate() + 7)
+      else if (frecuencia === 'Trimestral') next.setMonth(next.getMonth() + 3)
+      else next.setMonth(next.getMonth() + 1)
+      addCobro({
+        cliente: lead.empresa,
+        concepto: `Mantenimiento ${frecuencia.toLowerCase()} · ${lead.servicio || 'Servicio'}`,
+        monto: montoRec, vence: next.toISOString().slice(0,10),
+        pagado: false, vencida: false, recurrente: true, frecuencia,
+      })
     }
     if (lead.crearProyecto) {
       addProyecto({ nombre: lead.empresa, cliente: lead.empresa, estado: 'En curso', responsable: lead.responsable || '' })
@@ -145,7 +165,7 @@ export default function App() {
 
   const updateLead = async (id, updates) => {
     const lead = leads.find(l => l.id === id)
-    const { crearProyecto, origenCustom, yaCobrado: _y, ...safeUpdates } = updates
+    const { crearProyecto, origenCustom, yaCobrado: _y, tipo, montoRecurrente, frecuencia, ...safeUpdates } = updates
     try {
       await supabase.from('leads').update(clean(safeUpdates)).eq('id', id)
     } catch (_) {}
@@ -156,7 +176,7 @@ export default function App() {
     const seraCobrado = nuevoEstado === 'Cobrado'
 
     if (seraCobrado && !eraCobrado) {
-      autoWinLead({ ...lead, ...safeUpdates, crearProyecto })
+      autoWinLead({ ...lead, ...safeUpdates, crearProyecto, tipo, montoRecurrente, frecuencia })
     } else if (eraCobrado && nuevoEstado && !seraCobrado) {
       // Deja de ser Cobrado → eliminar cobro automático
       const c = findCobroAuto(lead)
@@ -315,6 +335,19 @@ export default function App() {
       if (!error) { setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c)); }
     } catch (_) {
       setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
+    }
+    // Si es un cobro recurrente que acaba de pagarse, generar el siguiente período
+    if (updates.pagado === true && cobro && !cobro.pagado && cobro.recurrente) {
+      const base = new Date(cobro.vence || Date.now())
+      const freq = cobro.frecuencia || 'Mensual'
+      if (freq === 'Semanal')      base.setDate(base.getDate() + 7)
+      else if (freq === 'Trimestral') base.setMonth(base.getMonth() + 3)
+      else                         base.setMonth(base.getMonth() + 1)
+      addCobro({
+        cliente: cobro.cliente, concepto: cobro.concepto,
+        monto: cobro.monto, vence: base.toISOString().slice(0,10),
+        pagado: false, vencida: false, recurrente: true, frecuencia: freq,
+      })
     }
   }
 

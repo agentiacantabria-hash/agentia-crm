@@ -25,11 +25,11 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
   const isNew = !lead?.id
   const SERVICIOS = getServicios()
   const RESP = getResp()
-  const [form, setForm] = useState(lead ? { ...lead, monto: lead.monto ?? '', crearProyecto: false } : {
+  const [form, setForm] = useState(lead ? { ...lead, monto: lead.monto ?? '', crearProyecto: false, tipo: lead.tipo || 'Proyecto', montoRecurrente: '', frecuencia: 'Mensual' } : {
     empresa:'', sector:'', ciudad:'', contacto:'', telefono:'', email:'',
     responsable: RESP[0] || 'LP', servicio: SERVICIOS[0] || 'Web premium',
     estado:'Cliente Nuevo', next:'', monto:'', origen:'Instagram', origenCustom:'', notas:'',
-    crearProyecto: false,
+    crearProyecto: false, tipo: 'Proyecto', montoRecurrente: '', frecuencia: 'Mensual',
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const [confirmDel, setConfirmDel] = useState(false)
@@ -86,13 +86,35 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
       <F label="Notas"><textarea value={form.notas||''} onChange={e => set('notas', e.target.value)} placeholder="Detalles adicionales…" /></F>
 
       {form.estado === 'Cobrado' && (
-        <div style={{padding:'12px 14px', background:'rgba(62,207,142,0.06)', border:'1px solid rgba(62,207,142,0.2)', borderRadius:10}}>
-          <F label="¿Crear proyecto automáticamente?">
-            <select value={form.crearProyecto ? 'si' : 'no'} onChange={e => set('crearProyecto', e.target.value === 'si')}>
-              <option value="no">No por ahora</option>
-              <option value="si">Sí — crear proyecto</option>
-            </select>
-          </F>
+        <div style={{display:'flex', flexDirection:'column', gap:10, padding:'14px', background:'rgba(62,207,142,0.06)', border:'1px solid rgba(62,207,142,0.2)', borderRadius:10}}>
+          <div className="form-2col">
+            <F label="Tipo de cliente">
+              <select value={form.tipo || 'Proyecto'} onChange={e => set('tipo', e.target.value)}>
+                <option value="Proyecto">Proyecto — pago único cerrado</option>
+                <option value="Recurrente">Recurrente — cuota periódica</option>
+              </select>
+            </F>
+            <F label="¿Crear proyecto?">
+              <select value={form.crearProyecto ? 'si' : 'no'} onChange={e => set('crearProyecto', e.target.value === 'si')}>
+                <option value="no">No por ahora</option>
+                <option value="si">Sí — crear proyecto</option>
+              </select>
+            </F>
+          </div>
+          {form.tipo === 'Recurrente' && (
+            <div className="form-2col">
+              <F label="Cuota (€)">
+                <input type="number" min="0" placeholder="30" value={form.montoRecurrente||''} onChange={e => set('montoRecurrente', e.target.value)} />
+              </F>
+              <F label="Frecuencia">
+                <select value={form.frecuencia || 'Mensual'} onChange={e => set('frecuencia', e.target.value)}>
+                  <option>Mensual</option>
+                  <option>Semanal</option>
+                  <option>Trimestral</option>
+                </select>
+              </F>
+            </div>
+          )}
         </div>
       )}
 
@@ -315,13 +337,21 @@ export function Clientes({ data }) {
 
       <div className="card">
         <table className="table">
-          <thead><tr><th>Cliente</th><th>Servicio</th><th>Estado</th><th>Ajustes</th><th>Resp.</th><th>Desde</th><th style={{textAlign:'right'}}>Importe</th><th></th></tr></thead>
+          <thead><tr><th>Cliente</th><th>Tipo</th><th>Servicio</th><th>Estado</th><th>Ajustes</th><th>Resp.</th><th>Desde</th><th style={{textAlign:'right'}}>Importe</th><th></th></tr></thead>
           <tbody>
             {clientes.map(c => {
               const chip = c.estado==='Cerrado'?'gray':c.estado==='En curso'?'blue':c.estado==='En revisión'?'violet':c.estado==='Recurrente'?'green':'amber'
+              const tipo = c.tipo || (c.estado === 'Recurrente' ? 'Recurrente' : 'Proyecto')
               return (
                 <tr key={c.id} style={{cursor:'pointer'}} onClick={() => setEditing(c)}>
                   <td><div className="primary">{c.nombre}</div></td>
+                  <td>
+                    <span style={{fontSize:11, fontWeight:600, padding:'2px 8px', borderRadius:20,
+                      background: tipo==='Recurrente' ? 'rgba(62,207,142,0.12)' : 'rgba(107,117,144,0.12)',
+                      color: tipo==='Recurrente' ? 'var(--ok)' : 'var(--text-3)'}}>
+                      {tipo==='Recurrente' ? '↺ Recurrente' : 'Proyecto'}
+                    </span>
+                  </td>
                   <td className="muted">{c.servicio}</td>
                   <td><span className={`chip ${chip}`}><span className="dot"/>{c.estado}</span></td>
                   <td>{c.ajustes>0 ? <span className="pend">{c.ajustes} pendiente{c.ajustes>1?'s':''}</span> : <span className="muted small">—</span>}</td>
