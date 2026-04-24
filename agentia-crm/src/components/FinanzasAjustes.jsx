@@ -32,7 +32,7 @@ function CobroModal({ cobro, onClose, onSave }) {
 
   return (
     <Modal open title={isNew ? 'Nueva factura' : 'Editar factura'}
-      onClose={onClose} onSave={() => onSave({ ...form, monto: parseFloat(form.monto) || 0 })} saveLabel={isNew ? 'Añadir factura' : 'Guardar'}>
+      onClose={onClose} onSave={() => { if (!form.cliente.trim()) return; onSave({ ...form, monto: parseFloat(form.monto) || 0 }) }} saveLabel={isNew ? 'Añadir factura' : 'Guardar'}>
       <F label="Cliente"><input value={form.cliente} onChange={e => set('cliente', e.target.value)} placeholder="Ej: Bodegas Altura" autoFocus /></F>
       <F label="Concepto"><input value={form.concepto||''} onChange={e => set('concepto', e.target.value)} placeholder="Ej: Mantenimiento mensual" /></F>
       <div className="form-2col">
@@ -70,7 +70,7 @@ function GastoModal({ gasto, onClose, onSave, onDelete }) {
 
   return (
     <Modal open title={isNew ? 'Nuevo gasto' : 'Editar gasto'}
-      onClose={onClose} onSave={() => onSave({ ...form, monto: parseFloat(form.monto) || 0 })} saveLabel={isNew ? 'Añadir gasto' : 'Guardar'}>
+      onClose={onClose} onSave={() => { if (!form.concepto.trim()) return; onSave({ ...form, monto: parseFloat(form.monto) || 0 }) }} saveLabel={isNew ? 'Añadir gasto' : 'Guardar'}>
       <F label="Concepto"><input value={form.concepto} onChange={e => set('concepto', e.target.value)} placeholder="Ej: OpenAI — API" autoFocus /></F>
       <div className="form-2col">
         <F label="Tipo">

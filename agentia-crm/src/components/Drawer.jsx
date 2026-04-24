@@ -26,7 +26,7 @@ const ORIGENES = ['Instagram', 'LinkedIn', 'Referido', 'Formulario web', 'Otro']
 
 const EMPTY = {
   empresa: '', servicio: '', contacto: '', origen: 'Instagram', origenCustom: '', notas: '',
-  sector: '', ciudad: '', telefono: '', email: '', instagram: '', responsable: '',
+  sector: '', ciudad: '', telefono: '', email: '', responsable: '',
   estado: 'Cliente Nuevo', next_contact: '', monto: '',
 }
 
@@ -55,6 +55,7 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
       monto:       parseFloat(form.monto) || 0,
       temp:        'cold',
       next:        nextText,
+      notas:       form.notas || null,
       sector:      form.sector || null,
       ciudad:      form.ciudad || null,
       responsable: form.responsable || resp[0]?.value || '',
@@ -149,11 +150,9 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
                 <div className="field"><label className="lbl">Email</label><input className="input" value={form.email} onChange={e => set('email', e.target.value)} /></div>
               </div>
               <div className="field-row">
-                <div className="field"><label className="lbl">Instagram</label><input className="input" placeholder="@handle" value={form.instagram} onChange={e => set('instagram', e.target.value)} /></div>
                 <div className="field"><label className="lbl">Responsable</label>
                   <CustomSelect className="select" value={form.responsable} onChange={v => set('responsable', v)} options={resp.map(r => ({ value: r.value, label: r.label }))} />
                 </div>
-              </div>
               <div className="field-row">
                 <div className="field"><label className="lbl">Servicio de interés</label>
                   <SelectOrText value={form.servicio} onChange={v => set('servicio', v)} options={servicios} selectClass="select" inputClass="input" placeholder="Ej: Web + Chatbot…" />

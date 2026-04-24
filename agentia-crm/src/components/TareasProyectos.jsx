@@ -267,6 +267,7 @@ function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [] }) {
   const [confirmDel, setConfirmDel] = useState(false)
 
   const handleSave = () => {
+    if (!form.title.trim()) return
     const group = computeWhenGroup(form.due_date) || form.when_group || 'hoy'
     onSave({ ...form, when_group: group })
   }
