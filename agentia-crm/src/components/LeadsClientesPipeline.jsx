@@ -244,6 +244,7 @@ function ClienteModal({ cliente, onClose, onSave, onDelete }) {
 
 export function Clientes({ data, openItem, onItemOpened }) {
   const clientes = data?.clientes || []
+  const cobros   = data?.cobros   || []
   const [editing, setEditing] = useState(null)
   const [creating, setCreating] = useState(false)
 
@@ -280,9 +281,26 @@ export function Clientes({ data, openItem, onItemOpened }) {
             {clientes.map(c => {
               const chip = c.estado==='Cerrado'?'gray':c.estado==='En curso'?'blue':c.estado==='En revisión'?'violet':c.estado==='Recurrente'?'green':'amber'
               const tipo = c.tipo || (c.estado === 'Recurrente' ? 'Recurrente' : 'Proyecto')
+              const nextCobro = tipo === 'Recurrente'
+                ? cobros.filter(cb => cb.cliente === c.nombre && cb.recurrente && !cb.pagado)
+                    .sort((a,b) => (a.vence||'') < (b.vence||'') ? -1 : 1)[0]
+                : null
+              const hoy = new Date(); hoy.setHours(0,0,0,0)
+              const venceDate = nextCobro?.vence ? new Date(nextCobro.vence + 'T00:00:00') : null
+              const diasVence = venceDate ? Math.floor((venceDate - hoy) / 86400000) : null
+              const cobroVencido = diasVence !== null && diasVence < 0
+              const cobroHoy     = diasVence === 0
               return (
                 <tr key={c.id} style={{cursor:'pointer'}} onClick={() => setEditing(c)}>
-                  <td><div className="primary">{c.nombre}</div></td>
+                  <td>
+                    <div className="primary">{c.nombre}</div>
+                    {nextCobro && (
+                      <div style={{fontSize:11, marginTop:2, color: cobroVencido ? 'var(--danger)' : cobroHoy ? 'var(--warn)' : 'var(--text-4)'}}>
+                        {cobroVencido ? `⚠ Vencido hace ${Math.abs(diasVence)}d` : cobroHoy ? '⚠ Vence hoy' : `Próximo pago ${nextCobro.vence}`}
+                        {' · '}€{eur(nextCobro.monto||0)}/{(nextCobro.frecuencia||'mes').toLowerCase()}
+                      </div>
+                    )}
+                  </td>
                   <td>
                     <span style={{fontSize:11, fontWeight:600, padding:'2px 8px', borderRadius:20,
                       background: tipo==='Recurrente' ? 'rgba(62,207,142,0.12)' : 'rgba(107,117,144,0.12)',
