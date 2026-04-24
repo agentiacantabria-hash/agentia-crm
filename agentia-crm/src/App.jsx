@@ -403,14 +403,10 @@ export default function App() {
     try {
       const { data: d, error } = await supabase.from('tareas').insert([clean(tarea)]).select().single()
       if (!error && d) { setTasks(prev => [d, ...prev]); showToast('Tarea creada'); return }
-      if (error) {
-        console.error('[Supabase] addTask error:', error.code, error.message, error.details)
-        showToast(`Error al guardar tarea: ${error.message}`, 'error')
-      }
-    } catch (e) {
-      console.error('[Supabase] addTask excepción:', e)
-    }
+      if (error) console.error('[Supabase] addTask:', error.message)
+    } catch (e) { console.error('[Supabase] addTask excepción:', e) }
     setTasks(prev => [{ ...tarea, id: `t${Date.now()}`, done: false }, ...prev])
+    showToast('Tarea creada')
   }
 
   const updateTask = async (id, updates) => {
