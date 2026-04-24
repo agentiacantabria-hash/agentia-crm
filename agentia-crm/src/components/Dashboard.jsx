@@ -170,7 +170,7 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
   const pendientesMes = pendientes.reduce((a,c) => a + (c.monto||0), 0)
   const gastosMes     = gastos.reduce((a,g) => a + (g.monto||0), 0)
   const gastoIA       = gastos.filter(g => g.tipo==='IA').reduce((a,g) => a + (g.monto||0), 0)
-  const totalFacturado = cobros.reduce((a,c) => a + (c.monto||0), 0)
+  const totalFacturado = cobros.filter(c => c.pagado).reduce((a,c) => a + (c.monto||0), 0)
   const margen        = (ingresosMes + pendientesMes) > 0
     ? Math.round((ingresosMes - gastosMes) / (ingresosMes + pendientesMes) * 100)
     : (gastosMes === 0 ? 100 : 0)
