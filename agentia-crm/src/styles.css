@@ -299,7 +299,7 @@ input, textarea, select { font-family: inherit; }
   .topbar > .icon-btn  { display: inline-flex; flex-shrink: 0; }
 }
 /* Ocultar role switcher en pantallas medianas para evitar overflow */
-@media (min-width: 769px) and (max-width: 1100px) {
+@media (min-width: 769px) and (max-width: 1280px) {
   .topbar > .segmented { display: none; }
 }
 /* Btn nuevo lead no se encoge */
@@ -721,7 +721,7 @@ input, textarea, select { font-family: inherit; }
 /* Kanban */
 .kanban {
   display: grid;
-  grid-template-columns: repeat(7, minmax(200px, 1fr));
+  grid-template-columns: repeat(7, 230px);
   gap: 10px;
   overflow-x: auto;
   padding-bottom: 8px;
@@ -1160,8 +1160,8 @@ label.lbl {
   .table .hide-mobile { display: none; }
 
   /* Kanban: scroll horizontal */
-  .kanban { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 16px; scroll-snap-type: x mandatory; }
-  .kanban-col { min-width: 260px; scroll-snap-align: start; }
+  .kanban { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 16px; scroll-snap-type: x mandatory; grid-template-columns: repeat(7, 240px); }
+  .kanban-col { scroll-snap-align: start; }
 
   /* Pipeline funnel */
   .pipe-tag { min-width: 90px !important; max-width: 90px !important; font-size: 10px; }
