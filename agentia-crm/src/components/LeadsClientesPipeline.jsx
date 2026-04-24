@@ -538,6 +538,10 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened }) {
     const lead = señalLead
     const servicio = lead.servicio || 'Servicio'
     const today = new Date().toISOString().slice(0,10)
+    const total = parseFloat(lead.monto) || 0
+    const resto = Math.max(0, total - señalMonto)
+
+    // Cobro de la señal (ya pagada)
     data.addCobro?.({
       cliente: lead.empresa,
       concepto: `Señal · ${servicio}`,
@@ -547,6 +551,19 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened }) {
       vencida: false,
       recurrente: false,
     })
+    // Cobro del resto (pendiente) — aparece en "Por cobrar"
+    if (resto > 0) {
+      const venceResto = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0,10) })()
+      data.addCobro?.({
+        cliente: lead.empresa,
+        concepto: `Resto · ${servicio}`,
+        monto: resto,
+        vence: venceResto,
+        pagado: false,
+        vencida: false,
+        recurrente: false,
+      })
+    }
     data.updateLead?.(lead.id, {
       estado: STAGE.SEÑAL,
       señal_cobrada: señalMonto,

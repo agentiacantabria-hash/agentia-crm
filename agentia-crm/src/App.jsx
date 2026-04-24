@@ -272,9 +272,10 @@ export default function App() {
       if (c) updateCobro(c.id, { monto: parseFloat(updates.monto) || 0 })
     }
 
-    // Señal pagada → atrás: borrar cobro de señal
+    // Señal pagada → atrás: borrar cobro de señal + cobro del resto + cliente auto-creado
     if (eraSeñal && nuevoEstado && !seraCobrado && !seraDenegado) {
       const señalVal = parseFloat(lead.señal_cobrada) || 0
+      // Borrar cobro de la señal
       if (señalVal > 0) {
         const señalCobro = cobrosRef.current.find(c =>
           c.cliente === lead.empresa &&
@@ -283,6 +284,16 @@ export default function App() {
         )
         if (señalCobro) deleteCobro(señalCobro.id)
       }
+      // Borrar cobro del resto (pendiente creado al confirmar señal)
+      const restoCobro = cobrosRef.current.find(c =>
+        c.cliente === lead.empresa &&
+        (c.concepto || '').startsWith('Resto ·') &&
+        !c.pagado
+      )
+      if (restoCobro) deleteCobro(restoCobro.id)
+      // Borrar cliente auto-creado (si existe con ese nombre)
+      const clienteAuto = clientesRef.current.find(c => c.nombre === lead.empresa)
+      if (clienteAuto) deleteCliente(clienteAuto.id)
     }
     // Señal pagada → Denegado: mantener cobro señal + crear tarea de revisión
     if (eraSeñal && seraDenegado) {

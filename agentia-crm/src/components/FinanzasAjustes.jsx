@@ -257,11 +257,13 @@ export function Finanzas({ role, data }) {
                       })()}
                     </td>
                     <td>
-                      {c.pagado
-                        ? <span className="chip green"><span className="dot"/>Pagada</span>
-                        : c.vencida
-                          ? <span className="chip red"><span className="dot"/>Vencida</span>
-                          : <span className="chip amber"><span className="dot"/>Pendiente</span>
+                      {c.pagado && (c.concepto || '').startsWith('Señal ·')
+                        ? <span className="chip amber"><span className="dot"/>Señal pagada</span>
+                        : c.pagado
+                          ? <span className="chip green"><span className="dot"/>Pagada</span>
+                          : c.vencida
+                            ? <span className="chip red"><span className="dot"/>Vencida</span>
+                            : <span className="chip amber"><span className="dot"/>Pendiente</span>
                       }
                     </td>
                     <td style={{display:'flex', alignItems:'center', gap:6, justifyContent:'flex-end'}}>
