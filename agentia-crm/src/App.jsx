@@ -92,56 +92,41 @@ export default function App() {
 
   // ── LEADS ──────────────────────────────────────────────────
   const addLead = async (lead) => {
-    const { yaCobrado, crearProyecto, origenCustom, ...leadData } = lead
+    const { crearProyecto, origenCustom, yaCobrado: _y, ...leadData } = lead
     try {
       const { data: d, error } = await supabase.from('leads').insert([clean(leadData)]).select().single()
       if (!error && d) {
         setLeads(prev => [d, ...prev])
-        autoWinLead({ ...d, yaCobrado, crearProyecto })
+        autoWinLead({ ...d, crearProyecto })
         return
       }
     } catch (_) {}
     const local = { ...leadData, id: `l${Date.now()}` }
     setLeads(prev => [local, ...prev])
-    autoWinLead({ ...local, yaCobrado, crearProyecto })
+    autoWinLead({ ...local, crearProyecto })
   }
 
   const autoWinLead = (lead) => {
     if (lead.estado !== 'Cobrado') return
     const monto = parseFloat(lead.monto) || 0
-    const yaCobrado = lead.yaCobrado !== false
-    // Solo crear cliente si ya han pagado — si no, queda en Finanzas como cobro pendiente
-    if (yaCobrado) {
-      const yaExiste = clientes.some(c => c.nombre === lead.empresa)
-      if (!yaExiste) {
-        const mes = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
-        addCliente({
-          nombre: lead.empresa, servicio: lead.servicio || '',
-          importe: monto, estado: 'Pagado · ajustes',
-          ajustes: 0, responsable: lead.responsable || '', since: mes,
-        })
-      }
+    // Cobrado = han pagado siempre. Crear cliente y cobro pagado automáticamente.
+    const yaExiste = clientes.some(c => c.nombre === lead.empresa)
+    if (!yaExiste) {
+      const mes = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
+      addCliente({
+        nombre: lead.empresa, servicio: lead.servicio || '',
+        importe: monto, estado: 'Pagado · ajustes',
+        ajustes: 0, responsable: lead.responsable || '', since: mes,
+      })
     }
     if (monto > 0) {
-      addCobro({ cliente: lead.empresa, concepto: lead.servicio || 'Servicio', monto, vence: null, pagado: yaCobrado, vencida: false })
+      addCobro({ cliente: lead.empresa, concepto: lead.servicio || 'Servicio', monto, vence: null, pagado: true, vencida: false })
     }
     if (lead.crearProyecto) {
       addProyecto({ nombre: lead.empresa, cliente: lead.empresa, estado: 'En curso', responsable: lead.responsable || '' })
     }
   }
 
-  const crearClienteDesdeCobro = (cobro) => {
-    const yaExiste = clientes.some(c => c.nombre === cobro.cliente)
-    if (yaExiste) return
-    const mes = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
-    addCliente({
-      nombre: cobro.cliente, servicio: cobro.concepto || '',
-      importe: cobro.monto, estado: 'Pagado · ajustes',
-      ajustes: 0, responsable: '', since: mes,
-    })
-  }
-
-  // Encuentra el cobro automático asociado a un lead (pagado o pendiente)
   const findCobroAuto = (lead) => {
     const monto = parseFloat(lead.monto) || 0
     return cobros.find(c => c.cliente === lead.empresa && c.monto === monto)
@@ -149,7 +134,7 @@ export default function App() {
 
   const updateLead = async (id, updates) => {
     const lead = leads.find(l => l.id === id)
-    const { yaCobrado, crearProyecto, origenCustom, ...safeUpdates } = updates
+    const { crearProyecto, origenCustom, yaCobrado: _y, ...safeUpdates } = updates
     try {
       await supabase.from('leads').update(clean(safeUpdates)).eq('id', id)
     } catch (_) {}
@@ -160,8 +145,7 @@ export default function App() {
     const seraCobrado = nuevoEstado === 'Cobrado'
 
     if (seraCobrado && !eraCobrado) {
-      // Pasa a Cobrado → crear cobro y cliente
-      autoWinLead({ ...lead, ...safeUpdates, yaCobrado, crearProyecto })
+      autoWinLead({ ...lead, ...safeUpdates, crearProyecto })
     } else if (eraCobrado && nuevoEstado && !seraCobrado) {
       // Deja de ser Cobrado → eliminar cobro automático
       const c = findCobroAuto(lead)
@@ -180,12 +164,13 @@ export default function App() {
     } catch (_) {}
     setLeads(prev => prev.filter(l => l.id !== id))
 
-    if (lead?.estado === 'Cobrado') {
-      // Eliminar cobro automático del lead ganado
-      const c = findCobroAuto(lead)
-      if (c) deleteCobro(c.id)
-    }
-    // Cascade: borrar tareas y proyectos solo si no hay cliente activo con ese nombre
+    // Leads cerrados: solo eliminar la fila. Cobros y clientes se preservan.
+    if (['Cobrado', 'Denegado'].includes(lead?.estado)) return
+
+    // Leads activos: limpiar cobro automático si lo había
+    const c = findCobroAuto(lead)
+    if (c) deleteCobro(c.id)
+    // Cascade tareas/proyectos si no hay cliente activo con ese nombre
     if (lead && !clientes.some(c => c.nombre === lead.empresa)) {
       tasks.filter(t => t.cliente === lead.empresa).forEach(t => deleteTask(t.id))
       proyectos.filter(p => p.cliente === lead.empresa).forEach(p => deleteProyecto(p.id))
@@ -319,10 +304,6 @@ export default function App() {
       if (!error) { setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c)); }
     } catch (_) {
       setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
-    }
-    // Si acaba de marcarse como pagado, crear cliente automáticamente
-    if (updates.pagado === true && cobro && !cobro.pagado && cobro.cliente) {
-      crearClienteDesdeCobro(cobro)
     }
   }
 

@@ -25,11 +25,11 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
   const isNew = !lead?.id
   const SERVICIOS = getServicios()
   const RESP = getResp()
-  const [form, setForm] = useState(lead ? { ...lead, monto: lead.monto ?? '', yaCobrado: true, crearProyecto: false } : {
+  const [form, setForm] = useState(lead ? { ...lead, monto: lead.monto ?? '', crearProyecto: false } : {
     empresa:'', sector:'', ciudad:'', contacto:'', telefono:'', email:'',
     responsable: RESP[0] || 'LP', servicio: SERVICIOS[0] || 'Web premium',
     estado:'Cliente Nuevo', next:'', monto:'', origen:'Instagram', origenCustom:'', notas:'',
-    yaCobrado: true, crearProyecto: false,
+    crearProyecto: false,
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const [confirmDel, setConfirmDel] = useState(false)
@@ -85,15 +85,9 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
       </div>
       <F label="Notas"><textarea value={form.notas||''} onChange={e => set('notas', e.target.value)} placeholder="Detalles adicionales…" /></F>
 
-      {form.estado === 'Cobrado' && parseFloat(form.monto) > 0 && (
-        <div className="form-2col" style={{padding:'12px 14px', background:'rgba(62,207,142,0.06)', border:'1px solid rgba(62,207,142,0.2)', borderRadius:10}}>
-          <F label="¿Ya han pagado?">
-            <select value={form.yaCobrado !== false ? 'si' : 'no'} onChange={e => set('yaCobrado', e.target.value === 'si')}>
-              <option value="si">Sí — marcar como cobrado</option>
-              <option value="no">No — pendiente de pago</option>
-            </select>
-          </F>
-          <F label="¿Crear proyecto?">
+      {form.estado === 'Cobrado' && (
+        <div style={{padding:'12px 14px', background:'rgba(62,207,142,0.06)', border:'1px solid rgba(62,207,142,0.2)', borderRadius:10}}>
+          <F label="¿Crear proyecto automáticamente?">
             <select value={form.crearProyecto ? 'si' : 'no'} onChange={e => set('crearProyecto', e.target.value === 'si')}>
               <option value="no">No por ahora</option>
               <option value="si">Sí — crear proyecto</option>
@@ -106,8 +100,10 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
         <div className="modal-danger-zone">
           <span>Zona peligrosa</span>
           {confirmDel
-            ? <button className="btn danger sm" onClick={() => { onDelete(form.id); onClose() }}>¿Confirmar eliminación?</button>
-            : <button className="btn sm ghost" onClick={() => setConfirmDel(true)} style={{color:'var(--danger)'}}>Eliminar lead</button>
+            ? <button className="btn danger sm" onClick={() => { onDelete(form.id); onClose() }}>¿Confirmar?</button>
+            : <button className="btn sm ghost" onClick={() => setConfirmDel(true)} style={{color:'var(--danger)'}}>
+                {['Cobrado','Denegado'].includes(form.estado) ? 'Quitar del pipeline' : 'Eliminar lead'}
+              </button>
           }
         </div>
       )}
