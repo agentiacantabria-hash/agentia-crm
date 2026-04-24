@@ -334,7 +334,13 @@ export function Tareas({ data, openItem, onItemOpened }) {
 
   const toggle = (id) => {
     const task = tasks.find(t => t.id === id)
-    if (task) updateTask?.(id, { done: !task.done })
+    if (!task) return
+    if (!task.done) {
+      updateTask?.(id, { done: true })
+      if (confirm('¿Eliminar la tarea completada?')) deleteTask?.(id)
+    } else {
+      updateTask?.(id, { done: false })
+    }
   }
 
   const handleSave = (form) => {
@@ -414,6 +420,10 @@ export function Tareas({ data, openItem, onItemOpened }) {
                       <div className="meta">
                         <span className={`chip ${t.prio==='alta'?'red':t.prio==='media'?'amber':'gray'}`}><span className="dot"/>{t.prio}</span>
                         <div className="avatar xs">{t.resp}</div>
+                        <button className="icon-btn" style={{width:22, height:22, color:'var(--text-4)'}}
+                          onClick={e => { e.stopPropagation(); if (confirm(`¿Eliminar "${t.title}"?`)) deleteTask?.(t.id) }}>
+                          <I.Close size={11}/>
+                        </button>
                       </div>
                     </div>
                   ))}
