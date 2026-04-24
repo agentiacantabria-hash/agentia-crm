@@ -177,8 +177,8 @@ export function Finanzas({ role, data }) {
         <div className="fin-card">
           <div className="label">Por cobrar</div>
           <div className="big"><span className="currency">€</span>{eur(cobrosPend)}</div>
-          <div className="small" style={{color: pendientes.length > 0 ? 'var(--warn)' : 'var(--ok)', marginTop:8, fontFamily:'var(--font-mono)'}}>
-            {pendientes.length > 0 ? `${pendientes.length} factura${pendientes.length!==1?'s':''} sin cobrar` : 'Todo cobrado ✓'}
+          <div className="small" style={{color: cobrosPend > 0 ? 'var(--warn)' : 'var(--ok)', marginTop:8, fontFamily:'var(--font-mono)'}}>
+            {cobrosPend > 0 ? `${pendientes.length} factura${pendientes.length!==1?'s':''} sin cobrar` : 'Todo cobrado ✓'}
           </div>
           <div style={{height:8}}/>
           <div className="progress">
@@ -272,11 +272,17 @@ export function Finanzas({ role, data }) {
                               : <span className="chip green"><span className="dot"/>Al día</span>
                             }
                           </td>
-                          <td style={{textAlign:'right'}}>
+                          <td style={{display:'flex', alignItems:'center', gap:6, justifyContent:'flex-end'}}>
                             {s.vencido && s.next && (
                               <button className="btn sm" style={{padding:'3px 10px', fontSize:12}}
                                 onClick={() => { data.updateCobro?.(s.next.id, { pagado: true, vencida: false }); showToast?.(`Cobro de ${s.cliente} marcado como pagado`) }}>
                                 ✓ Cobrado
+                              </button>
+                            )}
+                            {s.next && (
+                              <button className="icon-btn" style={{width:24, height:24, color:'var(--text-4)'}}
+                                onClick={() => { if (confirm(`¿Eliminar cobro pendiente de ${s.cliente}?`)) data.deleteCobro?.(s.next.id) }}>
+                                <I.Close size={11}/>
                               </button>
                             )}
                           </td>
