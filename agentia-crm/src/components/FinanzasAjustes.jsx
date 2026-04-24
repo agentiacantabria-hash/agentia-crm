@@ -212,7 +212,15 @@ export function Finanzas({ role, data }) {
                     </td>
                     <td className="muted small">{c.concepto}</td>
                     <td className="mono" style={{textAlign:'right'}}>€{eur(c.monto||0)}</td>
-                    <td className="muted">{c.vence || '—'}</td>
+                    <td className="muted">
+                      {c.vence || '—'}
+                      {!c.pagado && c.vence && (() => {
+                        const dias = Math.floor((Date.now() - new Date(c.vence + 'T00:00:00')) / 86400000)
+                        if (dias < 0) return null
+                        const col = dias < 15 ? '#3ECF8E' : dias < 30 ? '#FFB547' : '#FF5A6A'
+                        return <span style={{marginLeft:6, fontSize:10.5, fontWeight:600, color:col, fontFamily:'var(--font-mono)'}}>+{dias}d</span>
+                      })()}
+                    </td>
                     <td>
                       {c.pagado
                         ? <span className="chip green"><span className="dot"/>Pagada</span>

@@ -59,10 +59,11 @@ export const STATE_COLORS = {
   'Cliente Potencial':  { chip:'blue',   color:'#4F8BFF' },
   'Cliente Interesado': { chip:'violet', color:'#9A7BFF' },
   'En Revisión':        { chip:'amber',  color:'#FFB547' },
+  'Señal pagada':       { chip:'teal',   color:'#2EC4B6' },
   'Cobrado':            { chip:'green',  color:'#3ECF8E' },
   'Denegado':           { chip:'red',    color:'#FF5A6A' },
 }
 
-export const PIPELINE_COLS = ['Cliente Nuevo','Cliente Potencial','Cliente Interesado','En Revisión','Cobrado','Denegado']
+export const PIPELINE_COLS = ['Cliente Nuevo','Cliente Potencial','Cliente Interesado','En Revisión','Señal pagada','Cobrado','Denegado']
 
 export const eur = (n) => n.toLocaleString('es-ES', { minimumFractionDigits: 0 })

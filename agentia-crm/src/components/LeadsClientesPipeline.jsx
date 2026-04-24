@@ -297,16 +297,100 @@ export function Clientes({ data }) {
   )
 }
 
+// ── SeñalPagadaModal ─────────────────────────────────────────────
+
+function SeñalPagadaModal({ lead, onClose, onConfirm }) {
+  const total = parseFloat(lead.monto) || 0
+  const [señal, setSeñal] = useState(Math.round(total / 2))
+  const resto = total - (parseFloat(señal) || 0)
+  const pct   = total > 0 ? Math.round((parseFloat(señal) || 0) / total * 100) : 0
+
+  return (
+    <Modal open title={`Señal cobrada — ${lead.empresa}`} onClose={onClose}
+      onSave={() => onConfirm(parseFloat(señal) || 0)} saveLabel="Confirmar señal">
+      <div style={{padding:'14px 16px', background:'rgba(46,196,182,0.07)', border:'1px solid rgba(46,196,182,0.2)', borderRadius:10, marginBottom:4}}>
+        <div style={{fontSize:12, color:'var(--text-3)', marginBottom:2}}>Total del proyecto</div>
+        <div style={{fontSize:26, fontWeight:700}}>€{eur(total)}</div>
+      </div>
+      <F label="Importe de la señal (€)">
+        <input type="number" min="0" max={total} value={señal}
+          onChange={e => setSeñal(e.target.value)} autoFocus />
+      </F>
+      <div style={{padding:'12px 14px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--line-2)', borderRadius:10}}>
+        <div style={{display:'flex', justifyContent:'space-between', fontSize:12.5, marginBottom:8}}>
+          <span style={{color:'#2EC4B6', fontWeight:600}}>Cobras hoy: €{eur(parseFloat(señal)||0)}</span>
+          <span style={{color:'var(--text-3)'}}>Al entregar: €{eur(resto < 0 ? 0 : resto)}</span>
+        </div>
+        <div style={{height:6, background:'rgba(255,255,255,0.06)', borderRadius:3}}>
+          <div style={{width:`${Math.min(pct,100)}%`, height:'100%', background:'#2EC4B6', borderRadius:3, transition:'width 0.2s'}}/>
+        </div>
+        <div style={{fontSize:11, color:'var(--text-4)', marginTop:6}}>{pct}% cobrado ahora · {100-pct}% al cerrar</div>
+      </div>
+    </Modal>
+  )
+}
+
+// ── CobraRestoModal ──────────────────────────────────────────────
+
+function CobraRestoModal({ lead, onClose, onConfirm }) {
+  const SERVICIOS = getServicios()
+  const total        = parseFloat(lead.monto) || 0
+  const señalCobrada = parseFloat(lead.señal_cobrada) || 0
+  const restoAuto    = total - señalCobrada
+  const defaultVence = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0,10) })()
+  const [vence, setVence]               = useState(defaultVence)
+  const [tipo, setTipo]                 = useState('Proyecto')
+  const [crearProyecto, setCrearProyecto] = useState(false)
+
+  return (
+    <Modal open title={`Cobrar resto — ${lead.empresa}`} onClose={onClose}
+      onSave={() => onConfirm({ vence_resto: vence, tipo, crearProyecto })} saveLabel="Cerrar como cobrado">
+      <div style={{padding:'12px 14px', background:'rgba(46,196,182,0.07)', border:'1px solid rgba(46,196,182,0.2)', borderRadius:10, marginBottom:4}}>
+        <div style={{display:'flex', justifyContent:'space-between', marginBottom:6}}>
+          <span style={{fontSize:12.5, color:'var(--text-3)'}}>Total proyecto</span>
+          <span className="mono">€{eur(total)}</span>
+        </div>
+        <div style={{display:'flex', justifyContent:'space-between', marginBottom:6}}>
+          <span style={{fontSize:12.5, color:'#2EC4B6'}}>Señal ya cobrada</span>
+          <span className="mono" style={{color:'#2EC4B6'}}>€{eur(señalCobrada)}</span>
+        </div>
+        <div style={{borderTop:'1px solid rgba(255,255,255,0.08)', paddingTop:6, display:'flex', justifyContent:'space-between'}}>
+          <span style={{fontSize:12.5, fontWeight:600}}>Resto a cobrar</span>
+          <span className="mono" style={{fontWeight:700, color:'var(--ok)'}}>€{eur(restoAuto < 0 ? 0 : restoAuto)}</span>
+        </div>
+      </div>
+      <F label="Fecha límite para cobrar el resto">
+        <input type="date" value={vence} onChange={e => setVence(e.target.value)} />
+      </F>
+      <div className="form-2col">
+        <F label="Tipo de cliente">
+          <CustomSelect value={tipo} onChange={setTipo}
+            options={[{value:'Proyecto',label:'Proyecto — pago único'},{value:'Recurrente',label:'Recurrente — cuota periódica'}]} />
+        </F>
+        <F label="¿Crear proyecto?">
+          <CustomSelect value={crearProyecto?'si':'no'} onChange={v => setCrearProyecto(v==='si')}
+            options={[{value:'no',label:'No por ahora'},{value:'si',label:'Sí — crear proyecto'}]} />
+        </F>
+      </div>
+      <div style={{fontSize:11.5, color:'var(--text-4)', padding:'8px 12px', background:'rgba(255,255,255,0.03)', borderRadius:8}}>
+        Se creará una tarea «Cobrar resto · {lead.empresa}» con fecha {vence}.
+      </div>
+    </Modal>
+  )
+}
+
 // ── Pipeline ─────────────────────────────────────────────────────
 
 export function Pipeline({ data, openQuick }) {
   const leads = data?.leads || []
   const [view,     setView]     = useState('kanban')
   const [filter,   setFilter]   = useState('todos')
-  const [movingId,    setMovingId]    = useState(null)
-  const [editing,     setEditing]     = useState(null)
-  const [creating,    setCreating]    = useState(false)
-  const [cobradoLead, setCobradoLead] = useState(null) // lead pre-cargado para el modal de Cobrado
+  const [movingId,       setMovingId]       = useState(null)
+  const [editing,        setEditing]        = useState(null)
+  const [creating,       setCreating]       = useState(false)
+  const [cobradoLead,    setCobradoLead]    = useState(null)
+  const [señalLead,      setSeñalLead]      = useState(null)
+  const [cobrarRestoLead,setCobrarRestoLead] = useState(null)
 
   const activeLeads = leads.filter(l => !['Cobrado','Denegado'].includes(l.estado))
   const closedLeads = leads.filter(l =>  ['Cobrado','Denegado'].includes(l.estado))
@@ -320,12 +404,50 @@ export function Pipeline({ data, openQuick }) {
   }))
 
   const moveCard = (leadId, newEstado) => {
+    const lead = leads.find(l => l.id === leadId)
+    if (newEstado === 'Señal pagada') {
+      if (lead) { setSeñalLead(lead); setMovingId(null); return }
+    }
     if (newEstado === 'Cobrado') {
-      const lead = leads.find(l => l.id === leadId)
+      if (lead?.estado === 'Señal pagada') {
+        setCobrarRestoLead(lead); setMovingId(null); return
+      }
       if (lead) { setCobradoLead({ ...lead, estado: 'Cobrado' }); setMovingId(null); return }
     }
     data.updateLead?.(leadId, { estado: newEstado })
     setMovingId(null)
+  }
+
+  const handleSeñalConfirm = (señalMonto) => {
+    const lead = señalLead
+    const servicio = lead.servicio || 'Servicio'
+    const today = new Date().toISOString().slice(0,10)
+    data.addCobro?.({
+      cliente: lead.empresa,
+      concepto: `Señal · ${servicio}`,
+      monto: señalMonto,
+      vence: today,
+      pagado: true,
+      vencida: false,
+      recurrente: false,
+    })
+    data.updateLead?.(lead.id, {
+      estado: 'Señal pagada',
+      señal_cobrada: señalMonto,
+      señal_fecha: today,
+    })
+    setSeñalLead(null)
+  }
+
+  const handleRestoConfirm = ({ vence_resto, tipo, crearProyecto }) => {
+    const lead = cobrarRestoLead
+    data.updateLead?.(lead.id, {
+      estado: 'Cobrado',
+      tipo,
+      crearProyecto,
+      vence_resto,
+    })
+    setCobrarRestoLead(null)
   }
 
   const totalAbierto = activeLeads.reduce((a,l) => a + (l.monto||0), 0)
@@ -411,23 +533,47 @@ export function Pipeline({ data, openQuick }) {
                   <span className="title">{col.label}</span>
                   <span className="count">{col.items.length}</span>
                 </div>
-                {col.items.map(l=>(
-                  <div className="kanban-card" key={l.id} draggable
-                    onDragStart={e => e.dataTransfer.setData('leadId', l.id)}
-                    onClick={() => setEditing(l)}>
-                    <div className="name">{l.empresa}</div>
-                    <div className="sub">{l.servicio}</div>
-                    <div className="meta">
-                      <div className="avatar xs">{l.responsable}</div>
-                      <span>{l.ciudad}</span>
-                      <span className="amount">€{eur(l.monto||0)}</span>
+                {col.items.map(l=>{
+                  const isSeñal      = l.estado === 'Señal pagada'
+                  const señalCobrada = parseFloat(l.señal_cobrada) || 0
+                  const total        = parseFloat(l.monto) || 0
+                  const pct          = total > 0 ? Math.round(señalCobrada / total * 100) : 0
+                  const diasDesde    = l.señal_fecha
+                    ? Math.floor((Date.now() - new Date(l.señal_fecha)) / 86400000)
+                    : 0
+                  return (
+                    <div className="kanban-card" key={l.id} draggable
+                      onDragStart={e => e.dataTransfer.setData('leadId', l.id)}
+                      onClick={() => setEditing(l)}>
+                      <div className="name">{l.empresa}</div>
+                      <div className="sub">{l.servicio}</div>
+                      {isSeñal && (
+                        <div style={{marginTop:8}}>
+                          <div style={{display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:4}}>
+                            <span style={{color:'#2EC4B6'}}>Señal €{eur(señalCobrada)}</span>
+                            <span style={{color:'var(--text-3)'}}>Resto €{eur(total-señalCobrada)}</span>
+                          </div>
+                          <div style={{height:4, background:'rgba(255,255,255,0.06)', borderRadius:2}}>
+                            <div style={{width:`${pct}%`, height:'100%', background:'#2EC4B6', borderRadius:2}}/>
+                          </div>
+                          <div style={{fontSize:10.5, color:'var(--text-4)', marginTop:4, display:'flex', alignItems:'center', gap:6}}>
+                            {diasDesde > 0 ? `Hace ${diasDesde}d` : 'Hoy'}
+                            {diasDesde > 30 && <span style={{color:'#FF5A6A', fontWeight:600}}>⚠ +30d</span>}
+                          </div>
+                        </div>
+                      )}
+                      <div className="meta">
+                        <div className="avatar xs">{l.responsable}</div>
+                        <span>{l.ciudad}</span>
+                        <span className="amount">€{eur(l.monto||0)}</span>
+                      </div>
+                      <button className="btn sm ghost" style={{marginTop:8,width:'100%',fontSize:11}}
+                        onClick={e => { e.stopPropagation(); setMovingId(l.id) }}>
+                        Mover →
+                      </button>
                     </div>
-                    <button className="btn sm ghost" style={{marginTop:8,width:'100%',fontSize:11}}
-                      onClick={e => { e.stopPropagation(); setMovingId(l.id) }}>
-                      Mover →
-                    </button>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             ))}
           </div>
@@ -491,6 +637,22 @@ export function Pipeline({ data, openQuick }) {
           onClose={() => setCobradoLead(null)}
           onSave={(form) => { data.updateLead?.(form.id, form); setCobradoLead(null) }}
           onDelete={id => { data.deleteLead?.(id); setCobradoLead(null) }}
+        />
+      )}
+
+      {señalLead && (
+        <SeñalPagadaModal
+          lead={señalLead}
+          onClose={() => setSeñalLead(null)}
+          onConfirm={handleSeñalConfirm}
+        />
+      )}
+
+      {cobrarRestoLead && (
+        <CobraRestoModal
+          lead={cobrarRestoLead}
+          onClose={() => setCobrarRestoLead(null)}
+          onConfirm={handleRestoConfirm}
         />
       )}
     </div>

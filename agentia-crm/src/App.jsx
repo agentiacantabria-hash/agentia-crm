@@ -103,18 +103,18 @@ export default function App() {
 
   // ── LEADS ──────────────────────────────────────────────────
   const addLead = async (lead) => {
-    const { crearProyecto, origenCustom, yaCobrado: _y, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, ...leadData } = lead
+    const { crearProyecto, origenCustom, yaCobrado: _y, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, vence_resto, ...leadData } = lead
     try {
       const { data: d, error } = await supabase.from('leads').insert([clean(leadData)]).select().single()
       if (!error && d) {
         setLeads(prev => [d, ...prev])
-        autoWinLead({ ...d, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct })
+        autoWinLead({ ...d, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, vence_resto })
         return
       }
     } catch (_) {}
     const local = { ...leadData, id: `l${Date.now()}` }
     setLeads(prev => [local, ...prev])
-    autoWinLead({ ...local, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct })
+    autoWinLead({ ...local, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, vence_resto })
   }
 
   const autoWinLead = (lead) => {
@@ -127,6 +127,8 @@ export default function App() {
     const dividido       = !esRecurrente && lead.pagoDividido
     const señalPct       = lead.señalPct || 50
     const servicio       = lead.servicio || 'Servicio'
+    const señalCobrada   = parseFloat(lead.señal_cobrada) || 0
+    const tieneSeñal     = señalCobrada > 0 && !esRecurrente
 
     const yaExiste = clientes.some(c => c.nombre === lead.empresa)
     if (!yaExiste) {
@@ -134,13 +136,35 @@ export default function App() {
       addCliente({
         nombre: lead.empresa, servicio,
         importe: esRecurrente ? montoRec : monto,
-        estado: esRecurrente ? 'Recurrente' : (dividido ? 'En curso' : 'Pagado · ajustes'),
+        estado: esRecurrente ? 'Recurrente' : (tieneSeñal || dividido ? 'En curso' : 'Pagado · ajustes'),
         tipo,
         ajustes: 0, responsable: lead.responsable || '', since: mes,
       })
     }
 
-    if (dividido && monto > 0) {
+    if (tieneSeñal) {
+      const restoMonto = monto - señalCobrada
+      if (restoMonto > 0) {
+        const venceResto = lead.vence_resto || (() => {
+          const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0,10)
+        })()
+        addCobro({
+          cliente: lead.empresa, concepto: `Resto · ${servicio}`,
+          monto: restoMonto, vence: venceResto,
+          pagado: false, vencida: false, recurrente: false,
+        })
+        addTask({
+          title: `Cobrar resto · ${lead.empresa}`,
+          cliente: lead.empresa,
+          when_group: 'semana',
+          due_date: venceResto,
+          prio: 'alta',
+          resp: lead.responsable || '',
+          done: false,
+          tag: 'Finanzas',
+        })
+      }
+    } else if (dividido && monto > 0) {
       const señalMonto = Math.round(monto * señalPct / 100)
       const restoMonto = monto - señalMonto
       addCobro({ cliente: lead.empresa, concepto: `Señal (${señalPct}%) · ${servicio}`, monto: señalMonto, vence: null, pagado: true, vencida: false, recurrente: false })
@@ -162,7 +186,7 @@ export default function App() {
       })
     }
     if (lead.crearProyecto) {
-      addProyecto({ cliente: lead.empresa, servicio, estado: 'En curso', progreso: 0, ajustes: 0, pago: dividido ? 'Señal cobrada' : 'Pagado', resp: lead.responsable || '' })
+      addProyecto({ cliente: lead.empresa, servicio, estado: 'En curso', progreso: 0, ajustes: 0, pago: tieneSeñal || dividido ? 'Señal cobrada' : 'Pagado', resp: lead.responsable || '' })
     }
   }
 
@@ -173,18 +197,20 @@ export default function App() {
 
   const updateLead = async (id, updates) => {
     const lead = leads.find(l => l.id === id)
-    const { crearProyecto, origenCustom, yaCobrado: _y, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, ...safeUpdates } = updates
+    const { crearProyecto, origenCustom, yaCobrado: _y, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, vence_resto, ...safeUpdates } = updates
     try {
       await supabase.from('leads').update(clean(safeUpdates)).eq('id', id)
     } catch (_) {}
     setLeads(prev => prev.map(l => l.id === id ? { ...l, ...safeUpdates } : l))
 
-    const nuevoEstado = safeUpdates.estado
-    const eraCobrado  = lead?.estado === 'Cobrado'
-    const seraCobrado = nuevoEstado === 'Cobrado'
+    const nuevoEstado  = safeUpdates.estado
+    const eraCobrado   = lead?.estado === 'Cobrado'
+    const eraSeñal     = lead?.estado === 'Señal pagada'
+    const seraCobrado  = nuevoEstado === 'Cobrado'
+    const seraDenegado = nuevoEstado === 'Denegado'
 
     if (seraCobrado && !eraCobrado) {
-      autoWinLead({ ...lead, ...safeUpdates, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct })
+      autoWinLead({ ...lead, ...safeUpdates, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, vence_resto })
     } else if (eraCobrado && nuevoEstado && !seraCobrado) {
       // Deja de ser Cobrado → eliminar cobro automático
       const c = findCobroAuto(lead)
@@ -193,6 +219,33 @@ export default function App() {
       // Sigue Cobrado pero cambia el importe → actualizar cobro
       const c = findCobroAuto(lead)
       if (c) updateCobro(c.id, { monto: parseFloat(updates.monto) || 0 })
+    }
+
+    // Señal pagada → atrás: borrar cobro de señal
+    if (eraSeñal && nuevoEstado && !seraCobrado && !seraDenegado) {
+      const señalVal = parseFloat(lead.señal_cobrada) || 0
+      if (señalVal > 0) {
+        const señalCobro = cobros.find(c =>
+          c.cliente === lead.empresa &&
+          (c.concepto || '').startsWith('Señal ·') &&
+          c.monto === señalVal
+        )
+        if (señalCobro) deleteCobro(señalCobro.id)
+      }
+    }
+    // Señal pagada → Denegado: mantener cobro señal + crear tarea de revisión
+    if (eraSeñal && seraDenegado) {
+      const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1)
+      addTask({
+        title: `Revisar devolución señal · ${lead.empresa}`,
+        cliente: lead.empresa,
+        when_group: 'mañana',
+        due_date: tomorrow.toISOString().slice(0,10),
+        prio: 'alta',
+        resp: lead.responsable || '',
+        done: false,
+        tag: 'Finanzas',
+      })
     }
   }
 

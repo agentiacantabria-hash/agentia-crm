@@ -415,6 +415,49 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
 
       <div style={{height:16}}/>
 
+      {role === 'admin' && (() => {
+        const señalLeads = leads.filter(l => l.estado === 'Señal pagada')
+        if (!señalLeads.length) return null
+        return (
+          <div className="card" style={{marginBottom:16}}>
+            <div className="card-head">
+              <h3>Señales por cobrar</h3>
+              <span className="sub">· {señalLeads.length} lead{señalLeads.length!==1?'s':''} pendiente{señalLeads.length!==1?'s':''}</span>
+              <div className="right"><button className="btn sm ghost" onClick={() => setPage('pipeline')}>Ver pipeline <I.ChevronR size={12}/></button></div>
+            </div>
+            <div>
+              {señalLeads.map(l => {
+                const señalCobrada = parseFloat(l.señal_cobrada) || 0
+                const total        = parseFloat(l.monto) || 0
+                const resto        = total - señalCobrada
+                const diasDesde    = l.señal_fecha
+                  ? Math.floor((Date.now() - new Date(l.señal_fecha)) / 86400000)
+                  : 0
+                const alert = diasDesde > 30
+                return (
+                  <div key={l.id} className="task">
+                    <div style={{width:30, height:30, borderRadius:8,
+                      background: alert ? 'rgba(255,90,106,0.12)' : 'rgba(46,196,182,0.12)',
+                      display:'inline-flex', alignItems:'center', justifyContent:'center',
+                      color: alert ? '#FF5A6A' : '#2EC4B6', flexShrink:0}}>
+                      <I.Receipt size={14}/>
+                    </div>
+                    <div style={{minWidth:0, flex:1}}>
+                      <div className="title">{l.empresa}</div>
+                      <div className="sub">Señal €{eur(señalCobrada)} cobrada · Resto €{eur(resto > 0 ? resto : 0)} pendiente · Hace {diasDesde}d</div>
+                    </div>
+                    {alert
+                      ? <span className="chip red"><span className="dot"/>+30 días</span>
+                      : <span className="chip teal"><span className="dot"/>Activo</span>
+                    }
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
+
       <div className="grid-main-side">
         <div className="card">
           <div className="card-head">

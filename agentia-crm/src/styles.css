@@ -576,6 +576,8 @@ input, textarea, select { font-family: inherit; }
 .chip.violet .dot { background: var(--violet); }
 .chip.gray   { background: rgba(255,255,255,0.05); color: var(--text-2); border-color: var(--line-2); }
 .chip.gray .dot { background: var(--text-3); }
+.chip.teal   { background: rgba(46,196,182,0.12); color: #5EEAD4; border-color: rgba(46,196,182,0.3); }
+.chip.teal .dot { background: #2EC4B6; }
 
 /* Tables */
 .table {
