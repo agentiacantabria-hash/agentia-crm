@@ -355,10 +355,18 @@ export function Clientes({ data }) {
 
 // ── Pipeline ─────────────────────────────────────────────────────
 
-export function Pipeline({ data }) {
+export function Pipeline({ data, openQuick }) {
   const leads = data?.leads || []
+  const [view,     setView]     = useState('kanban')
+  const [filter,   setFilter]   = useState('todos')
   const [movingId, setMovingId] = useState(null)
-  const [editing, setEditing]   = useState(null)
+  const [editing,  setEditing]  = useState(null)
+  const [creating, setCreating] = useState(false)
+
+  const activeLeads = leads.filter(l => !['Cobrado','Denegado'].includes(l.estado))
+  const closedLeads = leads.filter(l =>  ['Cobrado','Denegado'].includes(l.estado))
+  const base     = filter === 'cerrados' ? closedLeads : activeLeads
+  const filtered = (filter === 'todos' || filter === 'cerrados') ? base : base.filter(l => l.temp === filter)
 
   const cols = PIPELINE_COLS.map(label => ({
     label,
@@ -371,12 +379,13 @@ export function Pipeline({ data }) {
     setMovingId(null)
   }
 
-  const totalAbierto = leads.filter(l => !['Cobrado','Denegado'].includes(l.estado)).reduce((a,l)=>a+(l.monto||0),0)
+  const totalAbierto = activeLeads.reduce((a,l) => a + (l.monto||0), 0)
 
   const handleSave = (form) => {
     if (form.id) data.updateLead?.(form.id, form)
     else data.addLead?.(form)
     setEditing(null)
+    setCreating(false)
   }
 
   return (
@@ -384,85 +393,144 @@ export function Pipeline({ data }) {
       <div className="page-head">
         <div>
           <h1 className="page-title">Pipeline</h1>
-          <p className="page-subtitle">Arrastra en desktop · toca la tarjeta para mover en móvil · €{eur(totalAbierto)} abiertos</p>
+          <p className="page-subtitle">
+            {view === 'lista' && filter === 'cerrados'
+              ? `Leads cerrados · ${closedLeads.length} totales`
+              : `${activeLeads.length} oportunidades activas · €${eur(totalAbierto)} en juego`}
+          </p>
         </div>
         <div className="page-actions">
-          <div className="segmented"><button className="active">Kanban</button></div>
+          {view === 'lista' && (
+            <div className="segmented">
+              {[['todos','Todos'],['hot','Calientes'],['warm','Tibios'],['cold','Fríos'],['cerrados','Cerrados']].map(([k,v])=>(
+                <button key={k} className={filter===k?'active':''} onClick={()=>setFilter(k)}>{v}</button>
+              ))}
+            </div>
+          )}
+          <div className="segmented">
+            <button className={view==='kanban'?'active':''} onClick={()=>setView('kanban')}>Kanban</button>
+            <button className={view==='lista'?'active':''} onClick={()=>setView('lista')}>Lista</button>
+          </div>
+          <button className="btn primary" onClick={() => setCreating(true)}><I.Plus size={13}/> Nuevo lead</button>
         </div>
       </div>
 
-      <div className="pipe-summary">
-        {[
-          {label:'Total abiertas', v:leads.filter(l=>!['Cobrado','Denegado'].includes(l.estado)).length, sub:'oportunidades'},
-          {label:'Valor potencial', v:`€${eur(totalAbierto)}`, sub:'suma total'},
-          {label:'Ganadas', v:leads.filter(l=>l.estado==='Cobrado').length, sub:'este pipeline'},
-          {label:'Perdidas', v:leads.filter(l=>l.estado==='Denegado').length, sub:'este pipeline'},
-        ].map((s,i)=>(
-          <div key={i} className="stat" style={{padding:'14px 16px'}}>
-            <div className="label" style={{fontSize:11}}>{s.label}</div>
-            <div className="value" style={{fontSize:22, marginTop:6}}>{s.v}</div>
-            <div className="foot">{s.sub}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Modal para mover tarjeta en móvil */}
-      {movingId && (() => {
-        const lead = leads.find(l => l.id === movingId)
-        return (
-          <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:300,display:'flex',alignItems:'flex-end'}} onClick={() => setMovingId(null)}>
-            <div style={{width:'100%',background:'var(--surface-1)',borderRadius:'20px 20px 0 0',padding:'20px 16px 32px'}} onClick={e=>e.stopPropagation()}>
-              <div style={{fontSize:13,color:'var(--text-3)',marginBottom:14}}>Mover <b style={{color:'var(--text-0)'}}>{lead?.empresa}</b> a…</div>
-              <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                {PIPELINE_COLS.map(col => (
-                  <button key={col} className="btn" style={{justifyContent:'flex-start',gap:10,opacity:lead?.estado===col?0.4:1}}
-                    disabled={lead?.estado===col}
-                    onClick={() => moveCard(movingId, col)}>
-                    <div style={{width:8,height:8,borderRadius:'50%',background:STATE_COLORS[col]?.color||'#6B7590',flexShrink:0}}/>
-                    {col}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )
-      })()}
-
-      <div className="kanban">
-        {cols.map(col=>(
-          <div className="kanban-col" key={col.label}
-            onDragOver={e => e.preventDefault()}
-            onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('leadId'); if (id) moveCard(id, col.label) }}>
-            <div className="kanban-col-head">
-              <div className="bar" style={{'--col-color': col.color}}/>
-              <span className="title">{col.label}</span>
-              <span className="count">{col.items.length}</span>
-            </div>
-            {col.items.map(l=>(
-              <div className="kanban-card" key={l.id} draggable
-                onDragStart={e => e.dataTransfer.setData('leadId', l.id)}
-                onClick={() => setEditing(l)}>
-                <div className="name">{l.empresa}</div>
-                <div className="sub">{l.servicio}</div>
-                <div className="meta">
-                  <div className="avatar xs">{l.responsable}</div>
-                  <span>{l.ciudad}</span>
-                  <span className="amount">€{eur(l.monto||0)}</span>
-                </div>
-                <button className="btn sm ghost" style={{marginTop:8,width:'100%',fontSize:11}}
-                  onClick={e => { e.stopPropagation(); setMovingId(l.id) }}>
-                  Mover →
-                </button>
+      {view === 'kanban' && (
+        <>
+          <div className="pipe-summary">
+            {[
+              {label:'Abiertas',       v: activeLeads.length,                                   sub:'oportunidades'},
+              {label:'Valor potencial',v: `€${eur(totalAbierto)}`,                              sub:'suma total'},
+              {label:'Cobradas',       v: leads.filter(l=>l.estado==='Cobrado').length,         sub:'este pipeline'},
+              {label:'Denegadas',      v: leads.filter(l=>l.estado==='Denegado').length,        sub:'este pipeline'},
+            ].map((s,i)=>(
+              <div key={i} className="stat" style={{padding:'14px 16px'}}>
+                <div className="label" style={{fontSize:11}}>{s.label}</div>
+                <div className="value" style={{fontSize:22, marginTop:6}}>{s.v}</div>
+                <div className="foot">{s.sub}</div>
               </div>
             ))}
           </div>
-        ))}
-      </div>
 
-      {editing && (
+          {movingId && (() => {
+            const lead = leads.find(l => l.id === movingId)
+            return (
+              <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:300,display:'flex',alignItems:'flex-end'}} onClick={() => setMovingId(null)}>
+                <div style={{width:'100%',background:'var(--surface-1)',borderRadius:'20px 20px 0 0',padding:'20px 16px 32px'}} onClick={e=>e.stopPropagation()}>
+                  <div style={{fontSize:13,color:'var(--text-3)',marginBottom:14}}>Mover <b style={{color:'var(--text-0)'}}>{lead?.empresa}</b> a…</div>
+                  <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                    {PIPELINE_COLS.map(col => (
+                      <button key={col} className="btn" style={{justifyContent:'flex-start',gap:10,opacity:lead?.estado===col?0.4:1}}
+                        disabled={lead?.estado===col} onClick={() => moveCard(movingId, col)}>
+                        <div style={{width:8,height:8,borderRadius:'50%',background:STATE_COLORS[col]?.color||'#6B7590',flexShrink:0}}/>
+                        {col}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+          <div className="kanban">
+            {cols.map(col=>(
+              <div className="kanban-col" key={col.label}
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('leadId'); if (id) moveCard(id, col.label) }}>
+                <div className="kanban-col-head">
+                  <div className="bar" style={{'--col-color': col.color}}/>
+                  <span className="title">{col.label}</span>
+                  <span className="count">{col.items.length}</span>
+                </div>
+                {col.items.map(l=>(
+                  <div className="kanban-card" key={l.id} draggable
+                    onDragStart={e => e.dataTransfer.setData('leadId', l.id)}
+                    onClick={() => setEditing(l)}>
+                    <div className="name">{l.empresa}</div>
+                    <div className="sub">{l.servicio}</div>
+                    <div className="meta">
+                      <div className="avatar xs">{l.responsable}</div>
+                      <span>{l.ciudad}</span>
+                      <span className="amount">€{eur(l.monto||0)}</span>
+                    </div>
+                    <button className="btn sm ghost" style={{marginTop:8,width:'100%',fontSize:11}}
+                      onClick={e => { e.stopPropagation(); setMovingId(l.id) }}>
+                      Mover →
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {view === 'lista' && (
+        <div className="card">
+          <table className="table">
+            <thead>
+              <tr><th>Empresa</th><th>Sector</th><th>Servicio</th><th>Estado</th><th>Origen</th><th>Próximo paso</th><th>Resp.</th><th style={{textAlign:'right'}}>Importe</th><th></th></tr>
+            </thead>
+            <tbody>
+              {filtered.map(l => {
+                const sc = STATE_COLORS[l.estado] || { chip:'gray' }
+                const tempColor = l.temp==='hot'?'#FF5A6A':l.temp==='warm'?'#FFB547':l.temp==='cold'?'#6B7590':'#3ECF8E'
+                return (
+                  <tr key={l.id} style={{cursor:'pointer'}} onClick={() => setEditing(l)}>
+                    <td>
+                      <div style={{display:'flex', alignItems:'center', gap:10}}>
+                        <div style={{width:8, height:8, borderRadius:'50%', background:tempColor, boxShadow:`0 0 8px ${tempColor}`, flexShrink:0}}/>
+                        <div><div className="primary">{l.empresa}</div><div className="muted" style={{fontSize:11.5}}>{l.ciudad}</div></div>
+                      </div>
+                    </td>
+                    <td className="muted">{l.sector}</td>
+                    <td className="muted">{l.servicio}</td>
+                    <td><span className={`chip ${sc.chip}`}><span className="dot"/>{l.estado}</span></td>
+                    <td className="muted small">{l.origen}</td>
+                    <td className="muted small">{l.next}</td>
+                    <td><div className="avatar sm">{l.responsable}</div></td>
+                    <td className="mono" style={{textAlign:'right'}}>{l.monto ? `€${eur(l.monto)}` : <span className="muted">—</span>}</td>
+                    <td onClick={e => e.stopPropagation()}>
+                      <RowMenu
+                        onEdit={() => setEditing(l)}
+                        onDelete={() => { if (confirm(`¿${['Cobrado','Denegado'].includes(l.estado) ? 'Quitar del pipeline' : 'Eliminar'} "${l.empresa}"?`)) data.deleteLead?.(l.id) }}
+                      />
+                    </td>
+                  </tr>
+                )
+              })}
+              {filtered.length === 0 && (
+                <tr><td colSpan={9} style={{textAlign:'center', padding:'32px 0', color:'var(--text-4)', fontSize:13}}>Sin leads en esta vista</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {(editing || creating) && (
         <LeadModal
           lead={editing}
-          onClose={() => setEditing(null)}
+          onClose={() => { setEditing(null); setCreating(false) }}
           onSave={handleSave}
           onDelete={id => { data.deleteLead?.(id); setEditing(null) }}
         />

@@ -2,16 +2,15 @@ import React, { useState, useEffect } from 'react'
 import { Sidebar, Topbar, SearchModal } from './components/Shell'
 import { QuickLeadDrawer } from './components/Drawer'
 import Dashboard from './components/Dashboard'
-import { Leads, Clientes, Pipeline } from './components/LeadsClientesPipeline'
+import { Clientes, Pipeline } from './components/LeadsClientesPipeline'
 import { Tareas, Proyectos } from './components/TareasProyectos'
 import { Finanzas, Ajustes } from './components/FinanzasAjustes'
 import { supabase } from './lib/supabase'
 
 const PAGES = [
   ['dashboard','Inicio'],
-  ['leads','Leads'],
-  ['clientes','Clientes'],
   ['pipeline','Pipeline'],
+  ['clientes','Clientes'],
   ['tareas','Tareas'],
   ['proyectos','Proyectos'],
   ['finanzas','Finanzas'],
@@ -20,9 +19,8 @@ const PAGES = [
 
 const crumbMap = {
   dashboard: ['Agentia','Inicio'],
-  leads:     ['Agentia','Comercial','Leads'],
-  clientes:  ['Agentia','Comercial','Clientes'],
   pipeline:  ['Agentia','Comercial','Pipeline'],
+  clientes:  ['Agentia','Comercial','Clientes'],
   tareas:    ['Agentia','Operativo','Tareas'],
   proyectos: ['Agentia','Entrega','Proyectos'],
   finanzas:  ['Agentia','Administración','Finanzas'],
@@ -30,7 +28,7 @@ const crumbMap = {
 }
 
 export default function App() {
-  const [page, setPage]   = useState(() => localStorage.getItem('agentia_page') || 'dashboard')
+  const [page, setPage]   = useState(() => { const p = localStorage.getItem('agentia_page') || 'dashboard'; return p === 'leads' ? 'pipeline' : p })
   const [role, setRole]   = useState(() => localStorage.getItem('agentia_role') || 'admin')
   const [drawer, setDrawer] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -344,9 +342,8 @@ export default function App() {
   const pageEl = (() => {
     switch (page) {
       case 'dashboard': return <Dashboard role={role} setPage={setPage} openQuick={() => setDrawer(true)} data={data} />
-      case 'leads':     return <Leads data={data} openQuick={() => setDrawer(true)} />
+      case 'pipeline':  return <Pipeline data={data} openQuick={() => setDrawer(true)} />
       case 'clientes':  return <Clientes data={data} />
-      case 'pipeline':  return <Pipeline data={data} />
       case 'tareas':    return <Tareas data={data} />
       case 'proyectos': return <Proyectos data={data} />
       case 'finanzas':  return <Finanzas role={role} data={data} />

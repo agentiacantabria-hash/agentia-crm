@@ -34,9 +34,8 @@ export function Sidebar({ page, setPage, role, counts, isOpen, onClose }) {
 
   const nav = [
     { key:'dashboard', label:'Inicio',    icon: I.Home },
-    { key:'leads',     label:'Leads',     icon: I.Leads,    count: counts.leads },
+    { key:'pipeline',  label:'Pipeline',  icon: I.Pipeline, count: counts.leads },
     { key:'clientes',  label:'Clientes',  icon: I.Users,    count: counts.clientes },
-    { key:'pipeline',  label:'Pipeline',  icon: I.Pipeline },
     { key:'tareas',    label:'Tareas',    icon: I.Tasks,    count: counts.tareas },
     { key:'proyectos', label:'Proyectos', icon: I.Projects, count: counts.proyectos },
   ]
