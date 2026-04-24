@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Sidebar, Topbar, SearchModal } from './components/Shell'
+import { Sidebar, Topbar, SearchModal, BellPanel } from './components/Shell'
 import { QuickLeadDrawer } from './components/Drawer'
 import Dashboard from './components/Dashboard'
 import { Clientes, Pipeline } from './components/LeadsClientesPipeline'
@@ -34,6 +34,8 @@ export default function App() {
   const [drawer, setDrawer] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [bellOpen, setBellOpen] = useState(false)
+  const [openItem, setOpenItem] = useState(null)
   const [hue, setHue]     = useState(225)
 
   const [leads,     setLeads]     = useState([])
@@ -517,12 +519,14 @@ export default function App() {
     showToast,
   }
 
+  const clearOpenItem = () => setOpenItem(null)
+
   const pageEl = (() => {
     switch (page) {
       case 'dashboard': return <Dashboard role={role} setPage={setPage} openQuick={() => setDrawer(true)} data={data} />
-      case 'pipeline':  return <Pipeline data={data} openQuick={() => setDrawer(true)} />
-      case 'clientes':  return <Clientes data={data} />
-      case 'tareas':    return <Tareas data={data} />
+      case 'pipeline':  return <Pipeline data={data} openQuick={() => setDrawer(true)} openItem={openItem} onItemOpened={clearOpenItem} />
+      case 'clientes':  return <Clientes data={data} openItem={openItem} onItemOpened={clearOpenItem} />
+      case 'tareas':    return <Tareas data={data} openItem={openItem} onItemOpened={clearOpenItem} />
       case 'proyectos': return <Proyectos data={data} />
       case 'finanzas':  return <Finanzas role={role} data={data} />
       case 'ajustes':   return <Ajustes role={role} data={data} />
@@ -535,13 +539,15 @@ export default function App() {
       <div className="app" data-screen-label={PAGES.find(p => p[0] === page)?.[1]}>
         <Sidebar page={page} setPage={setPage} role={role} counts={counts} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <div className="content">
-          <Topbar crumb={crumbMap[page]} setDrawerOpen={setDrawer} role={role} setRole={setRole} onMenuClick={() => setSidebarOpen(o => !o)} notifCount={notifCount} onSearchOpen={() => setSearchOpen(true)} />
+          <Topbar crumb={crumbMap[page]} setDrawerOpen={setDrawer} role={role} setRole={setRole} onMenuClick={() => setSidebarOpen(o => !o)} notifCount={notifCount} onSearchOpen={() => setSearchOpen(true)} onBellOpen={() => setBellOpen(o => !o)} />
           <main className="main">{pageEl}</main>
         </div>
       </div>
 
       <QuickLeadDrawer open={drawer} onClose={() => setDrawer(false)} onSave={addLead} />
-      <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} data={data} setPage={setPage} />
+      <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} data={data} setPage={setPage}
+        onSelect={r => { setPage(r.page); setOpenItem(r); setSearchOpen(false) }} />
+      <BellPanel open={bellOpen} onClose={() => setBellOpen(false)} tasks={tasks} cobros={cobros} />
 
       {/* Toast notifications */}
       <div style={{position:'fixed', bottom:24, right:24, display:'flex', flexDirection:'column', gap:8, zIndex:9999, pointerEvents:'none'}}>

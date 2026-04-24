@@ -1,6 +1,22 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { I } from './Icons'
 import { Modal, F, SelectOrText, CustomSelect } from './Modal'
+
+function downloadCSV(rows, filename) {
+  if (!rows.length) return
+  const headers = Object.keys(rows[0])
+  const csv = [
+    headers.join(';'),
+    ...rows.map(r => headers.map(h => {
+      const v = r[h] == null ? '' : String(r[h])
+      return v.includes(';') || v.includes('"') ? `"${v.replace(/"/g,'""')}"` : v
+    }).join(';'))
+  ].join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a'); a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
 
 // ── helpers ─────────────────────────────────────────────────────
 function getUsers() {
@@ -227,12 +243,19 @@ function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [] }) {
   )
 }
 
-export function Tareas({ data }) {
+export function Tareas({ data, openItem, onItemOpened }) {
   const { tasks = [], clientes = [], updateTask, addTask, deleteTask } = data || {}
   const [creating, setCreating] = useState(false)
   const [editing, setEditing]   = useState(null)
   const [view, setView]         = useState('lista')
   const [newTaskDate, setNewTaskDate] = useState(null)
+
+  useEffect(() => {
+    if (openItem?.type === 'Tarea' && openItem.item) {
+      const task = tasks.find(t => t.id === openItem.item.id)
+      if (task) { setEditing(task); onItemOpened?.() }
+    }
+  }, [openItem])
 
   const toggle = (id) => {
     const task = tasks.find(t => t.id === id)
@@ -495,6 +518,10 @@ export function Proyectos({ data }) {
           <p className="page-subtitle">Control de lo que está en marcha · ajustes post-pago vigilados</p>
         </div>
         <div className="page-actions">
+          <button className="btn ghost" onClick={() => downloadCSV(
+            proyectos.map(p => ({ Cliente: p.cliente, Servicio: p.servicio, Estado: p.estado, Progreso: `${p.progreso}%`, Ajustes: p.ajustes||0, Pago: p.pago||'', Responsable: p.resp||'' })),
+            `proyectos-${new Date().toISOString().slice(0,10)}.csv`
+          )}>↓ CSV</button>
           <button className="btn primary" onClick={() => setCreating(true)}><I.Plus size={13}/> Nuevo proyecto</button>
         </div>
       </div>

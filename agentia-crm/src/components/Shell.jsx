@@ -128,7 +128,7 @@ export function Sidebar({ page, setPage, role, counts, isOpen, onClose }) {
   )
 }
 
-export function SearchModal({ open, onClose, data, setPage }) {
+export function SearchModal({ open, onClose, data, setPage, onSelect }) {
   const [q, setQ] = useState('')
   const inputRef = useRef(null)
 
@@ -149,11 +149,11 @@ export function SearchModal({ open, onClose, data, setPage }) {
 
   const results = ql.length < 1 ? [] : [
     ...leads.filter(l => l.empresa?.toLowerCase().includes(ql) || l.servicio?.toLowerCase().includes(ql))
-      .slice(0,4).map(l => ({ type:'Lead', label: l.empresa, sub: l.estado, page:'pipeline', color:'var(--brand-2)' })),
+      .slice(0,4).map(l => ({ type:'Lead', label: l.empresa, sub: l.estado, page:'pipeline', color:'var(--brand-2)', item: l })),
     ...clientes.filter(c => c.nombre?.toLowerCase().includes(ql) || c.servicio?.toLowerCase().includes(ql))
-      .slice(0,4).map(c => ({ type:'Cliente', label: c.nombre, sub: c.servicio, page:'clientes', color:'var(--ok)' })),
+      .slice(0,4).map(c => ({ type:'Cliente', label: c.nombre, sub: c.servicio, page:'clientes', color:'var(--ok)', item: c })),
     ...tasks.filter(t => t.title?.toLowerCase().includes(ql) || t.cliente?.toLowerCase().includes(ql))
-      .slice(0,4).map(t => ({ type:'Tarea', label: t.title, sub: t.cliente, page:'tareas', color:'var(--violet)' })),
+      .slice(0,4).map(t => ({ type:'Tarea', label: t.title, sub: t.cliente, page:'tareas', color:'var(--violet)', item: t })),
   ]
 
   return (
@@ -178,7 +178,7 @@ export function SearchModal({ open, onClose, data, setPage }) {
           )}
           {results.map((r,i) => (
             <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 18px',cursor:'pointer',borderBottom:'1px solid var(--line-1)'}}
-              onPointerDown={() => { setPage(r.page); onClose() }}
+              onPointerDown={() => { onSelect ? onSelect(r) : setPage(r.page); onClose() }}
               onMouseEnter={e => e.currentTarget.style.background='var(--surface-2)'}
               onMouseLeave={e => e.currentTarget.style.background=''}
             >
@@ -196,7 +196,7 @@ export function SearchModal({ open, onClose, data, setPage }) {
   )
 }
 
-export function Topbar({ crumb, setDrawerOpen, role, setRole, onMenuClick, notifCount = 0, onSearchOpen }) {
+export function Topbar({ crumb, setDrawerOpen, role, setRole, onMenuClick, notifCount = 0, onSearchOpen, onBellOpen }) {
   useEffect(() => {
     const handler = (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); onSearchOpen?.() } }
     document.addEventListener('keydown', handler)
@@ -228,7 +228,7 @@ export function Topbar({ crumb, setDrawerOpen, role, setRole, onMenuClick, notif
         <button className={role === 'empleado' ? 'active' : ''} onClick={() => setRole('empleado')}>Empleado</button>
       </div>
 
-      <button className="icon-btn" title="Notificaciones" style={{position:'relative'}}>
+      <button className="icon-btn" title="Notificaciones" style={{position:'relative'}} onClick={onBellOpen}>
         <I.Bell size={16} />
         {notifCount > 0 && <span className="dot" style={{position:'absolute', top:6, right:6}} />}
       </button>
@@ -236,5 +236,72 @@ export function Topbar({ crumb, setDrawerOpen, role, setRole, onMenuClick, notif
         <I.Plus size={14} /> Nuevo lead
       </button>
     </header>
+  )
+}
+
+export function BellPanel({ open, onClose, tasks = [], cobros = [] }) {
+  if (!open) return null
+  const today = new Date(); today.setHours(0,0,0,0)
+  const urgentes = tasks.filter(t => {
+    if (t.done) return false
+    if (t.due_date) return new Date(t.due_date + 'T00:00:00') < today
+    return t.when_group === 'vencida'
+  })
+  const cobrosVencidos = cobros.filter(c => !c.pagado && (c.vencida || (c.vence && new Date(c.vence.length === 10 ? c.vence + 'T00:00:00' : c.vence) < today)))
+  const total = urgentes.length + cobrosVencidos.length
+
+  return (
+    <>
+      <div style={{position:'fixed',inset:0,zIndex:800}} onClick={onClose}/>
+      <div style={{
+        position:'fixed', top:60, right:16, width:340,
+        background:'var(--surface-1)', border:'1px solid var(--line-2)',
+        borderRadius:14, boxShadow:'0 16px 50px rgba(0,0,0,0.6)', zIndex:801,
+        overflow:'hidden', maxHeight:'80vh', overflowY:'auto',
+      }}>
+        <div style={{display:'flex', alignItems:'center', gap:8, padding:'14px 16px', borderBottom:'1px solid var(--line-1)', position:'sticky', top:0, background:'var(--surface-1)'}}>
+          <I.Bell size={15} style={{color:'var(--brand-2)'}}/>
+          <span style={{fontSize:13.5, fontWeight:600}}>Notificaciones</span>
+          <span style={{marginLeft:'auto', fontSize:11, color:'var(--text-4)'}}>{total} pendientes</span>
+        </div>
+
+        {total === 0 && (
+          <div style={{padding:'32px 16px', textAlign:'center', color:'var(--text-4)', fontSize:13}}>
+            Sin alertas — todo al día ✓
+          </div>
+        )}
+
+        {urgentes.length > 0 && (
+          <>
+            <div style={{fontSize:10.5, fontWeight:600, color:'var(--text-4)', padding:'10px 16px 4px', textTransform:'uppercase', letterSpacing:'0.07em'}}>Tareas vencidas</div>
+            {urgentes.slice(0,5).map(t => (
+              <div key={t.id} style={{display:'flex', alignItems:'flex-start', gap:10, padding:'10px 16px', borderBottom:'1px solid var(--line-1)'}}>
+                <div style={{width:6, height:6, borderRadius:'50%', background:'#FF5A6A', marginTop:5, flexShrink:0}}/>
+                <div>
+                  <div style={{fontSize:13, color:'var(--text-0)', lineHeight:1.4}}>{t.title}</div>
+                  {t.cliente && <div style={{fontSize:11.5, color:'var(--text-3)', marginTop:2}}>{t.cliente}</div>}
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {cobrosVencidos.length > 0 && (
+          <>
+            <div style={{fontSize:10.5, fontWeight:600, color:'var(--text-4)', padding:'10px 16px 4px', textTransform:'uppercase', letterSpacing:'0.07em'}}>Cobros vencidos</div>
+            {cobrosVencidos.slice(0,5).map(c => (
+              <div key={c.id} style={{display:'flex', alignItems:'center', gap:10, padding:'10px 16px', borderBottom:'1px solid var(--line-1)'}}>
+                <div style={{width:6, height:6, borderRadius:'50%', background:'#FFB547', flexShrink:0}}/>
+                <div style={{flex:1, minWidth:0}}>
+                  <div style={{fontSize:13, color:'var(--text-0)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{c.cliente}</div>
+                  {c.concepto && <div style={{fontSize:11.5, color:'var(--text-3)', marginTop:2}}>{c.concepto}</div>}
+                </div>
+                <div style={{fontSize:13, fontWeight:600, color:'#FFB547', fontFamily:'var(--font-mono)', flexShrink:0}}>€{(c.monto||0).toLocaleString('es-ES')}</div>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </>
   )
 }

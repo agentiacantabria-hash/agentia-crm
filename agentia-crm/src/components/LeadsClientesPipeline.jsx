@@ -242,10 +242,17 @@ function ClienteModal({ cliente, onClose, onSave, onDelete }) {
   )
 }
 
-export function Clientes({ data }) {
+export function Clientes({ data, openItem, onItemOpened }) {
   const clientes = data?.clientes || []
   const [editing, setEditing] = useState(null)
   const [creating, setCreating] = useState(false)
+
+  useEffect(() => {
+    if (openItem?.type === 'Cliente' && openItem.item) {
+      const c = clientes.find(c => c.id === openItem.item.id)
+      if (c) { setEditing(c); onItemOpened?.() }
+    }
+  }, [openItem])
 
   const handleSave = (form) => {
     if (form.id) data.updateCliente?.(form.id, form)
@@ -407,7 +414,7 @@ function CobraRestoModal({ lead, onClose, onConfirm }) {
 
 // ── Pipeline ─────────────────────────────────────────────────────
 
-export function Pipeline({ data, openQuick }) {
+export function Pipeline({ data, openQuick, openItem, onItemOpened }) {
   const leads = data?.leads || []
   const [view,     setView]     = useState('kanban')
   const [filter,   setFilter]   = useState('todos')
@@ -415,6 +422,13 @@ export function Pipeline({ data, openQuick }) {
   const [movingId,       setMovingId]       = useState(null)
   const [editing,        setEditing]        = useState(null)
   const [creating,       setCreating]       = useState(false)
+
+  useEffect(() => {
+    if (openItem?.type === 'Lead' && openItem.item) {
+      const lead = leads.find(l => l.id === openItem.item.id)
+      if (lead) { setEditing(lead); onItemOpened?.() }
+    }
+  }, [openItem])
   const [cobradoLead,    setCobradoLead]    = useState(null)
   const [señalLead,      setSeñalLead]      = useState(null)
   const [cobrarRestoLead,setCobrarRestoLead] = useState(null)
@@ -432,7 +446,12 @@ export function Pipeline({ data, openQuick }) {
 
   const applyRespFilter = (items) => filterResp === 'todos' ? items : items.filter(l => l.responsable === filterResp)
 
-  const cols = PIPELINE_COLS.map(label => ({
+  const activeCols = PIPELINE_COLS.filter(l => !STAGES_CLOSED.includes(l)).map(label => ({
+    label,
+    color: STATE_COLORS[label]?.color || '#6B7590',
+    items: applyRespFilter(leads.filter(l => l.estado === label)),
+  }))
+  const closedCols = STAGES_CLOSED.map(label => ({
     label,
     color: STATE_COLORS[label]?.color || '#6B7590',
     items: applyRespFilter(leads.filter(l => l.estado === label)),
@@ -547,7 +566,10 @@ export function Pipeline({ data, openQuick }) {
     setCobrarRestoLead(null)
   }
 
-  const totalAbierto = activeLeads.reduce((a,l) => a + (l.monto||0), 0)
+  const totalAbierto = activeLeads.reduce((a,l) => {
+    if (l.estado === STAGE.SEÑAL) return a + Math.max(0, (l.monto||0) - (parseFloat(l.señal_cobrada)||0))
+    return a + (l.monto||0)
+  }, 0)
 
   const handleSave = (form) => {
     if (form.id) data.updateLead?.(form.id, form)
@@ -638,7 +660,7 @@ export function Pipeline({ data, openQuick }) {
           })()}
 
           <div className="kanban" ref={kanbanRef}>
-            {cols.map(col=>(
+            {activeCols.map(col=>(
               <div className="kanban-col" key={col.label} data-col={col.label}
                 style={touchDrag?.targetCol === col.label ? { outline: `2px solid ${col.color}`, borderRadius: 10 } : undefined}
                 onDragOver={e => e.preventDefault()}
@@ -697,6 +719,41 @@ export function Pipeline({ data, openQuick }) {
                 })}
               </div>
             ))}
+          </div>
+
+          <div style={{marginTop:20, borderTop:'1px dashed var(--line-1)', paddingTop:14}}>
+            <div style={{fontSize:11, color:'var(--text-4)', fontWeight:600, letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:10}}>Cerrados</div>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px, 1fr))', gap:12}}>
+              {closedCols.map(col=>(
+                <div className="kanban-col" key={col.label} data-col={col.label}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('leadId'); if (id) moveCard(id, col.label) }}>
+                  <div className="kanban-col-head">
+                    <div className="bar" style={{'--col-color': col.color}}/>
+                    <span className="title">{col.label}</span>
+                    <span className="count">{col.items.length}</span>
+                    {col.items.length > 0 && (
+                      <span style={{fontSize:10, color:'var(--text-4)', fontFamily:'var(--font-mono)', marginLeft:4}}>
+                        €{eur(col.items.reduce((a,l) => a + (l.monto||0), 0))}
+                      </span>
+                    )}
+                  </div>
+                  {col.items.map(l=>(
+                    <div className="kanban-card" key={l.id} style={{opacity:0.7}} draggable
+                      onDragStart={e => e.dataTransfer.setData('leadId', l.id)}
+                      onClick={() => setEditing(l)}>
+                      <div className="name">{l.empresa}</div>
+                      <div className="sub">{l.servicio}</div>
+                      <div className="meta">
+                        <div className="avatar xs">{l.responsable}</div>
+                        <span>{l.ciudad}</span>
+                        <span className="amount">€{eur(l.monto||0)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
 
           {touchDrag && (
