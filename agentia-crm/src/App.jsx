@@ -184,14 +184,14 @@ export default function App() {
         const venceResto = lead.vence_resto || (() => {
           const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0,10)
         })()
-        // El cobro Resto ya fue creado en handleSeñalConfirm — solo actualizar vence si cambió
+        // El cobro Resto ya fue creado en handleSeñalConfirm — marcarlo como pagado al cerrar el lead
         const existingResto = cobrosRef.current.find(c =>
           c.cliente === lead.empresa && (c.concepto || '').startsWith('Resto ·') && !c.pagado
         )
         if (existingResto) {
-          if (lead.vence_resto && lead.vence_resto !== existingResto.vence) {
-            updateCobro(existingResto.id, { vence: lead.vence_resto })
-          }
+          const restoUpdates = { pagado: true, vencida: false }
+          if (lead.vence_resto) restoUpdates.vence = lead.vence_resto
+          updateCobro(existingResto.id, restoUpdates)
         } else {
           addCobro({
             cliente: lead.empresa, concepto: `Resto · ${servicio}`,
