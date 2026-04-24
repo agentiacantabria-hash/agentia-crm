@@ -135,11 +135,17 @@ export default function App() {
         showToast(`Lead «${leadData.empresa}» creado`)
         return
       }
-    } catch (_) {}
+      if (error) {
+        console.error('[Supabase] addLead error:', error.message, error.details)
+        showToast(`Error Supabase: ${error.message}`, 'error')
+      }
+    } catch (e) {
+      console.error('[Supabase] addLead excepción:', e)
+    }
     const local = { ...leadData, id: `l${Date.now()}` }
     setLeads(prev => [local, ...prev])
     autoWinLead({ ...local, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, vence_resto })
-    showToast(`Lead «${leadData.empresa}» creado`)
+    showToast(`Lead «${leadData.empresa}» creado (guardado local — revisar Supabase)`, 'error')
   }
 
   const autoWinLead = (lead) => {

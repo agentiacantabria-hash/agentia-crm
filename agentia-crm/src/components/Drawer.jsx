@@ -46,6 +46,7 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
     const nextText = form.next_contact
       ? `Contactar el ${new Date(form.next_contact + 'T00:00:00').toLocaleDateString('es-ES', { day:'numeric', month:'short' })}`
       : (form.notas || '').trim() || 'Primer contacto'
+    // Solo campos que existen en la tabla leads de Supabase
     const lead = {
       empresa:     form.empresa.trim(),
       servicio:    form.servicio || servicios[0] || '',
@@ -54,14 +55,12 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
       monto:       parseFloat(form.monto) || 0,
       temp:        'cold',
       next:        nextText,
-      notas:       (form.notas || '').trim() || null,
       sector:      form.sector || null,
       ciudad:      form.ciudad || null,
       responsable: form.responsable || resp[0]?.value || '',
       contacto:    form.contacto || null,
       telefono:    form.telefono || null,
       email:       form.email    || null,
-      instagram:   form.instagram || null,
     }
     onSave?.(lead)
     onClose?.()
