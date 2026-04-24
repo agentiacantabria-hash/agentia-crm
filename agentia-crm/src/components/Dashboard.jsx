@@ -501,6 +501,7 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
             <h3>Leads recientes</h3>
             <div className="right"><button className="btn sm ghost" onClick={() => setPage('pipeline')}>Ver todos</button></div>
           </div>
+          <div style={{overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
           <table className="table">
             <thead><tr><th>Empresa</th><th>Servicio</th><th>Estado</th><th>Próximo paso</th><th style={{textAlign:'right'}}>Importe</th></tr></thead>
             <tbody>
@@ -521,6 +522,7 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
               )}
             </tbody>
           </table>
+          </div>
         </div>
         <div className="card">
           <div className="card-head"><h3>Seguimientos próximos</h3></div>

@@ -120,11 +120,7 @@ export function Sidebar({ page, setPage, role, counts, isOpen, onClose }) {
         }}>
           <div className="row-menu-item" onPointerDown={() => handleNav('ajustes')}
             style={{display:'flex', alignItems:'center', gap:10, padding:'10px 16px', cursor:'pointer', fontSize:13, color:'var(--text-1)'}}>
-            <I.Settings size={14}/> Ajustes
-          </div>
-          <div className="row-menu-item" onPointerDown={() => handleNav('ajustes')}
-            style={{display:'flex', alignItems:'center', gap:10, padding:'10px 16px', cursor:'pointer', fontSize:13, color:'var(--text-1)'}}>
-            <I.Users size={14}/> Editar perfil
+            <I.Settings size={14}/> Ajustes y equipo
           </div>
         </div>
       )}
@@ -153,7 +149,7 @@ export function SearchModal({ open, onClose, data, setPage }) {
 
   const results = ql.length < 1 ? [] : [
     ...leads.filter(l => l.empresa?.toLowerCase().includes(ql) || l.servicio?.toLowerCase().includes(ql))
-      .slice(0,4).map(l => ({ type:'Lead', label: l.empresa, sub: l.estado, page:'leads', color:'var(--brand-2)' })),
+      .slice(0,4).map(l => ({ type:'Lead', label: l.empresa, sub: l.estado, page:'pipeline', color:'var(--brand-2)' })),
     ...clientes.filter(c => c.nombre?.toLowerCase().includes(ql) || c.servicio?.toLowerCase().includes(ql))
       .slice(0,4).map(c => ({ type:'Cliente', label: c.nombre, sub: c.servicio, page:'clientes', color:'var(--ok)' })),
     ...tasks.filter(t => t.title?.toLowerCase().includes(ql) || t.cliente?.toLowerCase().includes(ql))

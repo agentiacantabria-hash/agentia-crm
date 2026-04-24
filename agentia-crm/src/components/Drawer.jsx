@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { I } from './Icons'
 import { PIPELINE_COLS } from './data'
 import { SelectOrText, CustomSelect } from './Modal'
@@ -34,6 +34,8 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
   const [mode, setMode] = useState('quick')
   const [form, setForm] = useState(EMPTY)
 
+  useEffect(() => { if (!open) { setForm(EMPTY); setMode('quick') } }, [open])
+
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const handleSave = () => {
@@ -41,21 +43,25 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
     const servicios = getServicios()
     const resp = getResp()
     const origenFinal = form.origen === 'Otro' ? (form.origenCustom.trim() || 'Otro') : form.origen
+    const nextText = form.next_contact
+      ? `Contactar el ${new Date(form.next_contact + 'T00:00:00').toLocaleDateString('es-ES', { day:'numeric', month:'short' })}`
+      : (form.notas || '').trim() || 'Primer contacto'
     const lead = {
-      empresa:      form.empresa.trim(),
-      servicio:     form.servicio || servicios[0] || '',
-      origen:       origenFinal,
-      estado:       form.estado || 'Cliente Nuevo',
-      monto:        parseFloat(form.monto) || 0,
-      temp:         'cold',
-      next:         (form.notas || '').trim() || 'Primer contacto',
-      next_contact: form.next_contact || '',
-      sector:       form.sector,
-      ciudad:       form.ciudad,
-      responsable:  form.responsable || resp[0]?.value || '',
-      contacto:     form.contacto,
-      telefono:     form.telefono,
-      email:        form.email,
+      empresa:     form.empresa.trim(),
+      servicio:    form.servicio || servicios[0] || '',
+      origen:      origenFinal,
+      estado:      form.estado || 'Cliente Nuevo',
+      monto:       parseFloat(form.monto) || 0,
+      temp:        'cold',
+      next:        nextText,
+      notas:       (form.notas || '').trim() || null,
+      sector:      form.sector || null,
+      ciudad:      form.ciudad || null,
+      responsable: form.responsable || resp[0]?.value || '',
+      contacto:    form.contacto || null,
+      telefono:    form.telefono || null,
+      email:       form.email    || null,
+      instagram:   form.instagram || null,
     }
     onSave?.(lead)
     onClose?.()

@@ -266,6 +266,7 @@ export function Clientes({ data }) {
       </div>
 
       <div className="card">
+        <div style={{overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
         <table className="table">
           <thead><tr><th>Cliente</th><th>Tipo</th><th>Servicio</th><th>Estado</th><th>Ajustes</th><th>Resp.</th><th>Desde</th><th style={{textAlign:'right'}}>Importe</th><th></th></tr></thead>
           <tbody>
@@ -299,6 +300,7 @@ export function Clientes({ data }) {
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {(editing || creating) && (
@@ -719,6 +721,7 @@ export function Pipeline({ data, openQuick }) {
 
       {view === 'lista' && (
         <div className="card">
+          <div style={{overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
           <table className="table">
             <thead>
               <tr><th>Empresa</th><th>Sector</th><th>Servicio</th><th>Estado</th><th>Origen</th><th>Próximo paso</th><th>Resp.</th><th style={{textAlign:'right'}}>Importe</th><th></th></tr>
@@ -756,6 +759,7 @@ export function Pipeline({ data, openQuick }) {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

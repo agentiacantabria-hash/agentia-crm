@@ -99,8 +99,9 @@ function GastoModal({ gasto, onClose, onSave, onDelete }) {
 }
 
 export function Finanzas({ role, data }) {
-  const gastos = data?.gastos || []
-  const cobros = data?.cobros || []
+  const gastos     = data?.gastos    || []
+  const cobros     = data?.cobros    || []
+  const showToast  = data?.showToast
   const [addingGasto, setAddingGasto]   = useState(false)
   const [editingGasto, setEditingGasto] = useState(null)
   const [addingCobro, setAddingCobro]   = useState(false)
@@ -218,6 +219,7 @@ export function Finanzas({ role, data }) {
               Sin facturas — añade tu primera factura con el botón de arriba
             </div>
           ) : (
+            <div style={{overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
             <table className="table">
               <thead>
                 <tr>
@@ -265,7 +267,7 @@ export function Finanzas({ role, data }) {
                     <td style={{display:'flex', alignItems:'center', gap:6, justifyContent:'flex-end'}}>
                       {!c.pagado && (
                         <button className="btn sm" style={{padding:'3px 10px', fontSize:12}}
-                          onClick={e => { e.stopPropagation(); data.updateCobro?.(c.id, { pagado: true, vencida: false }) }}>
+                          onClick={e => { e.stopPropagation(); data.updateCobro?.(c.id, { pagado: true, vencida: false }); showToast?.(`Cobro de ${c.cliente} marcado como pagado`) }}>
                           ✓ Cobrado
                         </button>
                       )}
@@ -278,6 +280,7 @@ export function Finanzas({ role, data }) {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 

@@ -519,7 +519,7 @@ export default function App() {
       case 'tareas':    return <Tareas data={data} />
       case 'proyectos': return <Proyectos data={data} />
       case 'finanzas':  return <Finanzas role={role} data={data} />
-      case 'ajustes':   return <Ajustes role={role} />
+      case 'ajustes':   return <Ajustes role={role} data={data} />
       default:          return null
     }
   })()
