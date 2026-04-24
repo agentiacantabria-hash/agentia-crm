@@ -280,12 +280,13 @@ export function Finanzas({ role, data }) {
                                   ✓ Cobrado
                                 </button>
                               )}
-                              {s.next && (
-                                <button className="icon-btn" style={{width:24, height:24, color:'var(--text-4)'}}
-                                  onClick={() => { if (confirm(`¿Eliminar cobro pendiente de ${s.cliente}?`)) data.deleteCobro?.(s.next.id) }}>
-                                  <I.Close size={11}/>
-                                </button>
-                              )}
+                              <button className="icon-btn" style={{width:24, height:24, color:'var(--text-4)'}}
+                                onClick={() => {
+                                  const target = s.next || s.ultimo
+                                  if (target && confirm(`¿Eliminar suscripción de ${s.cliente}?`)) data.deleteCobro?.(target.id)
+                                }}>
+                                <I.Close size={11}/>
+                              </button>
                             </div>
                           </td>
                         </tr>
