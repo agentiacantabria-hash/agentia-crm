@@ -115,7 +115,7 @@ export default function App() {
       const mes = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
       addCliente({
         nombre: lead.empresa, servicio: lead.servicio || '',
-        importe: monto, estado: 'En curso',
+        importe: monto, estado: yaCobrado ? 'Pagado · ajustes' : 'En curso',
         ajustes: 0, responsable: lead.responsable || '', since: mes,
       })
     }
