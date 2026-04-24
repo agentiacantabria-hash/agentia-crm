@@ -261,70 +261,117 @@ export function Clientes({ data, openItem, onItemOpened }) {
     setEditing(null); setCreating(false)
   }
 
+  const getTipo = (c) => c.tipo || (c.estado === 'Recurrente' ? 'Recurrente' : 'Proyecto')
+  const recurrentes = clientes.filter(c => getTipo(c) === 'Recurrente')
+  const proyectos   = clientes.filter(c => getTipo(c) !== 'Recurrente')
+
+  const getRepCobro = (nombre) => {
+    const all = cobros.filter(cb => cb.cliente === nombre && cb.recurrente)
+    return all.filter(cb => !cb.pagado).sort((a,b) => (a.vence||'') < (b.vence||'') ? -1 : 1)[0]
+        || all.find(cb => cb.pagado)
+  }
+
+  const mrr = recurrentes.reduce((sum, c) => sum + (getRepCobro(c.nombre)?.monto || 0), 0)
+  const totalProyectos = proyectos.reduce((a, c) => a + (c.importe || 0), 0)
+
+  const hoy = new Date(); hoy.setHours(0,0,0,0)
+
+  const getChip = (estado) =>
+    estado === 'Cerrado' ? 'gray' : estado === 'En curso' ? 'blue' : estado === 'En revisión' ? 'violet' : 'amber'
+
+  const ClientCard = ({ c, isRecurrente }) => {
+    const nextCobro = isRecurrente ? getRepCobro(c.nombre) : null
+    const venceDate = nextCobro?.vence ? new Date(nextCobro.vence + 'T00:00:00') : null
+    const dias = venceDate ? Math.floor((venceDate - hoy) / 86400000) : null
+    const vencido = dias !== null && dias < 0
+    const esHoy   = dias === 0
+
+    return (
+      <div className="card" style={{padding:'14px 16px', cursor:'pointer', marginBottom:8}} onClick={() => setEditing(c)}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8}}>
+          <div style={{minWidth:0}}>
+            <div style={{fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{c.nombre}</div>
+            <div style={{fontSize:11.5, color:'var(--text-3)', marginTop:2}}>{c.servicio || c.responsable || ''}</div>
+          </div>
+          <div style={{textAlign:'right', flexShrink:0}}>
+            {isRecurrente ? (
+              <>
+                <div style={{fontWeight:700, color:'var(--ok)', fontSize:15}}>
+                  €{eur(nextCobro?.monto || 0)}<span style={{fontSize:10, fontWeight:400, color:'var(--text-4)'}}>/mes</span>
+                </div>
+                {nextCobro && (
+                  <div style={{fontSize:10.5, marginTop:2, color: vencido ? 'var(--danger)' : esHoy ? 'var(--warn)' : 'var(--text-4)'}}>
+                    {vencido ? `⚠ Vencido ${Math.abs(dias)}d` : esHoy ? '⚠ Hoy' : nextCobro.vence}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div style={{fontWeight:700, fontSize:15}}>€{eur(c.importe || 0)}</div>
+                <span className={`chip ${getChip(c.estado)}`} style={{marginTop:4, display:'inline-flex', fontSize:10}}>
+                  <span className="dot"/>{c.estado}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop: c.ajustes > 0 ? 8 : 0}}>
+          {c.ajustes > 0 && <span className="pend">{c.ajustes} ajuste{c.ajustes > 1 ? 's' : ''}</span>}
+          <div style={{marginLeft:'auto'}} onClick={e => e.stopPropagation()}>
+            <RowMenu
+              onEdit={() => setEditing(c)}
+              onDelete={() => { if (confirm(`¿Eliminar "${c.nombre}"?`)) data.deleteCliente?.(c.id) }}
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="fade-in">
       <div className="page-head">
         <div>
           <h1 className="page-title">Clientes</h1>
-          <p className="page-subtitle">Activos, recurrentes y cerrados · {clientes.length} clientes · €{eur(clientes.reduce((a,c)=>a+(c.importe||0),0))} facturados</p>
+          <p className="page-subtitle">{clientes.length} clientes</p>
         </div>
         <div className="page-actions">
           <button className="btn primary" onClick={() => setCreating(true)}><I.Plus size={13}/> Nuevo cliente</button>
         </div>
       </div>
 
-      <div className="card">
-        <div style={{overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
-        <table className="table">
-          <thead><tr><th>Cliente</th><th>Tipo</th><th>Servicio</th><th>Estado</th><th>Ajustes</th><th>Resp.</th><th>Desde</th><th style={{textAlign:'right'}}>Importe</th><th></th></tr></thead>
-          <tbody>
-            {clientes.map(c => {
-              const chip = c.estado==='Cerrado'?'gray':c.estado==='En curso'?'blue':c.estado==='En revisión'?'violet':c.estado==='Recurrente'?'green':'amber'
-              const tipo = c.tipo || (c.estado === 'Recurrente' ? 'Recurrente' : 'Proyecto')
-              const nextCobro = tipo === 'Recurrente'
-                ? cobros.filter(cb => cb.cliente === c.nombre && cb.recurrente && !cb.pagado)
-                    .sort((a,b) => (a.vence||'') < (b.vence||'') ? -1 : 1)[0]
-                : null
-              const hoy = new Date(); hoy.setHours(0,0,0,0)
-              const venceDate = nextCobro?.vence ? new Date(nextCobro.vence + 'T00:00:00') : null
-              const diasVence = venceDate ? Math.floor((venceDate - hoy) / 86400000) : null
-              const cobroVencido = diasVence !== null && diasVence < 0
-              const cobroHoy     = diasVence === 0
-              return (
-                <tr key={c.id} style={{cursor:'pointer'}} onClick={() => setEditing(c)}>
-                  <td>
-                    <div className="primary">{c.nombre}</div>
-                    {nextCobro && (
-                      <div style={{fontSize:11, marginTop:2, color: cobroVencido ? 'var(--danger)' : cobroHoy ? 'var(--warn)' : 'var(--text-4)'}}>
-                        {cobroVencido ? `⚠ Vencido hace ${Math.abs(diasVence)}d` : cobroHoy ? '⚠ Vence hoy' : `Próximo pago ${nextCobro.vence}`}
-                        {' · '}€{eur(nextCobro.monto||0)}/{(nextCobro.frecuencia||'mes').toLowerCase()}
-                      </div>
-                    )}
-                  </td>
-                  <td>
-                    <span style={{fontSize:11, fontWeight:600, padding:'2px 8px', borderRadius:20,
-                      background: tipo==='Recurrente' ? 'rgba(62,207,142,0.12)' : 'rgba(107,117,144,0.12)',
-                      color: tipo==='Recurrente' ? 'var(--ok)' : 'var(--text-3)'}}>
-                      {tipo==='Recurrente' ? '↺ Recurrente' : 'Proyecto'}
-                    </span>
-                  </td>
-                  <td className="muted">{c.servicio}</td>
-                  <td><span className={`chip ${chip}`}><span className="dot"/>{c.estado}</span></td>
-                  <td>{c.ajustes>0 ? <span className="pend">{c.ajustes} pendiente{c.ajustes>1?'s':''}</span> : <span className="muted small">—</span>}</td>
-                  <td><div className="avatar sm">{c.responsable}</div></td>
-                  <td className="muted small">{c.since}</td>
-                  <td className="mono" style={{textAlign:'right'}}>€{eur(c.importe||0)}</td>
-                  <td onClick={e => e.stopPropagation()}>
-                    <RowMenu
-                      onEdit={() => setEditing(c)}
-                      onDelete={() => { if (confirm(`¿Eliminar "${c.nombre}"?`)) data.deleteCliente?.(c.id) }}
-                    />
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+      <div className="grid-2" style={{marginBottom:16}}>
+        <div className="card" style={{padding:'16px 20px'}}>
+          <div style={{fontSize:11, fontWeight:600, textTransform:'uppercase', color:'var(--text-4)', letterSpacing:.5, marginBottom:6}}>↺ Ingresos recurrentes</div>
+          <div style={{fontSize:26, fontWeight:700, color:'var(--ok)'}}>€{eur(mrr)}<span style={{fontSize:13, fontWeight:400, color:'var(--text-3)'}}>/mes</span></div>
+          <div style={{fontSize:12, color:'var(--text-4)', marginTop:2}}>{recurrentes.length} cliente{recurrentes.length !== 1 ? 's' : ''}</div>
+        </div>
+        <div className="card" style={{padding:'16px 20px'}}>
+          <div style={{fontSize:11, fontWeight:600, textTransform:'uppercase', color:'var(--text-4)', letterSpacing:.5, marginBottom:6}}>Proyectos</div>
+          <div style={{fontSize:26, fontWeight:700}}>€{eur(totalProyectos)}</div>
+          <div style={{fontSize:12, color:'var(--text-4)', marginTop:2}}>{proyectos.length} proyecto{proyectos.length !== 1 ? 's' : ''}</div>
+        </div>
+      </div>
+
+      <div className="grid-2" style={{alignItems:'start'}}>
+        <div>
+          <div style={{fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:.5, color:'var(--ok)', marginBottom:10, display:'flex', alignItems:'center', gap:6}}>
+            ↺ Recurrentes <span style={{fontWeight:400, color:'var(--text-4)'}}>· {recurrentes.length}</span>
+          </div>
+          {recurrentes.length === 0
+            ? <div className="card" style={{padding:'24px 16px', textAlign:'center', color:'var(--text-4)', fontSize:13}}>Sin clientes recurrentes</div>
+            : recurrentes.map(c => <ClientCard key={c.id} c={c} isRecurrente={true} />)
+          }
+        </div>
+
+        <div>
+          <div style={{fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:.5, color:'var(--text-3)', marginBottom:10, display:'flex', alignItems:'center', gap:6}}>
+            Proyectos <span style={{fontWeight:400, color:'var(--text-4)'}}>· {proyectos.length}</span>
+          </div>
+          {proyectos.length === 0
+            ? <div className="card" style={{padding:'24px 16px', textAlign:'center', color:'var(--text-4)', fontSize:13}}>Sin proyectos</div>
+            : proyectos.map(c => <ClientCard key={c.id} c={c} isRecurrente={false} />)
+          }
         </div>
       </div>
 

@@ -153,18 +153,19 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
                 <div className="field"><label className="lbl">Responsable</label>
                   <CustomSelect className="select" value={form.responsable} onChange={v => set('responsable', v)} options={resp.map(r => ({ value: r.value, label: r.label }))} />
                 </div>
-              <div className="field-row">
                 <div className="field"><label className="lbl">Servicio de interés</label>
                   <SelectOrText value={form.servicio} onChange={v => set('servicio', v)} options={servicios} selectClass="select" inputClass="input" placeholder="Ej: Web + Chatbot…" />
                 </div>
+              </div>
+              <div className="field-row">
                 <div className="field"><label className="lbl">Importe (€)</label>
                   <input className="input" type="number" min="0" placeholder="0" value={form.monto} onChange={e => set('monto', e.target.value)} />
                 </div>
-              </div>
-              <div className="field-row">
                 <div className="field"><label className="lbl">Estado</label>
                   <CustomSelect className="select" value={form.estado} onChange={v => set('estado', v)} options={PIPELINE_COLS} />
                 </div>
+              </div>
+              <div className="field-row">
                 <div className="field"><label className="lbl">Próximo contacto</label><input className="input" type="date" value={form.next_contact} onChange={e => set('next_contact', e.target.value)} /></div>
               </div>
               <div className="field"><label className="lbl">Notas</label><textarea className="textarea" value={form.notas} onChange={e => set('notas', e.target.value)} /></div>

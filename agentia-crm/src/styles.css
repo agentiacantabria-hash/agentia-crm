@@ -1149,6 +1149,7 @@ label.lbl {
   .stat .value { font-size: 24px; }
 
   /* Grids → columna única */
+  .grid-2 { grid-template-columns: 1fr !important; }
   .grid-3 { grid-template-columns: 1fr !important; }
   .grid-main-side { grid-template-columns: 1fr !important; }
   .pipe-summary { grid-template-columns: 1fr 1fr !important; }
