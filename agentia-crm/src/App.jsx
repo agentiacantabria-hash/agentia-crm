@@ -5,6 +5,7 @@ import Dashboard from './components/Dashboard'
 import { Clientes, Pipeline } from './components/LeadsClientesPipeline'
 import { Tareas, Proyectos } from './components/TareasProyectos'
 import { Finanzas, Ajustes } from './components/FinanzasAjustes'
+import Login from './components/Login'
 import { supabase } from './lib/supabase'
 import { STAGE, STAGES_CLOSED } from './components/data'
 
@@ -29,8 +30,42 @@ const crumbMap = {
 }
 
 export default function App() {
+  // ── Auth ───────────────────────────────────────────────────
+  const [authReady,   setAuthReady]   = useState(false)  // false = still checking
+  const [currentUser, setCurrentUser] = useState(null)   // CRM user profile
+  const [noProfile,   setNoProfile]   = useState(false)  // logged in but not in usuarios table
+
+  useEffect(() => {
+    let mounted = true
+    const loadProfile = async (authUid) => {
+      const { data } = await supabase.from('usuarios').select('*').eq('auth_uid', authUid).single()
+      if (!mounted) return
+      if (data) { setCurrentUser(data); setNoProfile(false) }
+      else       { setNoProfile(true);  setCurrentUser(null) }
+      setAuthReady(true)
+    }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return
+      if (session) loadProfile(session.user.id)
+      else setAuthReady(true)
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return
+      if (session) loadProfile(session.user.id)
+      else { setCurrentUser(null); setNoProfile(false); setAuthReady(true) }
+    })
+    return () => { mounted = false; subscription.unsubscribe() }
+  }, [])
+
+  const signOut = async () => {
+    await supabase.auth.signOut()
+    setCurrentUser(null)
+    setNoProfile(false)
+  }
+
+  const role = currentUser?.rol === 'Admin' ? 'admin' : 'empleado'
+
   const [page, setPage]   = useState(() => { const p = localStorage.getItem('agentia_page') || 'dashboard'; return p === 'leads' ? 'pipeline' : p })
-  const [role, setRole]   = useState(() => localStorage.getItem('agentia_role') || 'admin')
   const [drawer, setDrawer] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -64,7 +99,10 @@ export default function App() {
   }, [])
 
   useEffect(() => { localStorage.setItem('agentia_page', page) }, [page])
-  useEffect(() => { localStorage.setItem('agentia_role', role) }, [role])
+  // Redirigir empleados fuera de secciones admin si acceden por caché
+  useEffect(() => {
+    if (currentUser && role === 'empleado' && ['finanzas','ajustes'].includes(page)) setPage('dashboard')
+  }, [currentUser, role, page])
 
   useEffect(() => {
     const root = document.documentElement.style
@@ -76,16 +114,26 @@ export default function App() {
   }, [hue])
 
   useEffect(() => {
+    if (!currentUser) return
     async function load() {
+      const isAdmin = currentUser.rol === 'Admin'
+      const ini     = currentUser.iniciales
       try {
-        const [l, c, t, p, g, co] = await Promise.all([
-          supabase.from('leads').select('*').order('created_at', { ascending: false }),
-          supabase.from('clientes').select('*').order('created_at', { ascending: false }),
-          supabase.from('tareas').select('*').order('created_at', { ascending: false }),
-          supabase.from('proyectos').select('*').order('created_at', { ascending: false }),
-          supabase.from('gastos').select('*').order('created_at', { ascending: false }),
-          supabase.from('cobros').select('*').order('created_at', { ascending: false }),
-        ])
+        let lQ  = supabase.from('leads').select('*').order('created_at', { ascending: false })
+        let cQ  = supabase.from('clientes').select('*').order('created_at', { ascending: false })
+        let tQ  = supabase.from('tareas').select('*').order('created_at', { ascending: false })
+        let pQ  = supabase.from('proyectos').select('*').order('created_at', { ascending: false })
+        let gQ  = supabase.from('gastos').select('*').order('created_at', { ascending: false })
+        let coQ = supabase.from('cobros').select('*').order('created_at', { ascending: false })
+
+        if (!isAdmin && ini) {
+          lQ  = lQ.eq('responsable', ini)
+          cQ  = cQ.eq('responsable', ini)
+          tQ  = tQ.eq('resp', ini)
+          pQ  = pQ.eq('resp', ini)
+        }
+
+        const [l, c, t, p, g, co] = await Promise.all([lQ, cQ, tQ, pQ, gQ, coQ])
         if (!l.error && l.data) {
           const stateMap = {
             'Ganado': 'Cobrado', 'Perdido': 'Denegado',
@@ -119,7 +167,7 @@ export default function App() {
       } catch (e) { console.error('[Supabase] excepción al cargar:', e) }
     }
     load()
-  }, [])
+  }, [currentUser])
 
   // Convierte strings vacíos a null para campos de tipo date en Supabase
   const clean = (obj) => Object.fromEntries(
@@ -584,17 +632,30 @@ export default function App() {
     showToast,
   }
 
+  // ── Auth gates ─────────────────────────────────────────────
+  if (!authReady) return (
+    <div style={{position:'fixed',inset:0,background:'#0A0E17',display:'flex',alignItems:'center',justifyContent:'center',color:'#6B7590',fontSize:13,fontFamily:'system-ui'}}>
+      Cargando…
+    </div>
+  )
+  if (!currentUser) return (
+    <Login
+      noProfile={noProfile}
+      onRetry={() => { supabase.auth.signOut(); setNoProfile(false) }}
+    />
+  )
+
   const clearOpenItem = () => setOpenItem(null)
 
   const pageEl = (() => {
     switch (page) {
-      case 'dashboard': return <Dashboard role={role} setPage={setPage} openQuick={() => setDrawer(true)} data={data} />
+      case 'dashboard': return <Dashboard role={role} setPage={setPage} openQuick={() => setDrawer(true)} data={data} currentUser={currentUser} />
       case 'pipeline':  return <Pipeline data={data} openQuick={() => setDrawer(true)} openItem={openItem} onItemOpened={clearOpenItem} />
       case 'clientes':  return <Clientes data={data} openItem={openItem} onItemOpened={clearOpenItem} />
       case 'tareas':    return <Tareas data={data} openItem={openItem} onItemOpened={clearOpenItem} />
       case 'proyectos': return <Proyectos data={data} />
-      case 'finanzas':  return <Finanzas role={role} data={data} />
-      case 'ajustes':   return <Ajustes role={role} data={data} />
+      case 'finanzas':  return role === 'admin' ? <Finanzas role={role} data={data} /> : null
+      case 'ajustes':   return role === 'admin' ? <Ajustes role={role} data={data} currentUser={currentUser} /> : null
       default:          return null
     }
   })()
@@ -602,9 +663,9 @@ export default function App() {
   return (
     <>
       <div className="app" data-screen-label={PAGES.find(p => p[0] === page)?.[1]}>
-        <Sidebar page={page} setPage={setPage} role={role} counts={counts} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <Sidebar page={page} setPage={setPage} role={role} counts={counts} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} currentUser={currentUser} onSignOut={signOut} />
         <div className="content">
-          <Topbar crumb={crumbMap[page]} setDrawerOpen={setDrawer} role={role} setRole={setRole} onMenuClick={() => setSidebarOpen(o => !o)} notifCount={notifCount} onSearchOpen={() => setSearchOpen(true)} onBellOpen={() => setBellOpen(o => !o)} />
+          <Topbar crumb={crumbMap[page]} setDrawerOpen={setDrawer} role={role} onMenuClick={() => setSidebarOpen(o => !o)} notifCount={notifCount} onSearchOpen={() => setSearchOpen(true)} onBellOpen={() => setBellOpen(o => !o)} currentUser={currentUser} />
           <main className="main">{pageEl}</main>
         </div>
       </div>

@@ -9,12 +9,11 @@ function getSidebarUser(role) {
   } catch { return { n: 'Usuario', ini: 'U' } }
 }
 
-export function Sidebar({ page, setPage, role, counts, isOpen, onClose }) {
+export function Sidebar({ page, setPage, role, counts, isOpen, onClose, currentUser, onSignOut }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuPos, setMenuPos] = useState({ bottom: 80, right: 16 })
   const btnRef  = useRef(null)
   const menuRef = useRef(null)
-  const user = getSidebarUser(role)
 
   useEffect(() => {
     function handleClose(e) {
@@ -94,11 +93,11 @@ export function Sidebar({ page, setPage, role, counts, isOpen, onClose }) {
         })}
 
         <div className="sidebar-footer">
-          <div className="avatar">{user.ini || '?'}</div>
+          <div className="avatar">{currentUser?.iniciales || '?'}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{user.n}</div>
+            <div style={{ fontSize: 13, fontWeight: 500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{currentUser?.nombre || 'Usuario'}</div>
             <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              {role === 'admin' ? 'Admin' : 'Empleado'} · Agentia
+              {currentUser?.rol || 'Empleado'} · Agentia
             </div>
           </div>
           <button ref={btnRef} className="icon-btn" style={{width:28, height:28}} onClick={handleMenuToggle}>
@@ -118,9 +117,16 @@ export function Sidebar({ page, setPage, role, counts, isOpen, onClose }) {
           boxShadow:'0 8px 30px rgba(0,0,0,0.5)',
           zIndex:400,
         }}>
-          <div className="row-menu-item" onPointerDown={() => handleNav('ajustes')}
-            style={{display:'flex', alignItems:'center', gap:10, padding:'10px 16px', cursor:'pointer', fontSize:13, color:'var(--text-1)'}}>
-            <I.Settings size={14}/> Ajustes y equipo
+          {role === 'admin' && (
+            <div className="row-menu-item" onPointerDown={() => handleNav('ajustes')}
+              style={{display:'flex', alignItems:'center', gap:10, padding:'10px 16px', cursor:'pointer', fontSize:13, color:'var(--text-1)'}}>
+              <I.Settings size={14}/> Ajustes y equipo
+            </div>
+          )}
+          <div onPointerDown={() => { setMenuOpen(false); onSignOut?.() }}
+            style={{display:'flex', alignItems:'center', gap:10, padding:'10px 16px', cursor:'pointer', fontSize:13, color:'#FF8FA0', borderTop:'1px solid var(--line-1)'}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Cerrar sesión
           </div>
         </div>
       )}
@@ -196,7 +202,7 @@ export function SearchModal({ open, onClose, data, setPage, onSelect }) {
   )
 }
 
-export function Topbar({ crumb, setDrawerOpen, role, setRole, onMenuClick, notifCount = 0, onSearchOpen, onBellOpen }) {
+export function Topbar({ crumb, setDrawerOpen, role, onMenuClick, notifCount = 0, onSearchOpen, onBellOpen, currentUser }) {
   useEffect(() => {
     const handler = (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); onSearchOpen?.() } }
     document.addEventListener('keydown', handler)
@@ -221,11 +227,6 @@ export function Topbar({ crumb, setDrawerOpen, role, setRole, onMenuClick, notif
         <I.Search size={14} />
         <span>Buscar clientes, leads, tareas…</span>
         <kbd>⌘K</kbd>
-      </div>
-
-      <div className="segmented" title="Cambiar rol (demo)">
-        <button className={role === 'admin' ? 'active' : ''} onClick={() => setRole('admin')}>Admin</button>
-        <button className={role === 'empleado' ? 'active' : ''} onClick={() => setRole('empleado')}>Empleado</button>
       </div>
 
       <button className="icon-btn" title="Notificaciones" style={{position:'relative'}} onClick={onBellOpen}>
