@@ -252,6 +252,9 @@ export default function App() {
   const updateLead = async (id, updates) => {
     const lead = leads.find(l => l.id === id)
     const { crearProyecto, origenCustom, yaCobrado: _y, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, vence_resto, ...safeUpdates } = updates
+    if (safeUpdates.estado && lead?.estado !== safeUpdates.estado) {
+      try { localStorage.setItem(`agentia_stagetime_${id}`, new Date().toISOString()) } catch {}
+    }
     try {
       await supabase.from('leads').update(clean(safeUpdates)).eq('id', id)
     } catch (_) {}

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/unaio/.claude/channels/telegram/inbox/**)",
+      "Read(//c/Users/unaio/.claude/channels/telegram/approved/**)"
+    ]
+  }
+}

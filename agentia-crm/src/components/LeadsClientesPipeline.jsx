@@ -35,6 +35,98 @@ function getResp() {
   } catch { return ['LP','AR'] }
 }
 
+// ── Activity log (localStorage) ─────────────────────────────────
+const ACT_TYPES = [
+  { id:'llamada', label:'Llamada', icon:'📞' },
+  { id:'email',   label:'Email',   icon:'✉️' },
+  { id:'reunion', label:'Reunión', icon:'🤝' },
+  { id:'nota',    label:'Nota',    icon:'📝' },
+]
+function getAct(leadId) {
+  if (!leadId) return []
+  try { return JSON.parse(localStorage.getItem(`agentia_act_${leadId}`) || '[]') } catch { return [] }
+}
+function saveAct(leadId, arr) {
+  localStorage.setItem(`agentia_act_${leadId}`, JSON.stringify(arr))
+}
+function diasSinActiv(leadId, createdAt) {
+  const acts = getAct(leadId)
+  const ref = acts.length ? new Date(acts[0].fecha) : (createdAt ? new Date(createdAt) : new Date())
+  return Math.floor((Date.now() - ref) / 86400000)
+}
+function getStageTime(leadId) {
+  try { return localStorage.getItem(`agentia_stagetime_${leadId}`) } catch { return null }
+}
+
+// ── Presupuesto generator ────────────────────────────────────────
+function generarPresupuesto(lead) {
+  const fecha = new Date().toLocaleDateString('es-ES', { day:'numeric', month:'long', year:'numeric' })
+  let agencyName = 'Agentia', agencyEmail = 'agentiacantabria@gmail.com', agencyPhone = ''
+  try {
+    const s = JSON.parse(localStorage.getItem('agentia_settings') || '{}')
+    if (s.nombre)   agencyName  = s.nombre
+    if (s.email)    agencyEmail = s.email
+    if (s.telefono) agencyPhone = s.telefono
+  } catch {}
+  const monto = parseFloat(lead.monto) || 0
+  const num = `PRES-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`
+
+  const html = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><title>Presupuesto — ${lead.empresa}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,sans-serif;background:#fff;color:#111;padding:48px 56px;max-width:780px;margin:0 auto;font-size:14px;line-height:1.6}
+.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:24px;border-bottom:2px solid #111;margin-bottom:36px}
+.agency{font-size:22px;font-weight:700}
+.agency-sub{font-size:12px;color:#777;margin-top:3px}
+.doc-num{font-size:12px;color:#777;text-align:right}
+.doc-num strong{display:block;font-size:16px;color:#111;margin-bottom:3px}
+h1{font-size:26px;font-weight:700;margin-bottom:6px}
+.para{color:#555;margin-bottom:32px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:36px}
+.box{background:#f6f6f6;border-radius:10px;padding:16px 20px}
+.box-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#999;margin-bottom:6px}
+.box-val{font-size:15px;font-weight:600}
+.box-sub{font-size:12px;color:#777;margin-top:3px}
+table{width:100%;border-collapse:collapse;margin-bottom:28px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#888;text-align:left;padding:8px 0;border-bottom:1px solid #ddd}
+td{padding:14px 0;border-bottom:1px solid #f0f0f0}
+.right{text-align:right}
+.total td{font-weight:700;font-size:16px;border-top:2px solid #111;border-bottom:none;padding-top:14px}
+.conds{font-size:12px;color:#888;border-top:1px solid #eee;padding-top:20px;margin-top:20px;white-space:pre-line}
+.footer{margin-top:48px;display:flex;justify-content:space-between;font-size:11px;color:#bbb;border-top:1px solid #eee;padding-top:16px}
+.print-btn{margin-top:32px;background:#111;color:#fff;border:none;padding:12px 24px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600}
+@media print{.print-btn{display:none}@page{margin:32px}}
+</style></head>
+<body>
+<div class="header">
+  <div><div class="agency">${agencyName}</div><div class="agency-sub">Automatizaciones · Presencia Digital</div></div>
+  <div class="doc-num"><strong>${num}</strong>${fecha}</div>
+</div>
+<h1>Propuesta de servicios</h1>
+<p class="para">Preparado para <strong>${lead.empresa}</strong>${lead.contacto ? ` — ${lead.contacto}` : ''}</p>
+<div class="grid">
+  <div class="box"><div class="box-label">Cliente</div><div class="box-val">${lead.empresa}</div>${lead.sector ? `<div class="box-sub">${lead.sector}${lead.ciudad ? ` · ${lead.ciudad}` : ''}</div>` : ''}</div>
+  <div class="box"><div class="box-label">Contacto</div><div class="box-val">${lead.contacto || '—'}</div>${lead.email ? `<div class="box-sub">${lead.email}</div>` : ''}${lead.telefono ? `<div class="box-sub">${lead.telefono}</div>` : ''}</div>
+</div>
+<table>
+  <thead><tr><th>Descripción</th><th class="right">Importe</th></tr></thead>
+  <tbody>
+    <tr><td>${lead.servicio || 'Servicio personalizado'}${lead.notas ? `<br><span style="font-size:12px;color:#888">${lead.notas}</span>` : ''}</td><td class="right">€${monto.toLocaleString('es-ES')}</td></tr>
+    <tr class="total"><td>Total (IVA no incluido)</td><td class="right">€${monto.toLocaleString('es-ES')}</td></tr>
+  </tbody>
+</table>
+<div class="conds">Presupuesto válido por 30 días.
+Pago: 50% señal + 50% al entregar.
+Los presupuestos no incluyen IVA.</div>
+<div class="footer"><span>${agencyName} · ${agencyEmail}${agencyPhone ? ` · ${agencyPhone}` : ''}</span><span>Generado el ${fecha}</span></div>
+<button class="print-btn" onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
+</body></html>`
+
+  const win = window.open('', '_blank', 'width=900,height=700')
+  if (win) { win.document.write(html); win.document.close() }
+}
+
 // ── Leads ────────────────────────────────────────────────────────
 
 function LeadModal({ lead, onClose, onSave, onDelete }) {
@@ -93,6 +185,8 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
       </div>
       <F label="Notas"><textarea value={form.notas||''} onChange={e => set('notas', e.target.value)} placeholder="Detalles adicionales…" /></F>
 
+      {!isNew && <ActivitySection leadId={lead?.id} defaultResp={form.responsable} />}
+
       {form.estado === 'Cobrado' && (
         <div style={{display:'flex', flexDirection:'column', gap:10, padding:'14px', background:'rgba(62,207,142,0.06)', border:'1px solid rgba(62,207,142,0.2)', borderRadius:10}}>
           <div className="form-2col">
@@ -140,6 +234,14 @@ function LeadModal({ lead, onClose, onSave, onDelete }) {
       )}
 
       {!isNew && (
+        <div style={{display:'flex', justifyContent:'flex-start', marginTop:4}}>
+          <button className="btn sm ghost" style={{fontSize:11.5}} onClick={() => generarPresupuesto(form)}>
+            📄 Generar presupuesto PDF
+          </button>
+        </div>
+      )}
+
+      {!isNew && (
         <div className="modal-danger-zone">
           <span>Zona peligrosa</span>
           {confirmDel
@@ -179,6 +281,74 @@ function RowMenu({ onEdit, onDelete }) {
           <button className="del" onClick={onDelete}><I.Close size={13}/> Eliminar</button>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── ActivitySection ──────────────────────────────────────────────
+function ActivitySection({ leadId, defaultResp }) {
+  const [items, setItems] = useState(() => getAct(leadId))
+  const [tipo, setTipo] = useState('nota')
+  const [texto, setTexto] = useState('')
+
+  const add = () => {
+    if (!texto.trim()) return
+    const RESP = getResp()
+    const entry = { id: Date.now(), tipo, texto: texto.trim(), fecha: new Date().toISOString(), resp: defaultResp || RESP[0] || '' }
+    const updated = [entry, ...items]
+    setItems(updated)
+    saveAct(leadId, updated)
+    setTexto('')
+  }
+
+  const remove = (id) => {
+    const updated = items.filter(i => i.id !== id)
+    setItems(updated)
+    saveAct(leadId, updated)
+  }
+
+  const fmt = (iso) => {
+    const days = Math.floor((Date.now() - new Date(iso)) / 86400000)
+    if (days === 0) return 'hoy'
+    if (days === 1) return 'ayer'
+    if (days < 7) return `hace ${days}d`
+    return new Date(iso).toLocaleDateString('es-ES', { day:'numeric', month:'short' })
+  }
+
+  return (
+    <div>
+      <div style={{fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:.5, color:'var(--text-4)', padding:'14px 0 10px', borderTop:'1px solid var(--line-2)', marginTop:8}}>Actividad</div>
+      <div style={{display:'flex', gap:6, marginBottom:12}}>
+        <select className="select" style={{flexShrink:0, width:108, padding:'0 8px'}} value={tipo} onChange={e => setTipo(e.target.value)}>
+          {ACT_TYPES.map(t => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
+        </select>
+        <input className="input" style={{flex:1}} placeholder="Escribe aquí…" value={texto}
+          onChange={e => setTexto(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); add() } }} />
+        <button className="btn primary sm" onClick={add} style={{flexShrink:0, padding:'0 12px'}}>+</button>
+      </div>
+      {items.length === 0 && (
+        <div style={{fontSize:12, color:'var(--text-4)', textAlign:'center', padding:'10px 0 4px'}}>Sin actividad registrada aún</div>
+      )}
+      {items.map(item => {
+        const t = ACT_TYPES.find(x => x.id === item.tipo) || ACT_TYPES[3]
+        return (
+          <div key={item.id} style={{display:'flex', gap:10, padding:'8px 0', borderTop:'1px solid var(--line-2)'}}>
+            <div style={{fontSize:15, flexShrink:0, marginTop:2, width:20, textAlign:'center'}}>{t.icon}</div>
+            <div style={{flex:1, minWidth:0}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:2}}>
+                <span style={{fontSize:11.5, fontWeight:600, color:'var(--text-2)'}}>{t.label}</span>
+                <div style={{display:'flex', alignItems:'center', gap:6, flexShrink:0}}>
+                  {item.resp && <div className="avatar xs" style={{fontSize:9,width:17,height:17}}>{item.resp}</div>}
+                  <span style={{fontSize:10.5, color:'var(--text-4)'}}>{fmt(item.fecha)}</span>
+                  <button style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-4)',fontSize:14,lineHeight:1,padding:'0 2px',display:'flex',alignItems:'center'}} onClick={() => remove(item.id)}>×</button>
+                </div>
+              </div>
+              <div style={{fontSize:12.5, color:'var(--text-1)', lineHeight:1.5, wordBreak:'break-word'}}>{item.texto}</div>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -765,6 +935,9 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened }) {
                   const diasDesde    = l.señal_fecha
                     ? Math.floor((Date.now() - new Date(l.señal_fecha)) / 86400000)
                     : 0
+                  const stageTime    = getStageTime(l.id)
+                  const diasEnEtapa  = stageTime ? Math.floor((Date.now() - new Date(stageTime)) / 86400000) : null
+                  const diasInact    = diasSinActiv(l.id, l.created_at)
                   return (
                     <div className="kanban-card" key={l.id} draggable
                       onDragStart={e => e.dataTransfer.setData('leadId', l.id)}
@@ -791,6 +964,18 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened }) {
                         <div className="avatar xs">{l.responsable}</div>
                         <span>{l.ciudad}</span>
                         <span className="amount">€{eur(l.monto||0)}</span>
+                      </div>
+                      <div style={{display:'flex', gap:4, marginTop:5, flexWrap:'wrap'}}>
+                        {diasEnEtapa !== null && (
+                          <span style={{fontSize:9.5, padding:'2px 6px', borderRadius:4, background:'rgba(255,255,255,0.05)', color: diasEnEtapa > 21 ? '#FF5A6A' : diasEnEtapa > 7 ? '#FFB547' : 'var(--text-4)'}}>
+                            {diasEnEtapa}d en etapa
+                          </span>
+                        )}
+                        {diasInact > 7 && (
+                          <span style={{fontSize:9.5, padding:'2px 6px', borderRadius:4, background:'rgba(255,90,106,0.1)', color:'#FF8FA0'}}>
+                            ⏱ {diasInact}d sin contacto
+                          </span>
+                        )}
                       </div>
                       <button className="btn sm ghost" style={{marginTop:8,width:'100%',fontSize:11}}
                         onClick={e => { e.stopPropagation(); setMovingId(l.id) }}>

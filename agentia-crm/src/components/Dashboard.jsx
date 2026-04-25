@@ -2,6 +2,13 @@ import React, { useState } from 'react'
 import { I } from './Icons'
 import { STATE_COLORS, PIPELINE_COLS, STAGE, STAGES_CLOSED, eur } from './data'
 
+function getActLastDate(leadId) {
+  try {
+    const arr = JSON.parse(localStorage.getItem(`agentia_act_${leadId}`) || '[]')
+    return arr.length ? new Date(arr[0].fecha) : null
+  } catch { return null }
+}
+
 function effectiveGroup(task) {
   if (task.due_date) {
     const today = new Date(); today.setHours(0,0,0,0)
@@ -66,6 +73,58 @@ function buildChartData(cobros, period) {
     if (m) m.value += (c.monto || 0)
   })
   return months
+}
+
+function MrrTrend({ cobros }) {
+  const now = new Date()
+  const months = []
+  for (let i = 2; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0)
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+    const label = d.toLocaleDateString('es-ES', { month:'short' })
+    const ingr = cobros.filter(c => {
+      if (!c.pagado) return false
+      const raw = c.vence || c.created_at
+      if (!raw) return false
+      const cd = new Date(raw.length === 10 ? raw + 'T00:00:00' : raw)
+      return cd >= d && cd <= end
+    }).reduce((a,c) => a + (c.monto||0), 0)
+    months.push({ key, label, value: ingr })
+  }
+  const max = Math.max(...months.map(m => m.value), 1)
+  const prev = months[1]?.value || 0
+  const curr = months[2]?.value || 0
+  const delta = prev > 0 ? Math.round((curr - prev) / prev * 100) : null
+
+  return (
+    <div style={{display:'flex', flexDirection:'column', gap:10}}>
+      <div style={{display:'flex', alignItems:'flex-end', gap:8, height:60}}>
+        {months.map((m, i) => (
+          <div key={m.key} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4}}>
+            <div style={{
+              width:'100%', borderRadius:4,
+              height: Math.max(4, Math.round(m.value / max * 56)),
+              background: i === 2 ? 'var(--brand)' : 'rgba(255,255,255,0.1)',
+              transition:'height 0.4s',
+            }}/>
+            <div style={{fontSize:10.5, color:'var(--text-4)'}}>{m.label}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline'}}>
+        <div>
+          <div style={{fontSize:22, fontWeight:700}}>€{eur(curr)}</div>
+          <div style={{fontSize:11, color:'var(--text-4)', marginTop:2}}>este mes</div>
+        </div>
+        {delta !== null && (
+          <div style={{fontSize:12, fontWeight:600, color: delta >= 0 ? 'var(--ok)' : 'var(--danger)'}}>
+            {delta >= 0 ? '▲' : '▼'} {Math.abs(delta)}% vs mes anterior
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function RevenueChart({ cobros, period }) {
@@ -347,6 +406,42 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
         </div>
       )}
 
+      {role === 'admin' && (() => {
+        const hotLeads = leads.filter(l => l.temp === 'hot' && !STAGES_CLOSED.includes(l.estado))
+        const sinContacto = hotLeads.filter(l => {
+          const last = getActLastDate(l.id)
+          const ref = last || (l.created_at ? new Date(l.created_at) : new Date())
+          return Math.floor((Date.now() - ref) / 86400000) >= 5
+        })
+        if (!sinContacto.length) return null
+        return (
+          <div className="card" style={{marginBottom:16, borderColor:'rgba(255,90,106,0.3)'}}>
+            <div className="card-head">
+              <h3>🔥 Leads calientes sin contacto reciente</h3>
+              <span className="sub">· {sinContacto.length} lead{sinContacto.length!==1?'s':''}</span>
+              <div className="right"><button className="btn sm ghost" onClick={() => setPage('pipeline')}>Ver pipeline <I.ChevronR size={12}/></button></div>
+            </div>
+            <div>
+              {sinContacto.map(l => {
+                const last = getActLastDate(l.id)
+                const ref = last || (l.created_at ? new Date(l.created_at) : new Date())
+                const dias = Math.floor((Date.now() - ref) / 86400000)
+                return (
+                  <div key={l.id} className="task">
+                    <div style={{width:30,height:30,borderRadius:8,background:'rgba(255,90,106,0.12)',display:'inline-flex',alignItems:'center',justifyContent:'center',color:'#FF5A6A',flexShrink:0,fontSize:14}}>🔥</div>
+                    <div style={{minWidth:0,flex:1}}>
+                      <div className="title">{l.empresa}</div>
+                      <div className="sub">{l.servicio} · {l.estado} · {l.responsable}</div>
+                    </div>
+                    <span className="chip red"><span className="dot"/>{dias}d sin contacto</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
+
       <div className="grid-main-side">
         <div className="card">
           <div className="card-head">
@@ -528,21 +623,29 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
           </table>
           </div>
         </div>
-        <div className="card">
-          <div className="card-head"><h3>Seguimientos próximos</h3></div>
-          <div>
-            {seguimientos.map((s,i) => (
-              <div key={i} className="task">
-                <div style={{width:30, height:30, borderRadius:8, background:'rgba(45,107,255,0.12)', display:'inline-flex', alignItems:'center', justifyContent:'center', color:'var(--brand-2)', flexShrink:0}}>
-                  {s.type==='Llamada'?<I.Phone size={14}/>:s.type==='Reunión'?<I.Calendar size={14}/>:<I.Clock size={14}/>}
+        <div>
+          {role === 'admin' && (
+            <div className="card" style={{marginBottom:16}}>
+              <div className="card-head"><h3>Ingresos · últimos 3 meses</h3></div>
+              <div className="card-body"><MrrTrend cobros={cobros} /></div>
+            </div>
+          )}
+          <div className="card">
+            <div className="card-head"><h3>Seguimientos próximos</h3></div>
+            <div>
+              {seguimientos.map((s,i) => (
+                <div key={i} className="task">
+                  <div style={{width:30, height:30, borderRadius:8, background:'rgba(45,107,255,0.12)', display:'inline-flex', alignItems:'center', justifyContent:'center', color:'var(--brand-2)', flexShrink:0}}>
+                    {s.type==='Llamada'?<I.Phone size={14}/>:s.type==='Reunión'?<I.Calendar size={14}/>:<I.Clock size={14}/>}
+                  </div>
+                  <div style={{minWidth:0, flex:1}}><div className="title">{s.name}</div><div className="sub">{s.type} · {s.when}</div></div>
+                  <div className="avatar sm">{s.who}</div>
                 </div>
-                <div style={{minWidth:0, flex:1}}><div className="title">{s.name}</div><div className="sub">{s.type} · {s.when}</div></div>
-                <div className="avatar sm">{s.who}</div>
-              </div>
-            ))}
-            {seguimientos.length === 0 && (
-              <div className="small" style={{color:'var(--text-4)', textAlign:'center', padding:'24px 0'}}>Sin seguimientos pendientes</div>
-            )}
+              ))}
+              {seguimientos.length === 0 && (
+                <div className="small" style={{color:'var(--text-4)', textAlign:'center', padding:'24px 0'}}>Sin seguimientos pendientes</div>
+              )}
+            </div>
           </div>
         </div>
       </div>

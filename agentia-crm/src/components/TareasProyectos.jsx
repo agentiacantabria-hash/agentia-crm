@@ -483,7 +483,7 @@ export function Tareas({ data, openItem, onItemOpened }) {
 
 // ── Proyectos ────────────────────────────────────────────────────
 
-function ProyectoModal({ proyecto, onClose, onSave, onDelete, cobros = [], updateCobro }) {
+function ProyectoModal({ proyecto, onClose, onSave, onDelete, cobros = [], updateCobro, tasks = [], addTask, updateTask, deleteTask }) {
   const isNew = !proyecto?.id
   const users    = getUsers()
   const servList = getServicios()
@@ -496,6 +496,21 @@ function ProyectoModal({ proyecto, onClose, onSave, onDelete, cobros = [], updat
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const [confirmDel, setConfirmDel] = useState(false)
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+
+  const addQuickTask = () => {
+    if (!newTaskTitle.trim()) return
+    addTask?.({
+      title: newTaskTitle.trim(),
+      cliente: form.cliente,
+      when_group: 'semana',
+      prio: 'media',
+      resp: form.resp || '',
+      done: false,
+      tag: 'Entrega',
+    })
+    setNewTaskTitle('')
+  }
 
   return (
     <Modal open title={isNew ? 'Nuevo proyecto' : `${form.cliente}`}
@@ -559,6 +574,43 @@ function ProyectoModal({ proyecto, onClose, onSave, onDelete, cobros = [], updat
         )
       })()}
 
+      {!isNew && (() => {
+        const tareasProy = tasks.filter(t => t.cliente === form.cliente)
+        const pendientes = tareasProy.filter(t => !t.done)
+        const done       = tareasProy.filter(t => t.done)
+        return (
+          <div style={{border:'1px solid var(--line-2)', borderRadius:10, overflow:'hidden', marginTop:4}}>
+            <div style={{padding:'10px 14px', borderBottom:'1px solid var(--line-1)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+              <span style={{fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:.5, color:'var(--text-4)'}}>Tareas del proyecto</span>
+              <span style={{fontSize:11.5, color:'var(--text-4)'}}>{pendientes.length} pendiente{pendientes.length!==1?'s':''}{done.length > 0 ? ` · ${done.length} hechas` : ''}</span>
+            </div>
+            <div style={{padding:'8px 14px', borderBottom:'1px solid var(--line-1)', display:'flex', gap:6}}>
+              <input className="input" style={{flex:1, fontSize:12}} placeholder="Nueva tarea…"
+                value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') addQuickTask() }} />
+              <button className="btn primary sm" onClick={addQuickTask} style={{padding:'0 12px', flexShrink:0}}>+</button>
+            </div>
+            {pendientes.length === 0 && (
+              <div style={{padding:'12px 14px', fontSize:12, color:'var(--text-4)', textAlign:'center'}}>Sin tareas pendientes</div>
+            )}
+            {pendientes.map(t => (
+              <div key={t.id} style={{display:'flex', alignItems:'center', gap:10, padding:'8px 14px', borderBottom:'1px solid rgba(255,255,255,0.03)'}}>
+                <div className="check" style={{cursor:'pointer', flexShrink:0}}
+                  onClick={() => { updateTask?.(t.id, {done:true}); if(confirm('¿Eliminar tarea completada?')) deleteTask?.(t.id) }} />
+                <div style={{flex:1, minWidth:0}}>
+                  <div style={{fontSize:12.5, color:'var(--text-1)'}}>{t.title}</div>
+                  {t.due_date && <div style={{fontSize:11, color:'var(--text-4)'}}>{t.due_date}</div>}
+                </div>
+                <span className={`chip ${t.prio==='alta'?'red':t.prio==='media'?'amber':'gray'}`} style={{fontSize:10}}><span className="dot"/>{t.prio}</span>
+                <button className="icon-btn" style={{width:20,height:20,color:'var(--text-4)',flexShrink:0}} onClick={() => { if(confirm('¿Eliminar tarea?')) deleteTask?.(t.id) }}>
+                  <I.Close size={10}/>
+                </button>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
+
       {!isNew && (
         <div className="modal-danger-zone">
           <span>Zona peligrosa</span>
@@ -575,6 +627,7 @@ function ProyectoModal({ proyecto, onClose, onSave, onDelete, cobros = [], updat
 export function Proyectos({ data }) {
   const proyectos = data?.proyectos || []
   const cobros    = data?.cobros    || []
+  const tasks     = data?.tasks     || []
   const [editing, setEditing]   = useState(null)
   const [creating, setCreating] = useState(false)
 
@@ -642,7 +695,11 @@ export function Proyectos({ data }) {
                   <span className="mono small" style={{color:'var(--text-3)', width:32}}>{p.progreso}%</span>
                 </div>
               </div>
-              <div>{p.ajustes>0 ? <span className="pend"><I.Bolt size={10}/> {p.ajustes} ajuste{p.ajustes>1?'s':''}</span> : <span className="muted small">sin pendientes</span>}</div>
+              <div style={{display:'flex', gap:6, flexWrap:'wrap', alignItems:'center'}}>
+                {p.ajustes>0 && <span className="pend"><I.Bolt size={10}/> {p.ajustes} ajuste{p.ajustes>1?'s':''}</span>}
+                {(() => { const n = tasks.filter(t => t.cliente === p.cliente && !t.done).length; return n > 0 ? <span style={{fontSize:11, padding:'2px 7px', borderRadius:4, background:'rgba(45,107,255,0.12)', color:'var(--brand-2)'}}>{n} tarea{n!==1?'s':''}</span> : null })()}
+                {p.ajustes===0 && tasks.filter(t=>t.cliente===p.cliente&&!t.done).length===0 && <span className="muted small">sin pendientes</span>}
+              </div>
               <div style={{display:'flex', alignItems:'center', gap:8, justifyContent:'flex-end'}}>
                 {(() => {
                   const cp = cobros.filter(c => c.cliente === p.cliente)
@@ -678,6 +735,10 @@ export function Proyectos({ data }) {
           onDelete={id => data.deleteProyecto?.(id)}
           cobros={cobros}
           updateCobro={handleUpdateCobro}
+          tasks={tasks}
+          addTask={data.addTask}
+          updateTask={data.updateTask}
+          deleteTask={data.deleteTask}
         />
       )}
     </div>
