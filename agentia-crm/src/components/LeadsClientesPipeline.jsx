@@ -401,12 +401,13 @@ function ClienteModal({ cliente, onClose, onSave, onDelete, resp: RESP = [] }) {
   )
 }
 
-export function Clientes({ data, openItem, onItemOpened }) {
+export function Clientes({ data, openItem, onItemOpened, currentUser }) {
   const clientes = data?.clientes || []
   const cobros   = data?.cobros   || []
   const [editing, setEditing] = useState(null)
   const [creating, setCreating] = useState(false)
-  const allResp = [...new Set(clientes.map(c => c.responsable).filter(Boolean))]
+  const myIni   = currentUser?.rol !== 'Admin' ? currentUser?.iniciales : null
+  const allResp = [...new Set([...(myIni ? [myIni] : []), ...clientes.map(c => c.responsable).filter(Boolean)])]
 
   useEffect(() => {
     if (openItem?.type === 'Cliente' && openItem.item) {
@@ -639,7 +640,7 @@ function CobraRestoModal({ lead, onClose, onConfirm }) {
 
 // ── Pipeline ─────────────────────────────────────────────────────
 
-export function Pipeline({ data, openQuick, openItem, onItemOpened }) {
+export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser }) {
   const leads = data?.leads || []
   const [view,     setView]     = useState('kanban')
   const [filter,   setFilter]   = useState('todos')
@@ -662,7 +663,8 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened }) {
   const touchDragRef = useRef(null)
   const moveCardRef  = useRef(null)
 
-  const allResp = [...new Set(leads.map(l => l.responsable).filter(Boolean))]
+  const myIni   = currentUser?.rol !== 'Admin' ? currentUser?.iniciales : null
+  const allResp = [...new Set([...(myIni ? [myIni] : []), ...leads.map(l => l.responsable).filter(Boolean)])]
 
   const activeLeads = leads.filter(l => !STAGES_CLOSED.includes(l.estado))
   const closedLeads = leads.filter(l =>  STAGES_CLOSED.includes(l.estado))

@@ -320,9 +320,10 @@ function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [], resp: res
   )
 }
 
-export function Tareas({ data, openItem, onItemOpened }) {
+export function Tareas({ data, openItem, onItemOpened, currentUser }) {
   const { tasks = [], clientes = [], updateTask, addTask, deleteTask } = data || {}
-  const allResp = [...new Set(tasks.map(t => t.resp).filter(Boolean))]
+  const myIni   = currentUser?.rol !== 'Admin' ? currentUser?.iniciales : null
+  const allResp = [...new Set([...(myIni ? [myIni] : []), ...tasks.map(t => t.resp).filter(Boolean)])]
   const [creating, setCreating] = useState(false)
   const [editing, setEditing]   = useState(null)
   const [view, setView]         = useState('lista')
@@ -619,11 +620,12 @@ function ProyectoModal({ proyecto, onClose, onSave, onDelete, cobros = [], updat
   )
 }
 
-export function Proyectos({ data }) {
+export function Proyectos({ data, currentUser }) {
   const proyectos = data?.proyectos || []
   const cobros    = data?.cobros    || []
   const tasks     = data?.tasks     || []
-  const allResp   = [...new Set(proyectos.map(p => p.resp).filter(Boolean))]
+  const myIni   = currentUser?.rol !== 'Admin' ? currentUser?.iniciales : null
+  const allResp   = [...new Set([...(myIni ? [myIni] : []), ...proyectos.map(p => p.resp).filter(Boolean)])]
   const [editing, setEditing]   = useState(null)
   const [creating, setCreating] = useState(false)
 

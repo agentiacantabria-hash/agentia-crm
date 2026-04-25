@@ -650,10 +650,10 @@ export default function App() {
   const pageEl = (() => {
     switch (page) {
       case 'dashboard': return <Dashboard role={role} setPage={setPage} openQuick={() => setDrawer(true)} data={data} currentUser={currentUser} />
-      case 'pipeline':  return <Pipeline data={data} openQuick={() => setDrawer(true)} openItem={openItem} onItemOpened={clearOpenItem} />
-      case 'clientes':  return <Clientes data={data} openItem={openItem} onItemOpened={clearOpenItem} />
-      case 'tareas':    return <Tareas data={data} openItem={openItem} onItemOpened={clearOpenItem} />
-      case 'proyectos': return <Proyectos data={data} />
+      case 'pipeline':  return <Pipeline data={data} openQuick={() => setDrawer(true)} openItem={openItem} onItemOpened={clearOpenItem} currentUser={currentUser} />
+      case 'clientes':  return <Clientes data={data} openItem={openItem} onItemOpened={clearOpenItem} currentUser={currentUser} />
+      case 'tareas':    return <Tareas data={data} openItem={openItem} onItemOpened={clearOpenItem} currentUser={currentUser} />
+      case 'proyectos': return <Proyectos data={data} currentUser={currentUser} />
       case 'finanzas':  return role === 'admin' ? <Finanzas role={role} data={data} /> : null
       case 'ajustes':   return role === 'admin' ? <Ajustes role={role} data={data} currentUser={currentUser} /> : null
       default:          return null
