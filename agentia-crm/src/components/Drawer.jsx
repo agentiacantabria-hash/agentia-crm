@@ -42,7 +42,6 @@ export function QuickLeadDrawer({ open, onClose, onSave, currentUser }) {
   const handleSave = () => {
     if (!form.empresa.trim()) return
     const servicios = getServicios()
-    const resp = getResp()
     const origenFinal = form.origen === 'Otro' ? (form.origenCustom.trim() || 'Otro') : form.origen
     const nextText = form.next_contact
       ? `Contactar el ${new Date(form.next_contact + 'T00:00:00').toLocaleDateString('es-ES', { day:'numeric', month:'short' })}`
