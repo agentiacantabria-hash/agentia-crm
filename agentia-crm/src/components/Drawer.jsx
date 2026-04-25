@@ -30,11 +30,16 @@ const EMPTY = {
   estado: 'Cliente Nuevo', next_contact: '', monto: '',
 }
 
-export function QuickLeadDrawer({ open, onClose, onSave }) {
-  const [mode, setMode] = useState('quick')
-  const [form, setForm] = useState(EMPTY)
+export function QuickLeadDrawer({ open, onClose, onSave, currentUser }) {
+  const isEmpleado = currentUser?.rol !== 'Admin'
+  const myIni = currentUser?.iniciales || ''
 
-  useEffect(() => { if (!open) { setForm(EMPTY); setMode('quick') } }, [open])
+  const [mode, setMode] = useState('quick')
+  const [form, setForm] = useState({ ...EMPTY, responsable: myIni })
+
+  useEffect(() => {
+    if (!open) { setForm({ ...EMPTY, responsable: myIni }); setMode('quick') }
+  }, [open, myIni])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -58,7 +63,7 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
       notas:       form.notas || null,
       sector:      form.sector || null,
       ciudad:      form.ciudad || null,
-      responsable: form.responsable || resp[0]?.value || '',
+      responsable: isEmpleado ? myIni : (form.responsable || resp[0]?.value || ''),
       contacto:    form.contacto || null,
       telefono:    form.telefono || null,
       email:       form.email    || null,
@@ -130,7 +135,7 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'rgba(45,107,255,0.06)', border: '1px solid rgba(45,107,255,0.15)', borderRadius: 10 }}>
                 <I.Sparkle size={16} style={{ color: 'var(--brand-2)' }} />
-                <div style={{ fontSize: 12.5, color: 'var(--text-2)' }}>Se asignará automáticamente a <b style={{ color: 'var(--text-0)' }}>ti</b> y entrará en estado <b style={{ color: 'var(--brand-3)' }}>Cliente Nuevo</b>.</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-2)' }}>Se asignará a <b style={{ color: 'var(--text-0)' }}>{isEmpleado ? `ti (${myIni})` : 'quien selecciones en modo completo'}</b> y entrará en estado <b style={{ color: 'var(--brand-3)' }}>Cliente Nuevo</b>.</div>
               </div>
             </>
           ) : (
@@ -157,7 +162,10 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
               </div>
               <div className="field-row">
                 <div className="field"><label className="lbl">Responsable</label>
-                  <CustomSelect className="select" value={form.responsable} onChange={v => set('responsable', v)} options={resp.map(r => ({ value: r.value, label: r.label }))} />
+                  {isEmpleado
+                    ? <input className="input" value={`${currentUser?.nombre || myIni} (${myIni})`} disabled style={{opacity:0.6, cursor:'not-allowed'}} />
+                    : <CustomSelect className="select" value={form.responsable} onChange={v => set('responsable', v)} options={resp.map(r => ({ value: r.value, label: r.label }))} />
+                  }
                 </div>
                 <div className="field"><label className="lbl">Servicio de interés</label>
                   <SelectOrText value={form.servicio} onChange={v => set('servicio', v)} options={servicios} selectClass="select" inputClass="input" placeholder="Ej: Web + Chatbot…" />

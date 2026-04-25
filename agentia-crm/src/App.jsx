@@ -123,8 +123,8 @@ export default function App() {
         let cQ  = supabase.from('clientes').select('*').order('created_at', { ascending: false })
         let tQ  = supabase.from('tareas').select('*').order('created_at', { ascending: false })
         let pQ  = supabase.from('proyectos').select('*').order('created_at', { ascending: false })
-        let gQ  = supabase.from('gastos').select('*').order('created_at', { ascending: false })
-        let coQ = supabase.from('cobros').select('*').order('created_at', { ascending: false })
+        const gQ  = isAdmin ? supabase.from('gastos').select('*').order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null })
+        const coQ = isAdmin ? supabase.from('cobros').select('*').order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null })
 
         if (!isAdmin && ini) {
           lQ  = lQ.eq('responsable', ini)
@@ -670,10 +670,10 @@ export default function App() {
         </div>
       </div>
 
-      <QuickLeadDrawer open={drawer} onClose={() => setDrawer(false)} onSave={addLead} />
+      <QuickLeadDrawer open={drawer} onClose={() => setDrawer(false)} onSave={addLead} currentUser={currentUser} />
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} data={data} setPage={setPage}
         onSelect={r => { setPage(r.page); setOpenItem(r); setSearchOpen(false) }} />
-      <BellPanel open={bellOpen} onClose={() => setBellOpen(false)} tasks={tasks} cobros={cobros} />
+      <BellPanel open={bellOpen} onClose={() => setBellOpen(false)} tasks={tasks} cobros={role === 'admin' ? cobros : []} />
 
       {/* Toast notifications */}
       <div style={{position:'fixed', bottom:24, right:24, display:'flex', flexDirection:'column', gap:8, zIndex:9999, pointerEvents:'none'}}>

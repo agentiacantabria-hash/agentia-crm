@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { I } from './Icons'
 import { STATE_COLORS, PIPELINE_COLS, STAGE, STAGES_CLOSED, eur } from './data'
+import { supabase } from '../lib/supabase'
 
 function getActLastDate(leadId) {
   try {
@@ -20,22 +21,6 @@ function effectiveGroup(task) {
     return 'semana'
   }
   return task.when_group || 'semana'
-}
-
-function getAdminName() {
-  try {
-    const users = JSON.parse(localStorage.getItem('agentia_usuarios') || '[]')
-    const admin = users.find(u => u.rol === 'Admin' && u.estado === 'activo')
-    return admin ? admin.n.split(' ')[0] : 'Admin'
-  } catch { return 'Admin' }
-}
-
-function getEmpleadoName() {
-  try {
-    const users = JSON.parse(localStorage.getItem('agentia_usuarios') || '[]')
-    const emp = users.find(u => u.rol === 'Empleado' && u.estado === 'activo')
-    return emp ? emp.n.split(' ')[0] : 'Empleado'
-  } catch { return 'Empleado' }
 }
 
 function buildChartData(cobros, period) {
@@ -81,7 +66,6 @@ function MrrTrend({ cobros }) {
   for (let i = 2; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
     const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0)
-    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
     const label = d.toLocaleDateString('es-ES', { month:'short' })
     const ingr = cobros.filter(c => {
       if (!c.pagado) return false
@@ -90,7 +74,7 @@ function MrrTrend({ cobros }) {
       const cd = new Date(raw.length === 10 ? raw + 'T00:00:00' : raw)
       return cd >= d && cd <= end
     }).reduce((a,c) => a + (c.monto||0), 0)
-    months.push({ key, label, value: ingr })
+    months.push({ label, value: ingr })
   }
   const max = Math.max(...months.map(m => m.value), 1)
   const prev = months[1]?.value || 0
@@ -101,7 +85,7 @@ function MrrTrend({ cobros }) {
     <div style={{display:'flex', flexDirection:'column', gap:10}}>
       <div style={{display:'flex', alignItems:'flex-end', gap:8, height:60}}>
         {months.map((m, i) => (
-          <div key={m.key} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4}}>
+          <div key={i} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4}}>
             <div style={{
               width:'100%', borderRadius:4,
               height: Math.max(4, Math.round(m.value / max * 56)),
@@ -219,16 +203,268 @@ function PipelineFunnel({ leads }) {
   )
 }
 
-export default function Dashboard({ role, setPage, openQuick, data }) {
+// ── Modal de detalle de empleado (admin) ─────────────────────────
+function EmpleadoDetalleModal({ empleado, data, onClose }) {
+  const [tab, setTab] = useState('leads')
+  const { leads = [], tasks = [], proyectos = [], updateTask } = data || {}
+  const ini = empleado.iniciales
+
+  const misLeads     = leads.filter(l => l.responsable === ini).sort((a,b) =>
+    STAGES_CLOSED.includes(a.estado) && !STAGES_CLOSED.includes(b.estado) ? 1 : -1
+  )
+  const misTareas    = tasks.filter(t => t.resp === ini).sort((a,b) => {
+    const ga = effectiveGroup(a), gb = effectiveGroup(b)
+    const order = ['vencida','hoy','mañana','semana']
+    return (order.indexOf(ga) - order.indexOf(gb)) || (a.done ? 1 : -1)
+  })
+  const misProyectos = proyectos.filter(p => p.resp === ini)
+
+  const activos    = misLeads.filter(l => !STAGES_CLOSED.includes(l.estado))
+  const cerrados   = misLeads.filter(l => l.estado === STAGE.COBRADO)
+  const montoGen   = cerrados.reduce((a,l) => a + (l.monto||0), 0)
+  const pipelineV  = activos.reduce((a,l) => a + (l.monto||0), 0)
+  const pendTareas = misTareas.filter(t => !t.done)
+
+  return (
+    <>
+      <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.72)',zIndex:950,backdropFilter:'blur(5px)'}} onClick={onClose}/>
+      <div style={{
+        position:'fixed', top:'4%', left:'50%', transform:'translateX(-50%)',
+        width:'min(900px,96vw)', maxHeight:'92vh',
+        background:'var(--surface-1)', border:'1px solid var(--line-2)',
+        borderRadius:20, boxShadow:'0 40px 100px rgba(0,0,0,0.85)',
+        zIndex:951, display:'flex', flexDirection:'column', overflow:'hidden',
+      }}>
+        {/* Header */}
+        <div style={{display:'flex', alignItems:'center', gap:16, padding:'20px 24px', borderBottom:'1px solid var(--line-1)', flexShrink:0, flexWrap:'wrap', rowGap:12}}>
+          <div className="avatar" style={{width:48, height:48, fontSize:17, borderRadius:14, flexShrink:0}}>{empleado.iniciales}</div>
+          <div style={{flex:1, minWidth:120}}>
+            <div style={{fontSize:18, fontWeight:700}}>{empleado.nombre}</div>
+            <div style={{fontSize:12, color:'var(--text-3)', marginTop:2}}>
+              <span className={`chip ${empleado.rol==='Admin'?'blue':'gray'}`} style={{fontSize:10}}><span className="dot"/>{empleado.rol}</span>
+              {empleado.email && <span style={{marginLeft:8}}>{empleado.email}</span>}
+            </div>
+          </div>
+          <div style={{display:'flex', gap:20, flexWrap:'wrap'}}>
+            <div style={{textAlign:'center'}}>
+              <div style={{fontSize:22, fontWeight:700, color:'var(--ok)'}}>€{eur(montoGen)}</div>
+              <div style={{fontSize:10.5, color:'var(--text-4)', marginTop:2}}>generado total</div>
+            </div>
+            <div style={{textAlign:'center'}}>
+              <div style={{fontSize:22, fontWeight:700, color:'var(--brand-2)'}}>€{eur(pipelineV)}</div>
+              <div style={{fontSize:10.5, color:'var(--text-4)', marginTop:2}}>en pipeline</div>
+            </div>
+            <div style={{textAlign:'center'}}>
+              <div style={{fontSize:22, fontWeight:700}}>{activos.length}</div>
+              <div style={{fontSize:10.5, color:'var(--text-4)', marginTop:2}}>leads activos</div>
+            </div>
+            <div style={{textAlign:'center'}}>
+              <div style={{fontSize:22, fontWeight:700, color: pendTareas.length > 0 ? 'var(--warn)' : 'var(--ok)'}}>{pendTareas.length}</div>
+              <div style={{fontSize:10.5, color:'var(--text-4)', marginTop:2}}>tareas pend.</div>
+            </div>
+            <div style={{textAlign:'center'}}>
+              <div style={{fontSize:22, fontWeight:700}}>{misProyectos.filter(p=>p.estado!=='Cerrado').length}</div>
+              <div style={{fontSize:10.5, color:'var(--text-4)', marginTop:2}}>proyectos</div>
+            </div>
+          </div>
+          <button className="icon-btn" onClick={onClose} style={{flexShrink:0, marginLeft:8}}><I.Close size={16}/></button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{padding:'12px 24px 0', flexShrink:0, borderBottom:'1px solid var(--line-1)'}}>
+          <div className="segmented">
+            <button className={tab==='leads'?'active':''} onClick={()=>setTab('leads')}>Leads ({misLeads.length})</button>
+            <button className={tab==='tareas'?'active':''} onClick={()=>setTab('tareas')}>Tareas ({misTareas.length})</button>
+            <button className={tab==='proyectos'?'active':''} onClick={()=>setTab('proyectos')}>Proyectos ({misProyectos.length})</button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div style={{overflowY:'auto', flex:1, padding:'16px 24px'}}>
+          {tab === 'leads' && (
+            <div style={{overflowX:'auto'}}>
+              <table className="table">
+                <thead>
+                  <tr><th>Empresa</th><th>Servicio</th><th>Estado</th><th>Temp</th><th style={{textAlign:'right'}}>Importe</th><th>Próximo paso</th></tr>
+                </thead>
+                <tbody>
+                  {misLeads.length === 0
+                    ? <tr><td colSpan={6} style={{textAlign:'center', color:'var(--text-4)', padding:'32px 0'}}>Sin leads asignados</td></tr>
+                    : misLeads.map(l => {
+                      const sc = STATE_COLORS[l.estado] || { chip:'gray' }
+                      return (
+                        <tr key={l.id}>
+                          <td>
+                            <div className="primary">{l.empresa}</div>
+                            <div className="muted" style={{fontSize:11, marginTop:2}}>{[l.sector, l.ciudad].filter(Boolean).join(' · ')}</div>
+                          </td>
+                          <td className="muted">{l.servicio}</td>
+                          <td><span className={`chip ${sc.chip}`}><span className="dot"/>{l.estado}</span></td>
+                          <td style={{fontSize:16}}>{l.temp==='hot'?'🔥':l.temp==='warm'?'☀️':'❄️'}</td>
+                          <td className="mono" style={{textAlign:'right'}}>€{eur(l.monto||0)}</td>
+                          <td className="muted small">{l.next || '—'}</td>
+                        </tr>
+                      )
+                    })
+                  }
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {tab === 'tareas' && (
+            <div>
+              {misTareas.length === 0
+                ? <div style={{textAlign:'center', color:'var(--text-4)', padding:'32px 0'}}>Sin tareas asignadas</div>
+                : misTareas.map(t => {
+                  const g = effectiveGroup(t)
+                  const isVencida = g === 'vencida'
+                  return (
+                    <div key={t.id} className="task">
+                      <div className={`check ${t.done?'done':''}`} style={{cursor:'pointer'}}
+                        onClick={() => updateTask?.(t.id, { done: !t.done })}>
+                        {t.done && <I.Check size={12} stroke={2.4}/>}
+                      </div>
+                      <div style={{minWidth:0, flex:1}}>
+                        <div className="title" style={{
+                          textDecoration: t.done ? 'line-through' : 'none',
+                          color: t.done ? 'var(--text-3)' : isVencida ? 'var(--danger)' : 'var(--text-0)',
+                        }}>{t.title}</div>
+                        <div className="sub">{[t.cliente, t.due_date].filter(Boolean).join(' · ')}</div>
+                      </div>
+                      {isVencida && !t.done && <span className="chip red"><span className="dot"/>Vencida</span>}
+                      {g === 'hoy'  && !t.done && <span className="chip amber"><span className="dot"/>Hoy</span>}
+                      <span className={`chip ${t.prio==='alta'?'red':t.prio==='media'?'amber':'gray'}`}><span className="dot"/>{t.prio||'—'}</span>
+                    </div>
+                  )
+                })
+              }
+            </div>
+          )}
+
+          {tab === 'proyectos' && (
+            <div>
+              {misProyectos.length === 0
+                ? <div style={{textAlign:'center', color:'var(--text-4)', padding:'32px 0'}}>Sin proyectos asignados</div>
+                : misProyectos.map(p => (
+                  <div key={p.id} className="task">
+                    <div style={{width:32, height:32, borderRadius:8, background:'rgba(45,107,255,0.1)', display:'inline-flex', alignItems:'center', justifyContent:'center', color:'var(--brand-2)', flexShrink:0}}>
+                      <I.Projects size={15}/>
+                    </div>
+                    <div style={{minWidth:0, flex:1}}>
+                      <div className="title">{p.cliente}</div>
+                      <div className="sub">{[p.servicio, p.estado].filter(Boolean).join(' · ')}</div>
+                    </div>
+                    <div style={{display:'flex', alignItems:'center', gap:8}}>
+                      {p.ajustes > 0 && <span className="chip amber"><span className="dot"/>{p.ajustes} ajuste{p.ajustes>1?'s':''}</span>}
+                      <div className="mono" style={{fontSize:12, color:'var(--text-3)'}}>{p.progreso||0}%</div>
+                      <div style={{width:60, height:5, borderRadius:3, background:'rgba(255,255,255,0.07)', overflow:'hidden'}}>
+                        <div style={{width:`${p.progreso||0}%`, height:'100%', background:'var(--brand)', borderRadius:3}}/>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── Sección Equipo (admin) ────────────────────────────────────────
+function EquipoSection({ usuarios, data, onSelect }) {
+  const { leads = [], tasks = [], proyectos = [] } = data || {}
+
+  const stats = usuarios.map(u => {
+    const ini = u.iniciales
+    const activos    = leads.filter(l => l.responsable === ini && !STAGES_CLOSED.includes(l.estado))
+    const cerrados   = leads.filter(l => l.responsable === ini && l.estado === STAGE.COBRADO)
+    const pendTareas = tasks.filter(t => t.resp === ini && !t.done)
+    const tareasHoy  = pendTareas.filter(t => ['hoy','vencida'].includes(effectiveGroup(t)))
+    const proyActivos = proyectos.filter(p => p.resp === ini && p.estado !== 'Cerrado')
+    const montoGen   = cerrados.reduce((a,l) => a + (l.monto||0), 0)
+    const pipelineV  = activos.reduce((a,l) => a + (l.monto||0), 0)
+    return { u, activos, cerrados, pendTareas, tareasHoy, proyActivos, montoGen, pipelineV }
+  })
+
+  return (
+    <div className="card" style={{marginBottom:16}}>
+      <div className="card-head">
+        <h3>Equipo</h3>
+        <span className="sub">· {usuarios.length} miembro{usuarios.length!==1?'s':''}</span>
+      </div>
+      {usuarios.length === 0 ? (
+        <div style={{textAlign:'center', color:'var(--text-4)', fontSize:13, padding:'24px 0'}}>
+          Sin miembros — añade desde Ajustes → Usuarios
+        </div>
+      ) : (
+        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(210px,1fr))', gap:12, paddingTop:4}}>
+          {stats.map(({ u, activos, pendTareas, tareasHoy, proyActivos, montoGen, pipelineV }) => (
+            <div key={u.id}
+              style={{border:'1px solid var(--line-2)', borderRadius:12, padding:'16px', background:'var(--surface-2)', cursor:'pointer', transition:'border-color 0.15s, box-shadow 0.15s'}}
+              onClick={() => onSelect(u)}
+              onMouseEnter={e => { e.currentTarget.style.borderColor='var(--brand)'; e.currentTarget.style.boxShadow='0 0 0 1px var(--brand-glow)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor='var(--line-2)'; e.currentTarget.style.boxShadow='' }}
+            >
+              <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:12}}>
+                <div className="avatar" style={{width:38, height:38, fontSize:13, borderRadius:10, flexShrink:0}}>{u.iniciales}</div>
+                <div style={{minWidth:0}}>
+                  <div style={{fontSize:13.5, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{u.nombre}</div>
+                  <div style={{fontSize:10.5, color:'var(--text-4)', textTransform:'uppercase', letterSpacing:'0.05em'}}>{u.rol}</div>
+                </div>
+              </div>
+
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10}}>
+                <div style={{background:'rgba(45,107,255,0.07)', borderRadius:8, padding:'8px 10px'}}>
+                  <div style={{fontSize:20, fontWeight:700, color:'var(--brand-2)', lineHeight:1}}>{activos.length}</div>
+                  <div style={{fontSize:10, color:'var(--text-4)', marginTop:3}}>leads activos</div>
+                </div>
+                <div style={{background:'rgba(62,207,142,0.07)', borderRadius:8, padding:'8px 10px'}}>
+                  <div style={{fontSize:14, fontWeight:700, color:'var(--ok)', lineHeight:1.2}}>€{eur(montoGen)}</div>
+                  <div style={{fontSize:10, color:'var(--text-4)', marginTop:3}}>generado</div>
+                </div>
+              </div>
+
+              <div style={{display:'flex', gap:6, flexWrap:'wrap', marginBottom:12, minHeight:22}}>
+                {tareasHoy.length > 0 && <span className="chip amber" style={{fontSize:10.5}}><span className="dot"/>{tareasHoy.length} tarea{tareasHoy.length>1?'s':''} hoy</span>}
+                {proyActivos.length > 0 && <span className="chip blue" style={{fontSize:10.5}}><span className="dot"/>{proyActivos.length} proy.</span>}
+                {pipelineV > 0 && <span style={{fontSize:10.5, color:'var(--text-3)', fontFamily:'var(--font-mono)'}}>€{eur(pipelineV)} en juego</span>}
+                {activos.length === 0 && pendTareas.length === 0 && <span style={{fontSize:10.5, color:'var(--text-4)'}}>Sin actividad reciente</span>}
+              </div>
+
+              <button className="btn sm ghost" style={{width:'100%', justifyContent:'center', fontSize:12, pointerEvents:'none'}}>
+                Ver detalle →
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Dashboard principal ───────────────────────────────────────────
+export default function Dashboard({ role, setPage, openQuick, data, currentUser }) {
   const { leads = [], tasks = [], proyectos = [], clientes = [], gastos = [], cobros = [], updateTask, showToast } = data || {}
   const [chartPeriod, setChartPeriod] = useState('mes')
+  const [usuarios, setUsuarios] = useState([])
+  const [selectedEmpleado, setSelectedEmpleado] = useState(null)
+
+  useEffect(() => {
+    if (role === 'admin') {
+      supabase.from('usuarios').select('*').eq('estado', 'activo').order('nombre').then(({ data: u }) => {
+        if (u) setUsuarios(u)
+      })
+    }
+  }, [role])
 
   // ── computed ────────────────────────────────────────────────
   const ingresosMes   = cobros.filter(c => c.pagado).reduce((a,c) => a + (c.monto||0), 0)
   const pendientes    = cobros.filter(c => !c.pagado)
   const pendientesMes = pendientes.reduce((a,c) => a + (c.monto||0), 0)
   const gastosMes     = gastos.reduce((a,g) => a + (g.monto||0), 0)
-  const gastoIA       = gastos.filter(g => g.tipo==='IA').reduce((a,g) => a + (g.monto||0), 0)
   const totalFacturado = cobros.filter(c => c.pagado).reduce((a,c) => a + (c.monto||0), 0)
   const margen        = (ingresosMes + pendientesMes) > 0
     ? Math.round((ingresosMes - gastosMes) / (ingresosMes + pendientesMes) * 100)
@@ -241,22 +477,22 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
   }, 0)
   const clientesRecurrentesN = clientes.filter(c => c.tipo === 'Recurrente' || c.estado === 'Recurrente').length
 
-  const leadsActivos  = leads.filter(l => !STAGES_CLOSED.includes(l.estado))
+  const leadsActivos   = leads.filter(l => !STAGES_CLOSED.includes(l.estado))
   const leadsCalientes = leads.filter(l => l.temp === 'hot')
-  const leadesTibios  = leads.filter(l => l.temp === 'warm')
-  const urgentes      = tasks.filter(t => t.prio === 'alta' && !t.done && ['hoy','vencida'].includes(effectiveGroup(t)))
+  const leadesTibios   = leads.filter(l => l.temp === 'warm')
+  const urgentes       = tasks.filter(t => t.prio === 'alta' && !t.done && ['hoy','vencida'].includes(effectiveGroup(t)))
 
   const clientesActivos    = clientes.length
   const clientesEnCurso    = clientes.filter(c => c.estado === 'En curso').length
   const clientesRecurrentes = clientes.filter(c => c.estado === 'Recurrente').length
   const clientesAjustes    = clientes.filter(c => c.ajustes > 0).length
 
-  const gastoIAItems = gastos.filter(g => g.tipo === 'IA')
-  const gastoIADetail = gastoIAItems.length
-    ? gastoIAItems.map(g => `${g.concepto.split('—')[0].trim()} €${g.monto}`).join(' · ')
-    : 'Sin gastos IA registrados'
-
   const pipelineTotal = leadsActivos.reduce((a,l) => a + (l.monto||0), 0)
+
+  // Para empleado: cuánto ha generado él mismo
+  const myIni = currentUser?.iniciales || ''
+  const misCierres = leads.filter(l => l.responsable === myIni && l.estado === STAGE.COBRADO)
+  const miMontoGen = misCierres.reduce((a,l) => a + (l.monto||0), 0)
 
   const seguimientos = leads
     .filter(l => l.next && l.next !== '—' && !STAGES_CLOSED.includes(l.estado))
@@ -268,10 +504,8 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
       who: l.responsable,
     }))
 
-  // ── hero message ────────────────────────────────────────────
-  const nombreAdmin = getAdminName()
-  const nombreEmp   = getEmpleadoName()
-  const nombre      = role === 'admin' ? nombreAdmin : nombreEmp
+  // ── greeting ────────────────────────────────────────────────
+  const nombre = currentUser?.nombre?.split(' ')[0] || (role === 'admin' ? 'Admin' : 'Empleado')
 
   const greeting = (() => {
     const h = new Date().getHours()
@@ -297,14 +531,12 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
 
   const heroSub = (() => {
     if (role !== 'admin') {
-      // Empleado: solo info operativa, sin finanzas
       const parts = []
       const tareasHoy = tasks.filter(t => effectiveGroup(t) === 'hoy' && !t.done).length
       if (tareasHoy > 0) parts.push(`${tareasHoy} tarea${tareasHoy!==1?'s':''} para hoy`)
       if (leadsActivos.length > 0) parts.push(`${leadsActivos.length} lead${leadsActivos.length!==1?'s':''} activo${leadsActivos.length!==1?'s':''}`)
       return parts.length ? parts.join(' · ') : 'Sin tareas ni leads pendientes.'
     }
-    // Admin: info financiera completa
     const parts = []
     if (ingresosMes > 0) parts.push(`€${eur(ingresosMes)} cobrados este mes`)
     if (pendientes.length > 0) parts.push(`${pendientes.length} factura${pendientes.length!==1?'s':''} pendiente${pendientes.length!==1?'s':''}`)
@@ -312,12 +544,13 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
     return parts.length ? parts.join(' · ') : 'Empieza añadiendo tus primeros leads y clientes.'
   })()
 
-  const pagadosN = cobros.filter(c => c.pagado).length
+  const pagadosN    = cobros.filter(c => c.pagado).length
   const pendientesN = cobros.filter(c => !c.pagado).length
-  const factFoot = pagadosN + ' cobro' + (pagadosN !== 1 ? 's' : '') + (pendientesN > 0 ? ' · ' + pendientesN + ' pendiente' + (pendientesN !== 1 ? 's' : '') : '')
+  const factFoot    = `${pagadosN} cobro${pagadosN!==1?'s':''}${pendientesN > 0 ? ' · ' + pendientesN + ' pendiente' + (pendientesN!==1?'s':'') : ''}`
 
   return (
     <div className="fade-in">
+      {/* ── Hero ── */}
       <div className="hero">
         <div className="hero-grid">
           <div className="hero-welcome">
@@ -326,8 +559,10 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
             <p>{fechaHoy} · {heroSub}</p>
             <div className="hero-actions">
               <button className="btn primary" onClick={openQuick}><I.Plus size={14}/> Crear lead</button>
-              <button className="btn" onClick={() => setPage('finanzas')}><I.Receipt size={14}/> Registrar cobro</button>
-              <button className="btn" onClick={() => setPage('finanzas')}><I.ArrowDn size={14}/> Registrar gasto</button>
+              {role === 'admin' && <>
+                <button className="btn" onClick={() => setPage('finanzas')}><I.Receipt size={14}/> Registrar cobro</button>
+                <button className="btn" onClick={() => setPage('finanzas')}><I.ArrowDn size={14}/> Registrar gasto</button>
+              </>}
               <button className="btn ghost" onClick={() => setPage('tareas')}><I.Tasks size={14}/> Crear tarea</button>
             </div>
           </div>
@@ -365,15 +600,16 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
             </div>
           ) : (
             <div className="hero-kpi">
-              <div className="mini"><div className="label">Leads activos</div><div className="value">{leadsActivos.length}</div><div className="trend" style={{color:'var(--brand-3)'}}>{leadsCalientes.length} calientes</div></div>
-              <div className="mini"><div className="label">Tareas hoy</div><div className="value">{tasks.filter(t=>effectiveGroup(t)==='hoy'&&!t.done).length}</div><div className="trend" style={{color: urgentes.length>0?'var(--warn)':'var(--ok)'}}>{urgentes.length>0?`${urgentes.length} urgente${urgentes.length!==1?'s':''}`:'Sin urgentes'}</div></div>
-              <div className="mini"><div className="label">En proyecto</div><div className="value">{proyectos.filter(p=>p.estado!=='Cerrado').length}</div><div className="trend" style={{color:'var(--text-3)'}}>{proyectos.filter(p=>p.ajustes>0).length} con ajustes</div></div>
-              <div className="mini"><div className="label">Cobrados</div><div className="value">{leads.filter(l=>l.estado===STAGE.COBRADO).length}</div><div className="trend trend-up">leads cerrados</div></div>
+              <div className="mini"><div className="label">Mis leads activos</div><div className="value">{leadsActivos.length}</div><div className="trend" style={{color:'var(--brand-3)'}}>{leadsCalientes.length} calientes</div></div>
+              <div className="mini"><div className="label">Mis tareas hoy</div><div className="value">{tasks.filter(t=>effectiveGroup(t)==='hoy'&&!t.done).length}</div><div className="trend" style={{color: urgentes.length>0?'var(--warn)':'var(--ok)'}}>{urgentes.length>0?`${urgentes.length} urgente${urgentes.length!==1?'s':''}`:'Sin urgentes'}</div></div>
+              <div className="mini"><div className="label">Mis proyectos</div><div className="value">{proyectos.filter(p=>p.estado!=='Cerrado').length}</div><div className="trend" style={{color:'var(--text-3)'}}>{proyectos.filter(p=>p.ajustes>0).length} con ajustes</div></div>
+              <div className="mini"><div className="label">He generado</div><div className="value"><span style={{fontSize:14, color:'var(--text-3)'}}>€</span>{eur(miMontoGen)}</div><div className="trend trend-up">{misCierres.length} cierre{misCierres.length!==1?'s':''} totales</div></div>
             </div>
           )}
         </div>
       </div>
 
+      {/* ── KPI grid (admin) ── */}
       {role === 'admin' && (
         <div className="stat-grid">
           <div className="stat" style={{'--stat-glow':'rgba(45,107,255,0.22)','--stat-dot':'#4F8BFF'}}>
@@ -406,6 +642,7 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
         </div>
       )}
 
+      {/* ── Alerta leads calientes sin contacto (admin) ── */}
       {role === 'admin' && (() => {
         const hotLeads = leads.filter(l => l.temp === 'hot' && !STAGES_CLOSED.includes(l.estado))
         const sinContacto = hotLeads.filter(l => {
@@ -431,7 +668,7 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
                     <div style={{width:30,height:30,borderRadius:8,background:'rgba(255,90,106,0.12)',display:'inline-flex',alignItems:'center',justifyContent:'center',color:'#FF5A6A',flexShrink:0,fontSize:14}}>🔥</div>
                     <div style={{minWidth:0,flex:1}}>
                       <div className="title">{l.empresa}</div>
-                      <div className="sub">{l.servicio} · {l.estado} · {l.responsable}</div>
+                      <div className="sub">{l.servicio} · {l.estado} · resp. {l.responsable}</div>
                     </div>
                     <span className="chip red"><span className="dot"/>{dias}d sin contacto</span>
                   </div>
@@ -442,21 +679,38 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
         )
       })()}
 
+      {/* ── Equipo (admin) ── */}
+      {role === 'admin' && (
+        <EquipoSection usuarios={usuarios} data={data} onSelect={setSelectedEmpleado} />
+      )}
+
+      {/* ── Charts + Tareas hoy ── */}
       <div className="grid-main-side">
-        <div className="card">
-          <div className="card-head">
-            <h3>Ingresos cobrados · histórico</h3>
-            <span className="sub">· total €{eur(ingresosMes)}</span>
-            <div className="right">
-              <div className="segmented">
-                {[['semana','Semana'],['mes','Mes'],['año','Año']].map(([k,v]) => (
-                  <button key={k} className={chartPeriod===k?'active':''} onClick={() => setChartPeriod(k)}>{v}</button>
-                ))}
+        {role === 'admin' ? (
+          <div className="card">
+            <div className="card-head">
+              <h3>Ingresos cobrados · histórico</h3>
+              <span className="sub">· total €{eur(ingresosMes)}</span>
+              <div className="right">
+                <div className="segmented">
+                  {[['semana','Semana'],['mes','Mes'],['año','Año']].map(([k,v]) => (
+                    <button key={k} className={chartPeriod===k?'active':''} onClick={() => setChartPeriod(k)}>{v}</button>
+                  ))}
+                </div>
               </div>
             </div>
+            <div className="card-body"><RevenueChart cobros={cobros} period={chartPeriod} /></div>
           </div>
-          <div className="card-body"><RevenueChart cobros={cobros} period={chartPeriod} /></div>
-        </div>
+        ) : (
+          <div className="card">
+            <div className="card-head">
+              <h3>Mi pipeline comercial</h3>
+              <span className="sub">· €{eur(pipelineTotal)} en juego</span>
+              <div className="right"><button className="btn sm ghost" onClick={() => setPage('pipeline')}>Ver tablero <I.ChevronR size={12}/></button></div>
+            </div>
+            <div className="card-body"><PipelineFunnel leads={leads} /></div>
+          </div>
+        )}
         <div className="card">
           <div className="card-head">
             <h3>Qué toca hoy</h3>
@@ -486,36 +740,72 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
       <div style={{height:16}}/>
 
       <div className="grid-main-side">
-        <div className="card">
-          <div className="card-head">
-            <h3>Pipeline comercial</h3>
-            <span className="sub">· €{eur(pipelineTotal)} en juego</span>
-            <div className="right"><button className="btn sm ghost" onClick={() => setPage('pipeline')}>Abrir tablero <I.ChevronR size={12}/></button></div>
+        {role === 'admin' ? (
+          <div className="card">
+            <div className="card-head">
+              <h3>Pipeline comercial</h3>
+              <span className="sub">· €{eur(pipelineTotal)} en juego</span>
+              <div className="right"><button className="btn sm ghost" onClick={() => setPage('pipeline')}>Abrir tablero <I.ChevronR size={12}/></button></div>
+            </div>
+            <div className="card-body"><PipelineFunnel leads={leads} /></div>
           </div>
-          <div className="card-body"><PipelineFunnel leads={leads} /></div>
-        </div>
-        <div className="card">
-          <div className="card-head">
-            <h3>Ajustes pendientes tras pago</h3>
-            <div className="right"><button className="btn sm ghost" onClick={() => setPage('proyectos')}>Ver todo</button></div>
+        ) : (
+          <div className="card">
+            <div className="card-head">
+              <h3>Leads recientes</h3>
+              <div className="right"><button className="btn sm ghost" onClick={() => setPage('pipeline')}>Ver todos</button></div>
+            </div>
+            <div style={{overflowX:'auto'}}>
+              <table className="table">
+                <thead><tr><th>Empresa</th><th>Servicio</th><th>Estado</th><th style={{textAlign:'right'}}>Importe</th></tr></thead>
+                <tbody>
+                  {leads.slice(0,5).map(l => {
+                    const sc = STATE_COLORS[l.estado] || { chip:'gray' }
+                    return (
+                      <tr key={l.id}>
+                        <td><div className="primary">{l.empresa}</div></td>
+                        <td className="muted">{l.servicio}</td>
+                        <td><span className={`chip ${sc.chip}`}><span className="dot"/>{l.estado}</span></td>
+                        <td className="mono" style={{textAlign:'right'}}>€{eur(l.monto||0)}</td>
+                      </tr>
+                    )
+                  })}
+                  {leads.length === 0 && <tr><td colSpan={4} style={{textAlign:'center', color:'var(--text-4)', padding:'24px 0'}}>Sin leads — crea el primero</td></tr>}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div>
-            {proyectos.filter(p => p.ajustes > 0).map(p => (
-              <div key={p.id} className="task">
-                <div style={{width:30, height:30, borderRadius:8, background:'rgba(255,181,71,0.12)', display:'inline-flex', alignItems:'center', justifyContent:'center', color:'#FFB547', flexShrink:0}}><I.Bolt size={14}/></div>
-                <div style={{minWidth:0, flex:1}}><div className="title">{p.cliente}</div><div className="sub">{p.servicio}</div></div>
-                <span className="pend">{p.ajustes} ajuste{p.ajustes>1?'s':''}</span>
-              </div>
-            ))}
-            {proyectos.filter(p => p.ajustes > 0).length === 0 && (
-              <div className="small" style={{color:'var(--text-4)', textAlign:'center', padding:'24px 0'}}>Sin ajustes pendientes</div>
-            )}
+        )}
+        <div>
+          {role === 'admin' && (
+            <div className="card" style={{marginBottom:16}}>
+              <div className="card-head"><h3>Ingresos · últimos 3 meses</h3></div>
+              <div className="card-body"><MrrTrend cobros={cobros} /></div>
+            </div>
+          )}
+          <div className="card">
+            <div className="card-head"><h3>Ajustes pendientes</h3>
+              <div className="right"><button className="btn sm ghost" onClick={() => setPage('proyectos')}>Ver todo</button></div>
+            </div>
+            <div>
+              {proyectos.filter(p => p.ajustes > 0).map(p => (
+                <div key={p.id} className="task">
+                  <div style={{width:30, height:30, borderRadius:8, background:'rgba(255,181,71,0.12)', display:'inline-flex', alignItems:'center', justifyContent:'center', color:'#FFB547', flexShrink:0}}><I.Bolt size={14}/></div>
+                  <div style={{minWidth:0, flex:1}}><div className="title">{p.cliente}</div><div className="sub">{p.servicio}</div></div>
+                  <span className="pend">{p.ajustes} ajuste{p.ajustes>1?'s':''}</span>
+                </div>
+              ))}
+              {proyectos.filter(p => p.ajustes > 0).length === 0 && (
+                <div className="small" style={{color:'var(--text-4)', textAlign:'center', padding:'24px 0'}}>Sin ajustes pendientes</div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       <div style={{height:16}}/>
 
+      {/* ── Señales por cobrar (admin) ── */}
       {role === 'admin' && (() => {
         const señalLeads = leads.filter(l => l.estado === STAGE.SEÑAL)
         if (!señalLeads.length) return null
@@ -559,6 +849,7 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
         )
       })()}
 
+      {/* ── Cuotas recurrentes vencidas (admin) ── */}
       {role === 'admin' && (() => {
         const today = new Date(); today.setHours(0,0,0,0)
         const recVencidos = cobros.filter(c => c.recurrente && !c.pagado && c.vence && new Date(c.vence + 'T00:00:00') < today)
@@ -594,42 +885,38 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
         )
       })()}
 
-      <div className="grid-main-side">
-        <div className="card">
-          <div className="card-head">
-            <h3>Leads recientes</h3>
-            <div className="right"><button className="btn sm ghost" onClick={() => setPage('pipeline')}>Ver todos</button></div>
-          </div>
-          <div style={{overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
-          <table className="table">
-            <thead><tr><th>Empresa</th><th>Servicio</th><th>Estado</th><th>Próximo paso</th><th style={{textAlign:'right'}}>Importe</th></tr></thead>
-            <tbody>
-              {leads.slice(0,5).map(l => {
-                const sc = STATE_COLORS[l.estado] || { chip:'gray' }
-                return (
-                  <tr key={l.id}>
-                    <td><div className="primary">{l.empresa}</div><div className="muted" style={{fontSize:11.5, marginTop:2}}>{l.sector} · {l.ciudad}</div></td>
-                    <td className="muted">{l.servicio}</td>
-                    <td><span className={`chip ${sc.chip}`}><span className="dot"/>{l.estado}</span></td>
-                    <td className="muted small">{l.next}</td>
-                    <td className="mono" style={{textAlign:'right'}}>€{eur(l.monto || 0)}</td>
-                  </tr>
-                )
-              })}
-              {leads.length === 0 && (
-                <tr><td colSpan={5} style={{textAlign:'center', color:'var(--text-4)', padding:'24px 0'}}>Sin leads — crea tu primero con el botón de arriba</td></tr>
-              )}
-            </tbody>
-          </table>
-          </div>
-        </div>
-        <div>
-          {role === 'admin' && (
-            <div className="card" style={{marginBottom:16}}>
-              <div className="card-head"><h3>Ingresos · últimos 3 meses</h3></div>
-              <div className="card-body"><MrrTrend cobros={cobros} /></div>
+      {/* ── Tabla leads recientes (admin) ── */}
+      {role === 'admin' && (
+        <div className="grid-main-side">
+          <div className="card">
+            <div className="card-head">
+              <h3>Leads recientes</h3>
+              <div className="right"><button className="btn sm ghost" onClick={() => setPage('pipeline')}>Ver todos</button></div>
             </div>
-          )}
+            <div style={{overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
+              <table className="table">
+                <thead><tr><th>Empresa</th><th>Resp.</th><th>Servicio</th><th>Estado</th><th>Próximo paso</th><th style={{textAlign:'right'}}>Importe</th></tr></thead>
+                <tbody>
+                  {leads.slice(0,5).map(l => {
+                    const sc = STATE_COLORS[l.estado] || { chip:'gray' }
+                    return (
+                      <tr key={l.id}>
+                        <td><div className="primary">{l.empresa}</div><div className="muted" style={{fontSize:11.5, marginTop:2}}>{l.sector} · {l.ciudad}</div></td>
+                        <td><div className="avatar sm" style={{width:26,height:26,fontSize:10}}>{l.responsable}</div></td>
+                        <td className="muted">{l.servicio}</td>
+                        <td><span className={`chip ${sc.chip}`}><span className="dot"/>{l.estado}</span></td>
+                        <td className="muted small">{l.next}</td>
+                        <td className="mono" style={{textAlign:'right'}}>€{eur(l.monto || 0)}</td>
+                      </tr>
+                    )
+                  })}
+                  {leads.length === 0 && (
+                    <tr><td colSpan={6} style={{textAlign:'center', color:'var(--text-4)', padding:'24px 0'}}>Sin leads — crea tu primero con el botón de arriba</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
           <div className="card">
             <div className="card-head"><h3>Seguimientos próximos</h3></div>
             <div>
@@ -648,7 +935,16 @@ export default function Dashboard({ role, setPage, openQuick, data }) {
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ── Modal detalle empleado ── */}
+      {selectedEmpleado && (
+        <EmpleadoDetalleModal
+          empleado={selectedEmpleado}
+          data={data}
+          onClose={() => setSelectedEmpleado(null)}
+        />
+      )}
     </div>
   )
 }
