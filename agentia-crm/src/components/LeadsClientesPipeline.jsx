@@ -28,11 +28,7 @@ function getServicios() {
 }
 
 function getResp() {
-  try {
-    const users = JSON.parse(localStorage.getItem('agentia_usuarios') || '[]')
-    const r = users.filter(u => u.estado === 'activo').map(u => u.ini || u.n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())
-    return r.length ? r : ['LP','AR']
-  } catch { return ['LP','AR'] }
+  return []
 }
 
 // ── Activity log (localStorage) ─────────────────────────────────
@@ -129,13 +125,12 @@ Los presupuestos no incluyen IVA.</div>
 
 // ── Leads ────────────────────────────────────────────────────────
 
-function LeadModal({ lead, onClose, onSave, onDelete }) {
+function LeadModal({ lead, onClose, onSave, onDelete, resp: RESP = [] }) {
   const isNew = !lead?.id
   const SERVICIOS = getServicios()
-  const RESP = getResp()
   const [form, setForm] = useState(lead ? { ...lead, monto: lead.monto ?? '', crearProyecto: false, tipo: lead.tipo || 'Proyecto', montoRecurrente: '', frecuencia: 'Mensual', pagoDividido: false, señalPct: 50 } : {
     empresa:'', sector:'', ciudad:'', contacto:'', telefono:'', email:'',
-    responsable: RESP[0] || 'LP', servicio: SERVICIOS[0] || 'Web premium',
+    responsable: RESP[0] || '', servicio: SERVICIOS[0] || 'Web premium',
     estado:'Cliente Nuevo', next:'', monto:'', origen:'Instagram', origenCustom:'', notas:'',
     crearProyecto: false, tipo: 'Proyecto', montoRecurrente: '', frecuencia: 'Mensual', pagoDividido: false, señalPct: 50,
   })
@@ -355,14 +350,13 @@ function ActivitySection({ leadId, defaultResp }) {
 
 // ── Clientes ─────────────────────────────────────────────────────
 
-function ClienteModal({ cliente, onClose, onSave, onDelete }) {
+function ClienteModal({ cliente, onClose, onSave, onDelete, resp: RESP = [] }) {
   const isNew = !cliente?.id
   const SERVICIOS = getServicios()
-  const RESP = getResp()
   const [form, setForm] = useState(cliente ? { ...cliente, importe: cliente.importe ?? '' } : {
     nombre:'', contacto:'', telefono:'', email:'',
     servicio: SERVICIOS[0] || 'Web premium', importe:'', estado:'En curso',
-    tipo:'Proyecto', pagado:false, ajustes:0, responsable: RESP[0] || 'LP', since:'',
+    tipo:'Proyecto', pagado:false, ajustes:0, responsable: RESP[0] || '', since:'',
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const [confirmDel, setConfirmDel] = useState(false)
@@ -417,6 +411,7 @@ export function Clientes({ data, openItem, onItemOpened }) {
   const cobros   = data?.cobros   || []
   const [editing, setEditing] = useState(null)
   const [creating, setCreating] = useState(false)
+  const allResp = [...new Set(clientes.map(c => c.responsable).filter(Boolean))]
 
   useEffect(() => {
     if (openItem?.type === 'Cliente' && openItem.item) {
@@ -550,6 +545,7 @@ export function Clientes({ data, openItem, onItemOpened }) {
           onClose={() => { setEditing(null); setCreating(false) }}
           onSave={handleSave}
           onDelete={id => data.deleteCliente?.(id)}
+          resp={allResp}
         />
       )}
     </div>
@@ -1099,6 +1095,7 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened }) {
           onClose={() => { setEditing(null); setCreating(false) }}
           onSave={handleSave}
           onDelete={id => { data.deleteLead?.(id); setEditing(null) }}
+          resp={allResp}
         />
       )}
 
@@ -1108,6 +1105,7 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened }) {
           onClose={() => setCobradoLead(null)}
           onSave={(form) => { data.updateLead?.(form.id, form); setCobradoLead(null) }}
           onDelete={id => { data.deleteLead?.(id); setCobradoLead(null) }}
+          resp={allResp}
         />
       )}
 

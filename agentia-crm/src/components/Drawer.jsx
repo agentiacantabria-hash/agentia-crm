@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { I } from './Icons'
 import { PIPELINE_COLS } from './data'
 import { SelectOrText, CustomSelect } from './Modal'
+import { supabase } from '../lib/supabase'
 
 function getServicios() {
   try {
@@ -9,17 +10,6 @@ function getServicios() {
     const activos = s.filter(x => x.activo !== false).map(x => x.n).filter(Boolean)
     return activos.length ? activos : ['Web premium', 'Automatización WhatsApp', 'Chatbot de reservas', 'Mantenimiento mensual']
   } catch { return ['Web premium', 'Automatización WhatsApp', 'Chatbot de reservas', 'Mantenimiento mensual'] }
-}
-
-function getResp() {
-  try {
-    const u = JSON.parse(localStorage.getItem('agentia_usuarios') || '[]')
-    const activos = u.filter(x => x.estado === 'activo').map(x => {
-      const ini = x.ini || (x.n||'').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() || '?'
-      return { label: `${x.n || ini} (${ini})`, value: ini }
-    })
-    return activos.length ? activos : [{ label: 'Admin', value: 'AD' }]
-  } catch { return [{ label: 'Admin', value: 'AD' }] }
 }
 
 const ORIGENES = ['Instagram', 'LinkedIn', 'Referido', 'Formulario web', 'Otro']
@@ -36,10 +26,16 @@ export function QuickLeadDrawer({ open, onClose, onSave, currentUser }) {
 
   const [mode, setMode] = useState('quick')
   const [form, setForm] = useState({ ...EMPTY, responsable: myIni })
+  const [teamMembers, setTeamMembers] = useState([])
 
   useEffect(() => {
-    if (!open) { setForm({ ...EMPTY, responsable: myIni }); setMode('quick') }
-  }, [open, myIni])
+    if (!open) { setForm({ ...EMPTY, responsable: myIni }); setMode('quick'); return }
+    if (!isEmpleado) {
+      supabase.from('usuarios').select('nombre,iniciales').eq('estado', 'activo').then(({ data }) => {
+        if (data) setTeamMembers(data.map(u => ({ label: `${u.nombre} (${u.iniciales})`, value: u.iniciales })))
+      })
+    }
+  }, [open, myIni, isEmpleado])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -74,7 +70,7 @@ export function QuickLeadDrawer({ open, onClose, onSave, currentUser }) {
   }
 
   const servicios = getServicios()
-  const resp = getResp()
+  const resp = teamMembers.length ? teamMembers : [{ label: currentUser?.nombre || 'Admin', value: myIni }]
 
   return (
     <>
