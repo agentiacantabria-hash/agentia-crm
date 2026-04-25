@@ -261,11 +261,9 @@ function MesView({ tasks, onEdit, onAdd }) {
 
 // ── Tareas ───────────────────────────────────────────────────────
 
-function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [] }) {
+function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [], resp: respOptions = [] }) {
   const isNew = !tarea?.id
-  const users = getUsers()
-  const respOptions = users.filter(u => u.estado === 'activo').map(u => u.ini || (u.n||'').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() || '?')
-  const defaultResp = respOptions[0] || 'LP'
+  const defaultResp = respOptions[0] || ''
 
   const [form, setForm] = useState(tarea || {
     title:'', cliente:'', due_date: todayIso(), time:'', prio:'media', resp: defaultResp, tag:'Operativo', done:false,
@@ -327,6 +325,7 @@ function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [] }) {
 
 export function Tareas({ data, openItem, onItemOpened }) {
   const { tasks = [], clientes = [], updateTask, addTask, deleteTask } = data || {}
+  const allResp = [...new Set(tasks.map(t => t.resp).filter(Boolean))]
   const [creating, setCreating] = useState(false)
   const [editing, setEditing]   = useState(null)
   const [view, setView]         = useState('lista')
@@ -475,6 +474,7 @@ export function Tareas({ data, openItem, onItemOpened }) {
           onSave={handleSave}
           onDelete={deleteTask}
           clientes={clientes}
+          resp={allResp}
         />
       )}
     </div>
@@ -483,16 +483,14 @@ export function Tareas({ data, openItem, onItemOpened }) {
 
 // ── Proyectos ────────────────────────────────────────────────────
 
-function ProyectoModal({ proyecto, onClose, onSave, onDelete, cobros = [], updateCobro, tasks = [], addTask, updateTask, deleteTask }) {
+function ProyectoModal({ proyecto, onClose, onSave, onDelete, cobros = [], updateCobro, tasks = [], addTask, updateTask, deleteTask, resp: respOptions = [] }) {
   const isNew = !proyecto?.id
-  const users    = getUsers()
   const servList = getServicios()
   const DEFAULT_SERVICIOS = ['Web premium','Automatización WhatsApp','Chatbot de reservas','Mantenimiento mensual','E-commerce + SEO','Web + Captación']
   const servicios = servList.length ? servList : DEFAULT_SERVICIOS
-  const respOptions = users.filter(u => u.estado === 'activo').map(u => u.ini || (u.n||'').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() || '?')
 
   const [form, setForm] = useState(proyecto || {
-    cliente:'', servicio: servicios[0] || 'Web premium', estado:'En curso', progreso:0, ajustes:0, pago:'Pendiente', resp: respOptions[0] || 'LP',
+    cliente:'', servicio: servicios[0] || 'Web premium', estado:'En curso', progreso:0, ajustes:0, pago:'Pendiente', resp: respOptions[0] || '',
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const [confirmDel, setConfirmDel] = useState(false)
@@ -628,6 +626,7 @@ export function Proyectos({ data }) {
   const proyectos = data?.proyectos || []
   const cobros    = data?.cobros    || []
   const tasks     = data?.tasks     || []
+  const allResp   = [...new Set(proyectos.map(p => p.resp).filter(Boolean))]
   const [editing, setEditing]   = useState(null)
   const [creating, setCreating] = useState(false)
 
@@ -739,6 +738,7 @@ export function Proyectos({ data }) {
           addTask={data.addTask}
           updateTask={data.updateTask}
           deleteTask={data.deleteTask}
+          resp={allResp}
         />
       )}
     </div>
