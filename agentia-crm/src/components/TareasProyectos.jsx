@@ -19,9 +19,6 @@ function downloadCSV(rows, filename) {
 }
 
 // ── helpers ─────────────────────────────────────────────────────
-function getUsers() {
-  try { return JSON.parse(localStorage.getItem('agentia_usuarios') || '[]') } catch { return [] }
-}
 function getServicios() {
   try {
     const s = JSON.parse(localStorage.getItem('agentia_servicios') || '[]')

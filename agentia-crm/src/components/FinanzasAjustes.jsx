@@ -714,11 +714,6 @@ function ServicioModal({ servicio, onClose, onSave }) {
   )
 }
 
-const DEFAULT_USUARIOS = [
-  { id:1, n:'Lucía P.',    rol:'Admin',    email:'lucia@agentia.com',  ini:'LP', estado:'activo' },
-  { id:2, n:'Andrés R.',   rol:'Empleado', email:'andres@agentia.com', ini:'AR', estado:'activo' },
-]
-
 const DEFAULT_SERVICIOS = [
   { id:1, n:'Página web premium',       base:2500, activo:true,  color:'#4F8BFF' },
   { id:2, n:'Automatización WhatsApp',  base:1800, activo:true,  color:'#9A7BFF' },

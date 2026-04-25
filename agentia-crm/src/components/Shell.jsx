@@ -1,13 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { I } from './Icons'
 
-function getSidebarUser(role) {
-  try {
-    const users = JSON.parse(localStorage.getItem('agentia_usuarios') || '[]')
-    const u = users.find(u => u.rol === (role === 'admin' ? 'Admin' : 'Empleado') && u.estado === 'activo')
-    return u || { n: role === 'admin' ? 'Administrador' : 'Empleado', ini: role === 'admin' ? 'AD' : 'EM' }
-  } catch { return { n: 'Usuario', ini: 'U' } }
-}
 
 export function Sidebar({ page, setPage, role, counts, isOpen, onClose, currentUser, onSignOut }) {
   const [menuOpen, setMenuOpen] = useState(false)
