@@ -143,7 +143,7 @@ export function SearchModal({ open, onClose, data, setPage, onSelect }) {
 
   if (!open) return null
 
-  const { leads = [], clientes = [], tasks = [] } = data || {}
+  const { leads = [], clientes = [], tasks = [], proyectos = [] } = data || {}
   const ql = q.toLowerCase().trim()
 
   const results = ql.length < 1 ? [] : [
@@ -153,6 +153,8 @@ export function SearchModal({ open, onClose, data, setPage, onSelect }) {
       .slice(0,4).map(c => ({ type:'Cliente', label: c.nombre, sub: c.servicio, page:'clientes', color:'var(--ok)', item: c })),
     ...tasks.filter(t => t.title?.toLowerCase().includes(ql) || t.cliente?.toLowerCase().includes(ql))
       .slice(0,4).map(t => ({ type:'Tarea', label: t.title, sub: t.cliente, page:'tareas', color:'var(--violet)', item: t })),
+    ...proyectos.filter(p => p.cliente?.toLowerCase().includes(ql) || p.servicio?.toLowerCase().includes(ql))
+      .slice(0,3).map(p => ({ type:'Proyecto', label: p.cliente, sub: p.servicio ? `${p.servicio} · ${p.estado||''}` : p.estado, page:'proyectos', color:'#FFB547', item: p })),
   ]
 
   return (
@@ -162,7 +164,7 @@ export function SearchModal({ open, onClose, data, setPage, onSelect }) {
         <div style={{display:'flex',alignItems:'center',gap:12,padding:'14px 18px',borderBottom:'1px solid var(--line-1)'}}>
           <I.Search size={16} style={{color:'var(--text-3)',flexShrink:0}}/>
           <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)}
-            placeholder="Buscar leads, clientes, tareas…"
+            placeholder="Buscar leads, clientes, tareas, proyectos…"
             style={{flex:1,background:'none',border:'none',outline:'none',fontSize:15,color:'var(--text-0)'}}
             onKeyDown={e => { if (e.key === 'Escape') onClose() }}
           />
@@ -173,7 +175,7 @@ export function SearchModal({ open, onClose, data, setPage, onSelect }) {
             <div style={{padding:'32px 0',textAlign:'center',color:'var(--text-4)',fontSize:13}}>Sin resultados para "{q}"</div>
           )}
           {results.length === 0 && ql.length === 0 && (
-            <div style={{padding:'32px 0',textAlign:'center',color:'var(--text-4)',fontSize:13}}>Escribe para buscar en leads, clientes y tareas</div>
+            <div style={{padding:'32px 0',textAlign:'center',color:'var(--text-4)',fontSize:13}}>Escribe para buscar en leads, clientes, tareas y proyectos</div>
           )}
           {results.map((r,i) => (
             <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 18px',cursor:'pointer',borderBottom:'1px solid var(--line-1)'}}
@@ -218,7 +220,7 @@ export function Topbar({ crumb, setDrawerOpen, role, onMenuClick, notifCount = 0
 
       <div className="topbar-search" style={{cursor:'pointer'}} onClick={onSearchOpen}>
         <I.Search size={14} />
-        <span>Buscar clientes, leads, tareas…</span>
+        <span>Buscar clientes, leads, tareas, proyectos…</span>
         <kbd>⌘K</kbd>
       </div>
 
