@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { I } from './Icons'
 import { Modal, F, SelectOrText, CustomSelect } from './Modal'
 import { PIPELINE_COLS, STATE_COLORS, eur } from './data'
+import { supabase } from '../lib/supabase'
 
 // ── CSV export helper ────────────────────────────────────────────
 function downloadCSV(rows, filename) {
@@ -732,20 +733,25 @@ function initials(name) {
 
 function UsuarioModal({ usuario, onClose, onSave, onDelete }) {
   const isNew = !usuario?.id
-  const [form, setForm] = useState(usuario || { n:'', rol:'Empleado', email:'', estado:'activo' })
+  const [form, setForm] = useState(usuario || { nombre:'', iniciales:'', rol:'Empleado', email:'', estado:'activo' })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const [confirmDel, setConfirmDel] = useState(false)
 
   return (
-    <Modal open title={isNew ? 'Nuevo usuario' : `Editar — ${form.n}`}
-      onClose={onClose} onSave={() => onSave({ ...form, ini: initials(form.n) })}
-      saveLabel={isNew ? 'Crear usuario' : 'Guardar'}>
-      <F label="Nombre completo">
-        <input value={form.n} onChange={e => set('n', e.target.value)} placeholder="Ej: Unai López" autoFocus />
-      </F>
+    <Modal open title={isNew ? 'Nuevo miembro del equipo' : `Editar — ${form.nombre}`}
+      onClose={onClose} onSave={() => { if (!form.nombre.trim()) return; onSave(form) }}
+      saveLabel={isNew ? 'Añadir al equipo' : 'Guardar'}>
+      <div className="form-2col">
+        <F label="Nombre completo">
+          <input value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="Ej: Juan García" autoFocus />
+        </F>
+        <F label="Iniciales (2 letras)">
+          <input value={form.iniciales||''} onChange={e => set('iniciales', e.target.value.toUpperCase().slice(0,2))} placeholder="Ej: JG" maxLength={2} />
+        </F>
+      </div>
       <div className="form-2col">
         <F label="Email">
-          <input value={form.email||''} onChange={e => set('email', e.target.value)} placeholder="unai@agentia.com" />
+          <input value={form.email||''} onChange={e => set('email', e.target.value)} placeholder="juan@agentia.com" />
         </F>
         <F label="Rol">
           <CustomSelect value={form.rol||'Empleado'} onChange={v => set('rol', v)} options={['Admin','Empleado']} />
@@ -754,6 +760,11 @@ function UsuarioModal({ usuario, onClose, onSave, onDelete }) {
       <F label="Estado">
         <CustomSelect value={form.estado||'activo'} onChange={v => set('estado', v)} options={[{value:'activo',label:'Activo'},{value:'inactivo',label:'Inactivo'}]} />
       </F>
+      {isNew && (
+        <div style={{padding:'12px 14px', background:'rgba(45,107,255,0.06)', border:'1px solid rgba(45,107,255,0.2)', borderRadius:10, fontSize:12.5, color:'var(--text-3)', lineHeight:1.6}}>
+          Después de añadir al equipo aquí, el empleado necesita una cuenta en <b style={{color:'var(--text-2)'}}>Supabase Auth</b> con el mismo email para poder iniciar sesión. Su <b>auth_uid</b> debe coincidir con el de la tabla usuarios.
+        </div>
+      )}
       {!isNew && (
         <div className="modal-danger-zone">
           <span>Zona peligrosa</span>
@@ -802,20 +813,34 @@ export function Ajustes({ role }) {
     setEditingServicio(null); setAddingServicio(false)
   }
 
-  const [usuarios, setUsuarios] = useState(() => {
-    try { const u = localStorage.getItem('agentia_usuarios'); return u ? JSON.parse(u) : DEFAULT_USUARIOS } catch { return DEFAULT_USUARIOS }
-  })
-  useEffect(() => { localStorage.setItem('agentia_usuarios', JSON.stringify(usuarios)) }, [usuarios])
+  const [usuarios, setUsuarios] = useState([])
+  const [usuariosLoading, setUsuariosLoading] = useState(true)
+
+  useEffect(() => {
+    supabase.from('usuarios').select('*').order('created_at', { ascending: true }).then(({ data }) => {
+      if (data) setUsuarios(data)
+      setUsuariosLoading(false)
+    })
+  }, [])
 
   const [editingUsuario, setEditingUsuario] = useState(null)
   const [addingUsuario, setAddingUsuario] = useState(false)
 
-  const saveUsuario = (form) => {
-    if (form.id) setUsuarios(prev => prev.map(u => u.id===form.id ? form : u))
-    else setUsuarios(prev => [...prev, { ...form, id: Date.now() }])
+  const saveUsuario = async (form) => {
+    const { id, created_at, ...fields } = form
+    if (id) {
+      const { data } = await supabase.from('usuarios').update(fields).eq('id', id).select().single()
+      if (data) setUsuarios(prev => prev.map(u => u.id === id ? data : u))
+    } else {
+      const { data } = await supabase.from('usuarios').insert([fields]).select().single()
+      if (data) setUsuarios(prev => [...prev, data])
+    }
     setEditingUsuario(null); setAddingUsuario(false)
   }
-  const deleteUsuario = (id) => setUsuarios(prev => prev.filter(u => u.id !== id))
+  const deleteUsuario = async (id) => {
+    await supabase.from('usuarios').delete().eq('id', id)
+    setUsuarios(prev => prev.filter(u => u.id !== id))
+  }
 
   return (
     <div className="fade-in">
@@ -872,42 +897,49 @@ export function Ajustes({ role }) {
         <div className="card">
           <div className="card-head">
             <h3>Equipo y permisos</h3>
-            <span className="sub">· {usuarios.length} usuario{usuarios.length!==1?'s':''}</span>
+            <span className="sub">· {usuarios.length} miembro{usuarios.length!==1?'s':''}</span>
             <div className="right">
-              <button className="btn primary" onClick={() => setAddingUsuario(true)}><I.Plus size={13}/> Añadir usuario</button>
+              <button className="btn primary" onClick={() => setAddingUsuario(true)}><I.Plus size={13}/> Añadir miembro</button>
             </div>
           </div>
-          <table className="table">
-            <thead><tr><th>Usuario</th><th>Email</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
-            <tbody>
-              {usuarios.map(u => (
-                <tr key={u.id}>
-                  <td>
-                    <div style={{display:'flex', alignItems:'center', gap:10}}>
-                      <div className="avatar" style={u.estado==='inactivo'?{background:'rgba(255,255,255,0.05)', color:'var(--text-3)'}:{}}>{u.ini || initials(u.n)}</div>
-                      <span className="primary">{u.n}</span>
-                    </div>
-                  </td>
-                  <td className="muted">{u.email || '—'}</td>
-                  <td>
-                    {u.rol==='Admin'
-                      ? <span className="chip blue"><span className="dot"/>Admin</span>
-                      : <span className="chip gray"><span className="dot"/>Empleado</span>
-                    }
-                  </td>
-                  <td>
-                    {u.estado==='activo'
-                      ? <span className="chip green"><span className="dot"/>Activo</span>
-                      : <span className="chip amber"><span className="dot"/>Inactivo</span>
-                    }
-                  </td>
-                  <td style={{textAlign:'right'}}>
-                    <button className="btn sm ghost" onClick={() => setEditingUsuario(u)}>Editar</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {usuariosLoading ? (
+            <div style={{padding:'24px 0', textAlign:'center', color:'var(--text-4)', fontSize:13}}>Cargando equipo…</div>
+          ) : usuarios.length === 0 ? (
+            <div style={{padding:'24px 0', textAlign:'center', color:'var(--text-4)', fontSize:13}}>Sin miembros en el equipo aún</div>
+          ) : (
+            <table className="table">
+              <thead><tr><th>Usuario</th><th>Email</th><th>Iniciales</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
+              <tbody>
+                {usuarios.map(u => (
+                  <tr key={u.id}>
+                    <td>
+                      <div style={{display:'flex', alignItems:'center', gap:10}}>
+                        <div className="avatar" style={u.estado==='inactivo'?{background:'rgba(255,255,255,0.05)', color:'var(--text-3)'}:{}}>{u.iniciales || '?'}</div>
+                        <span className="primary">{u.nombre}</span>
+                      </div>
+                    </td>
+                    <td className="muted">{u.email || '—'}</td>
+                    <td><span style={{fontFamily:'var(--font-mono)', fontSize:12, color:'var(--text-3)'}}>{u.iniciales || '—'}</span></td>
+                    <td>
+                      {u.rol==='Admin'
+                        ? <span className="chip blue"><span className="dot"/>Admin</span>
+                        : <span className="chip gray"><span className="dot"/>Empleado</span>
+                      }
+                    </td>
+                    <td>
+                      {u.estado==='activo'
+                        ? <span className="chip green"><span className="dot"/>Activo</span>
+                        : <span className="chip amber"><span className="dot"/>Inactivo</span>
+                      }
+                    </td>
+                    <td style={{textAlign:'right'}}>
+                      <button className="btn sm ghost" onClick={() => setEditingUsuario(u)}>Editar</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
