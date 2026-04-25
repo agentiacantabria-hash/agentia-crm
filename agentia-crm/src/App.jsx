@@ -74,12 +74,13 @@ export default function App() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [hue, setHue]     = useState(225)
 
-  const [leads,     setLeads]     = useState([])
-  const [clientes,  setClientes]  = useState([])
-  const [tasks,     setTasks]     = useState([])
-  const [proyectos, setProyectos] = useState([])
-  const [gastos,    setGastos]    = useState([])
-  const [cobros,    setCobros]    = useState([])
+  const [leads,       setLeads]       = useState([])
+  const [clientes,    setClientes]    = useState([])
+  const [tasks,       setTasks]       = useState([])
+  const [proyectos,   setProyectos]   = useState([])
+  const [gastos,      setGastos]      = useState([])
+  const [cobros,      setCobros]      = useState([])
+  const [teamMembers, setTeamMembers] = useState([])
 
   // Refs para siempre tener el valor actual en callbacks sin stale closures
   const clientesRef  = useRef(clientes)
@@ -126,6 +127,7 @@ export default function App() {
         let pQ  = supabase.from('proyectos').select('*').order('created_at', { ascending: false })
         const gQ  = isAdmin ? supabase.from('gastos').select('*').order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null })
         const coQ = isAdmin ? supabase.from('cobros').select('*').order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null })
+        const tmQ = isAdmin ? supabase.from('usuarios').select('iniciales,nombre').eq('estado','activo').order('nombre') : Promise.resolve({ data: null, error: null })
 
         if (!isAdmin && ini) {
           lQ  = lQ.eq('responsable', ini)
@@ -134,7 +136,7 @@ export default function App() {
           pQ  = pQ.eq('resp', ini)
         }
 
-        const [l, c, t, p, g, co] = await Promise.all([lQ, cQ, tQ, pQ, gQ, coQ])
+        const [l, c, t, p, g, co, tm] = await Promise.all([lQ, cQ, tQ, pQ, gQ, coQ, tmQ])
         if (!l.error && l.data) {
           const stateMap = {
             'Ganado': 'Cobrado', 'Perdido': 'Denegado',
@@ -157,6 +159,7 @@ export default function App() {
         if (!t.error && t.data)  setTasks(t.data)
         if (!p.error && p.data)  setProyectos(p.data)
         if (!g.error && g.data)  setGastos(g.data)
+        if (tm.data) setTeamMembers(tm.data.map(u => u.iniciales).filter(Boolean))
         if (!co.error && co.data) {
           const today = new Date(); today.setHours(0,0,0,0)
           setCobros(co.data.map(c => {
@@ -679,7 +682,7 @@ export default function App() {
     cobros.filter(c => !c.pagado && (c.vencida || (c.vence && new Date(c.vence + 'T00:00:00') < _today))).length
 
   const data = {
-    leads, clientes, tasks, proyectos, gastos, cobros,
+    leads, clientes, tasks, proyectos, gastos, cobros, teamMembers,
     addLead, updateLead, deleteLead,
     addCliente, updateCliente, deleteCliente,
     addTask, updateTask, deleteTask,

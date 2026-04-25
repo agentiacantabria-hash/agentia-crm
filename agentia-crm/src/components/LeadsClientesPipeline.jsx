@@ -402,12 +402,15 @@ function ClienteModal({ cliente, onClose, onSave, onDelete, resp: RESP = [] }) {
 }
 
 export function Clientes({ data, openItem, onItemOpened, currentUser }) {
+  const teamMembers = data?.teamMembers || []
   const clientes = data?.clientes || []
   const cobros   = data?.cobros   || []
   const [editing, setEditing] = useState(null)
   const [creating, setCreating] = useState(false)
   const myIni   = currentUser?.rol !== 'Admin' ? currentUser?.iniciales : null
-  const allResp = [...new Set([...(myIni ? [myIni] : []), ...clientes.map(c => c.responsable).filter(Boolean)])]
+  const allResp = teamMembers.length
+    ? teamMembers
+    : [...new Set([...(myIni ? [myIni] : []), ...clientes.map(c => c.responsable).filter(Boolean)])]
 
   useEffect(() => {
     if (openItem?.type === 'Cliente' && openItem.item) {
@@ -641,7 +644,8 @@ function CobraRestoModal({ lead, onClose, onConfirm }) {
 // ── Pipeline ─────────────────────────────────────────────────────
 
 export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser }) {
-  const leads = data?.leads || []
+  const leads       = data?.leads       || []
+  const teamMembers = data?.teamMembers || []
   const [view,     setView]     = useState('kanban')
   const [filter,   setFilter]   = useState('todos')
   const [filterResp, setFilterResp] = useState('todos')
@@ -664,7 +668,9 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser 
   const moveCardRef  = useRef(null)
 
   const myIni   = currentUser?.rol !== 'Admin' ? currentUser?.iniciales : null
-  const allResp = [...new Set([...(myIni ? [myIni] : []), ...leads.map(l => l.responsable).filter(Boolean)])]
+  const allResp = teamMembers.length
+    ? teamMembers
+    : [...new Set([...(myIni ? [myIni] : []), ...leads.map(l => l.responsable).filter(Boolean)])]
 
   const activeLeads = leads.filter(l => !STAGES_CLOSED.includes(l.estado))
   const closedLeads = leads.filter(l =>  STAGES_CLOSED.includes(l.estado))

@@ -321,9 +321,11 @@ function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [], resp: res
 }
 
 export function Tareas({ data, openItem, onItemOpened, currentUser }) {
-  const { tasks = [], clientes = [], updateTask, addTask, deleteTask } = data || {}
+  const { tasks = [], clientes = [], teamMembers = [], updateTask, addTask, deleteTask } = data || {}
   const myIni   = currentUser?.rol !== 'Admin' ? currentUser?.iniciales : null
-  const allResp = [...new Set([...(myIni ? [myIni] : []), ...tasks.map(t => t.resp).filter(Boolean)])]
+  const allResp = teamMembers.length
+    ? teamMembers
+    : [...new Set([...(myIni ? [myIni] : []), ...tasks.map(t => t.resp).filter(Boolean)])]
   const [creating, setCreating] = useState(false)
   const [editing, setEditing]   = useState(null)
   const [view, setView]         = useState('lista')
@@ -621,11 +623,14 @@ function ProyectoModal({ proyecto, onClose, onSave, onDelete, cobros = [], updat
 }
 
 export function Proyectos({ data, currentUser }) {
-  const proyectos = data?.proyectos || []
-  const cobros    = data?.cobros    || []
-  const tasks     = data?.tasks     || []
+  const proyectos    = data?.proyectos    || []
+  const cobros       = data?.cobros       || []
+  const tasks        = data?.tasks        || []
+  const teamMembers  = data?.teamMembers  || []
   const myIni   = currentUser?.rol !== 'Admin' ? currentUser?.iniciales : null
-  const allResp   = [...new Set([...(myIni ? [myIni] : []), ...proyectos.map(p => p.resp).filter(Boolean)])]
+  const allResp = teamMembers.length
+    ? teamMembers
+    : [...new Set([...(myIni ? [myIni] : []), ...proyectos.map(p => p.resp).filter(Boolean)])]
   const [editing, setEditing]   = useState(null)
   const [creating, setCreating] = useState(false)
 
