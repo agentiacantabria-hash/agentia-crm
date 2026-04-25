@@ -108,6 +108,12 @@ export function QuickLeadDrawer({ open, onClose, onSave }) {
                   <input className="input" placeholder="Teléfono o email" value={form.contacto} onChange={e => set('contacto', e.target.value)} />
                 </div>
                 <div className="field">
+                  <label className="lbl">Importe (€)</label>
+                  <input className="input" type="number" min="0" placeholder="0" value={form.monto} onChange={e => set('monto', e.target.value)} />
+                </div>
+              </div>
+              <div className="field-row">
+                <div className="field">
                   <label className="lbl">Origen</label>
                   <CustomSelect className="select" value={form.origen} onChange={v => set('origen', v)} options={ORIGENES} />
                 </div>
