@@ -98,6 +98,187 @@ function GastoModal({ gasto, onClose, onSave, onDelete }) {
   )
 }
 
+// ── P&L View ─────────────────────────────────────────────────────
+function PLView({ cobros, gastos }) {
+  const [offset, setOffset] = useState(0)
+
+  const monthData = (off) => {
+    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + off)
+    const y = d.getFullYear(), m = d.getMonth()
+    const pad = n => String(n).padStart(2, '0')
+    const start = `${y}-${pad(m+1)}-01`
+    const end   = `${y}-${pad(m+1)}-${pad(new Date(y, m+1, 0).getDate())}`
+    const ingresos    = cobros.filter(c => c.pagado && c.vence >= start && c.vence <= end)
+    const gastosPunt  = gastos.filter(g => !g.recurrente && g.fecha && g.fecha >= start && g.fecha <= end)
+    const gastosRec   = gastos.filter(g => g.recurrente && (!g.fecha || g.fecha <= end))
+    const totalIng    = ingresos.reduce((a,c) => a+(c.monto||0), 0)
+    const totalGPunt  = gastosPunt.reduce((a,g) => a+(g.monto||0), 0)
+    const totalGRec   = gastosRec.reduce((a,g) => a+(g.monto||0), 0)
+    const totalGast   = totalGPunt + totalGRec
+    const beneficio   = totalIng - totalGast
+    const margen      = totalIng > 0 ? Math.round(beneficio/totalIng*100) : (totalGast > 0 ? -100 : 0)
+    const label       = d.toLocaleDateString('es-ES', {month:'long', year:'numeric'})
+    return { y, m, start, end, ingresos, gastosPunt, gastosRec, totalIng, totalGPunt, totalGRec, totalGast, beneficio, margen, label }
+  }
+
+  const cur   = monthData(offset)
+  const prv   = monthData(offset - 1)
+  const chart = Array.from({length:6}, (_,i) => monthData(offset - 5 + i))
+  const maxVal = Math.max(...chart.map(d => Math.max(d.totalIng, d.totalGast)), 1)
+
+  const ingByCliente = Object.values(
+    cur.ingresos.reduce((acc, c) => {
+      const k = c.cliente || 'Sin cliente'
+      if (!acc[k]) acc[k] = { cliente: k, total: 0, items: [] }
+      acc[k].total += c.monto||0; acc[k].items.push(c)
+      return acc
+    }, {})
+  ).sort((a,b) => b.total - a.total)
+
+  const mrr    = cur.ingresos.filter(c => c.recurrente).reduce((a,c) => a+(c.monto||0), 0)
+  const oneOff = cur.ingresos.filter(c => !c.recurrente).reduce((a,c) => a+(c.monto||0), 0)
+  const diffIng = prv.totalIng > 0 ? Math.round((cur.totalIng - prv.totalIng)/prv.totalIng*100) : null
+  const diffBen = prv.beneficio !== 0 ? Math.round((cur.beneficio - prv.beneficio)/Math.abs(prv.beneficio)*100) : null
+
+  return (
+    <div className="fade-in">
+      {/* Month selector */}
+      <div style={{display:'flex', alignItems:'center', gap:12, marginBottom:20}}>
+        <button className="btn ghost" onClick={() => setOffset(o => o-1)}>←</button>
+        <h2 style={{fontSize:18, fontWeight:700, textTransform:'capitalize', minWidth:200, textAlign:'center'}}>{cur.label}</h2>
+        <button className="btn ghost" onClick={() => setOffset(o => o+1)} disabled={offset >= 0} style={{opacity: offset >= 0 ? 0.3 : 1}}>→</button>
+        {offset < 0 && <button className="btn sm ghost" onClick={() => setOffset(0)}>Mes actual</button>}
+      </div>
+
+      {/* KPI row */}
+      <div className="grid-3" style={{marginBottom:20}}>
+        <div className="card" style={{padding:'18px 20px'}}>
+          <div style={{fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:.5, color:'var(--ok)', marginBottom:10}}>Ingresos</div>
+          <div style={{fontSize:28, fontWeight:700, color:'var(--ok)'}}>€{eur(cur.totalIng)}</div>
+          {diffIng !== null && <div style={{fontSize:12, color: diffIng>=0?'var(--ok)':'var(--danger)', marginTop:4}}>{diffIng>=0?'↑':'↓'} {Math.abs(diffIng)}% vs mes anterior</div>}
+          <div style={{display:'flex', gap:6, flexWrap:'wrap', marginTop:10}}>
+            {mrr > 0    && <span style={{fontSize:11, padding:'2px 8px', borderRadius:12, background:'rgba(62,207,142,0.12)', color:'var(--ok)'}}>↺ MRR €{eur(mrr)}</span>}
+            {oneOff > 0 && <span style={{fontSize:11, padding:'2px 8px', borderRadius:12, background:'rgba(107,117,144,0.12)', color:'var(--text-3)'}}>One-off €{eur(oneOff)}</span>}
+          </div>
+        </div>
+        <div className="card" style={{padding:'18px 20px'}}>
+          <div style={{fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:.5, color:'var(--danger)', marginBottom:10}}>Gastos</div>
+          <div style={{fontSize:28, fontWeight:700, color:'var(--danger)'}}>€{eur(cur.totalGast)}</div>
+          <div style={{display:'flex', gap:6, flexWrap:'wrap', marginTop:10}}>
+            {cur.totalGRec  > 0 && <span style={{fontSize:11, padding:'2px 8px', borderRadius:12, background:'rgba(255,90,106,0.1)', color:'var(--danger)'}}>Suscr. €{eur(cur.totalGRec)}</span>}
+            {cur.totalGPunt > 0 && <span style={{fontSize:11, padding:'2px 8px', borderRadius:12, background:'rgba(107,117,144,0.12)', color:'var(--text-3)'}}>Puntuales €{eur(cur.totalGPunt)}</span>}
+          </div>
+        </div>
+        <div className="card" style={{padding:'18px 20px'}}>
+          <div style={{fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:.5, color:'var(--text-4)', marginBottom:10}}>Resultado</div>
+          <div style={{fontSize:28, fontWeight:700, color: cur.beneficio>=0?'var(--ok)':'var(--danger)'}}>
+            {cur.beneficio<0?'-':''}€{eur(Math.abs(cur.beneficio))}
+          </div>
+          <div style={{fontSize:13, color:'var(--text-3)', marginTop:4}}>Margen {cur.margen}%</div>
+          {diffBen !== null && <div style={{fontSize:12, color: diffBen>=0?'var(--ok)':'var(--danger)', marginTop:4}}>{diffBen>=0?'↑':'↓'} {Math.abs(diffBen)}% vs mes anterior</div>}
+        </div>
+      </div>
+
+      {/* Detail + chart */}
+      <div className="grid-main-side">
+        <div style={{display:'flex', flexDirection:'column', gap:16}}>
+          {/* Ingresos detail */}
+          <div className="card">
+            <div className="card-head"><h3>Ingresos del mes</h3></div>
+            {cur.ingresos.length === 0
+              ? <div className="small" style={{color:'var(--text-4)', textAlign:'center', padding:'20px 0'}}>Sin ingresos este mes</div>
+              : <div style={{overflowX:'auto'}}><table className="table">
+                  <thead><tr><th>Cliente</th><th>Concepto</th><th style={{textAlign:'right'}}>Importe</th><th>Tipo</th></tr></thead>
+                  <tbody>
+                    {ingByCliente.map(g => g.items.map(c => (
+                      <tr key={c.id}>
+                        <td><span className="primary">{c.cliente}</span></td>
+                        <td className="muted small">{c.concepto}</td>
+                        <td className="mono" style={{textAlign:'right', color:'var(--ok)'}}>€{eur(c.monto||0)}</td>
+                        <td>{c.recurrente
+                          ? <span style={{fontSize:10, fontWeight:600, color:'var(--ok)', background:'rgba(62,207,142,0.12)', padding:'2px 8px', borderRadius:12}}>↺ Recurrente</span>
+                          : <span style={{fontSize:10, fontWeight:600, color:'var(--text-4)', background:'rgba(107,117,144,0.1)', padding:'2px 8px', borderRadius:12}}>One-off</span>
+                        }</td>
+                      </tr>
+                    )))}
+                  </tbody>
+                </table></div>
+            }
+          </div>
+          {/* Gastos detail */}
+          <div className="card">
+            <div className="card-head"><h3>Gastos del mes</h3></div>
+            {cur.totalGast === 0
+              ? <div className="small" style={{color:'var(--text-4)', textAlign:'center', padding:'20px 0'}}>Sin gastos este mes</div>
+              : <div style={{overflowX:'auto'}}><table className="table">
+                  <thead><tr><th>Concepto</th><th>Categoría</th><th style={{textAlign:'right'}}>Importe</th></tr></thead>
+                  <tbody>
+                    {cur.gastosRec.map(g => (
+                      <tr key={g.id}>
+                        <td><span className="primary">{g.concepto}</span></td>
+                        <td><span style={{fontSize:10, fontWeight:600, color:'var(--ok)', background:'rgba(62,207,142,0.12)', padding:'2px 8px', borderRadius:12}}>↺ {g.tipo}</span></td>
+                        <td className="mono" style={{textAlign:'right', color:'var(--danger)'}}>€{eur(g.monto||0)}</td>
+                      </tr>
+                    ))}
+                    {cur.gastosPunt.map(g => (
+                      <tr key={g.id}>
+                        <td><span className="primary">{g.concepto}</span></td>
+                        <td className="muted small">{g.tipo}</td>
+                        <td className="mono" style={{textAlign:'right', color:'var(--danger)'}}>€{eur(g.monto||0)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table></div>
+            }
+          </div>
+        </div>
+
+        {/* Chart + histórico */}
+        <div className="card" style={{padding:'18px 20px'}}>
+          <div style={{fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:.5, color:'var(--text-4)', marginBottom:16}}>Últimos 6 meses</div>
+          <div style={{display:'flex', alignItems:'flex-end', gap:6, height:140, marginBottom:8}}>
+            {chart.map((d,i) => {
+              const ingH = Math.round((d.totalIng/maxVal)*130)
+              const gstH = Math.round((d.totalGast/maxVal)*130)
+              const sel  = i === 5
+              return (
+                <div key={i} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:3}}>
+                  <div style={{width:'100%', display:'flex', gap:2, alignItems:'flex-end', height:130}}>
+                    <div style={{flex:1, height:ingH||2, background:sel?'var(--ok)':'rgba(62,207,142,0.35)', borderRadius:'3px 3px 0 0'}}/>
+                    <div style={{flex:1, height:gstH||2, background:sel?'var(--danger)':'rgba(255,90,106,0.35)', borderRadius:'3px 3px 0 0'}}/>
+                  </div>
+                  <div style={{fontSize:9, color:sel?'var(--text-0)':'var(--text-4)', fontWeight:sel?700:400, textAlign:'center'}}>
+                    {new Date(d.y,d.m,1).toLocaleDateString('es-ES',{month:'short'})}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div style={{display:'flex', gap:12, justifyContent:'center', marginBottom:16}}>
+            <div style={{display:'flex', alignItems:'center', gap:4, fontSize:11, color:'var(--text-4)'}}><div style={{width:10,height:10,borderRadius:2,background:'var(--ok)'}}/> Ingresos</div>
+            <div style={{display:'flex', alignItems:'center', gap:4, fontSize:11, color:'var(--text-4)'}}><div style={{width:10,height:10,borderRadius:2,background:'var(--danger)'}}/> Gastos</div>
+          </div>
+          <div style={{borderTop:'1px solid var(--border)', paddingTop:14}}>
+            {[...chart].reverse().map((d,i) => (
+              <div key={i} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 0', borderBottom:i<5?'1px solid rgba(255,255,255,0.04)':'none'}}>
+                <div style={{fontSize:12, color:'var(--text-3)', textTransform:'capitalize', minWidth:60}}>
+                  {new Date(d.y,d.m,1).toLocaleDateString('es-ES',{month:'long'})}
+                </div>
+                <div style={{display:'flex', gap:10, fontSize:12, fontFamily:'var(--font-mono)'}}>
+                  <span style={{color:'var(--ok)'}}>+{eur(d.totalIng)}</span>
+                  <span style={{color:'var(--danger)'}}>-{eur(d.totalGast)}</span>
+                  <span style={{fontWeight:700, color:d.beneficio>=0?'var(--ok)':'var(--danger)'}}>{d.beneficio<0?'-':''}{eur(Math.abs(d.beneficio))}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Finanzas ──────────────────────────────────────────────────────
 export function Finanzas({ role, data }) {
   const gastos     = data?.gastos    || []
   const cobros     = data?.cobros    || []
@@ -106,6 +287,7 @@ export function Finanzas({ role, data }) {
   const [editingGasto, setEditingGasto] = useState(null)
   const [addingCobro, setAddingCobro]   = useState(false)
   const [editingCobro, setEditingCobro] = useState(null)
+  const [tab, setTab] = useState('resumen')
 
   if (role !== 'admin') {
     return (
@@ -152,12 +334,22 @@ export function Finanzas({ role, data }) {
           <p className="page-subtitle">Visión ejecutiva del negocio · {new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</p>
         </div>
         <div className="page-actions">
-          <button className="btn" onClick={() => setAddingCobro(true)}><I.Plus size={13}/> Nueva factura</button>
-          <button className="btn primary" onClick={() => setAddingGasto(true)}><I.Plus size={13}/> Añadir gasto</button>
+          {tab === 'resumen' && <>
+            <button className="btn" onClick={() => setAddingCobro(true)}><I.Plus size={13}/> Nueva factura</button>
+            <button className="btn primary" onClick={() => setAddingGasto(true)}><I.Plus size={13}/> Añadir gasto</button>
+          </>}
         </div>
       </div>
 
-      <div className="grid-3" style={{marginBottom:16}}>
+      <div style={{padding:'0 0 20px'}}>
+        <div className="segmented">
+          <button className={tab==='resumen'?'active':''} onClick={()=>setTab('resumen')}>Resumen</button>
+          <button className={tab==='pl'?'active':''} onClick={()=>setTab('pl')}>P&L mensual</button>
+        </div>
+      </div>
+
+      {tab === 'pl' && <PLView cobros={cobros} gastos={gastos} />}
+      {tab === 'resumen' && <><div className="grid-3" style={{marginBottom:16}}>
         <div className="fin-card accent">
           <div className="label">Ingresos cobrados</div>
           <div className="big"><span className="currency">€</span>{eur(ingresosMes)}</div>
@@ -466,6 +658,7 @@ export function Finanzas({ role, data }) {
           })()}
         </div>
       </div>
+      </>}
 
       {(addingCobro || editingCobro) && (
         <CobroModal
