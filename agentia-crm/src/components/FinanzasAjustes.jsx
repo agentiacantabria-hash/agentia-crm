@@ -771,7 +771,7 @@ function UsuarioModal({ usuario, onClose, onSave, onDelete }) {
   )
 }
 
-export function Ajustes({ role }) {
+export function Ajustes({ role, data }) {
   if (role !== 'admin') {
     return (
       <div className="card fade-in" style={{marginTop:40}}>
@@ -850,7 +850,56 @@ export function Ajustes({ role }) {
         <button className={tab==='finanzas'?'active':''} onClick={()=>setTab('finanzas')}>Finanzas</button>
         <button className={tab==='estados'?'active':''} onClick={()=>setTab('estados')}>Estados y etiquetas</button>
         <button className={tab==='marca'?'active':''} onClick={()=>setTab('marca')}>Marca</button>
+        <button className={tab==='datos'?'active':''} onClick={()=>setTab('datos')}>Datos</button>
       </div>
+
+      {tab === 'datos' && (() => {
+        const exportBackup = () => {
+          const backup = {
+            exportado: new Date().toISOString(),
+            leads:     data?.leads     || [],
+            clientes:  data?.clientes  || [],
+            tareas:    data?.tasks     || [],
+            proyectos: data?.proyectos || [],
+            cobros:    data?.cobros    || [],
+            gastos:    data?.gastos    || [],
+          }
+          const json = JSON.stringify(backup, null, 2)
+          const blob = new Blob([json], { type: 'application/json' })
+          const url  = URL.createObjectURL(blob)
+          const a    = document.createElement('a')
+          a.href = url; a.download = `agentia-backup-${new Date().toISOString().slice(0,10)}.json`; a.click()
+          URL.revokeObjectURL(url)
+        }
+        const totalRegistros = (data?.leads?.length || 0) + (data?.clientes?.length || 0) + (data?.tasks?.length || 0) + (data?.proyectos?.length || 0) + (data?.cobros?.length || 0) + (data?.gastos?.length || 0)
+        return (
+          <div style={{display:'flex', flexDirection:'column', gap:16}}>
+            <div className="card">
+              <div className="card-head"><h3>Backup manual</h3></div>
+              <p style={{fontSize:13, color:'var(--text-3)', marginBottom:16, lineHeight:1.6}}>
+                Descarga una copia de todos tus datos en formato JSON. Guárdala en un lugar seguro (Drive, iCloud, etc.).
+                Incluye leads, clientes, tareas, proyectos, cobros y gastos.
+              </p>
+              <div style={{display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:'var(--surface-2)', borderRadius:10, border:'1px solid var(--line-2)', marginBottom:16}}>
+                <span style={{fontSize:22}}>📦</span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13, fontWeight:600}}>{totalRegistros} registros totales</div>
+                  <div style={{fontSize:11.5, color:'var(--text-4)'}}>Leads · Clientes · Tareas · Proyectos · Cobros · Gastos</div>
+                </div>
+                <button className="btn primary" onClick={exportBackup}>↓ Exportar JSON</button>
+              </div>
+              <div style={{fontSize:12, color:'var(--text-4)', lineHeight:1.7}}>
+                <div style={{fontWeight:600, color:'var(--text-3)', marginBottom:6}}>Copias automáticas en Supabase</div>
+                <div>· Supabase guarda <b>backups diarios automáticos</b> de tu base de datos (plan gratuito: 7 días de historial).</div>
+                <div>· Para restaurar un backup antiguo, ve a <b>Supabase Dashboard → Project Settings → Backups</b>.</div>
+                <div style={{marginTop:8, padding:'8px 12px', background:'rgba(62,207,142,0.08)', borderRadius:8, border:'1px solid rgba(62,207,142,0.2)', color:'var(--ok)', fontWeight:500}}>
+                  ✓ Los datos guardados ahora son permanentes — cualquier fallo de guardado aparece con un error visible en pantalla.
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {tab === 'servicios' && (
         <div className="card">

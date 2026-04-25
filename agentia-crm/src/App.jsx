@@ -81,6 +81,7 @@ export default function App() {
   const [gastos,      setGastos]      = useState([])
   const [cobros,      setCobros]      = useState([])
   const [teamMembers, setTeamMembers] = useState([])
+  const [actividades, setActividades] = useState([])
 
   // Refs para siempre tener el valor actual en callbacks sin stale closures
   const clientesRef  = useRef(clientes)
@@ -169,6 +170,11 @@ export default function App() {
           }))
         }
       } catch (e) { console.error('[Supabase] excepción al cargar:', e) }
+      // Cargar actividades por separado — un fallo aquí no afecta al resto
+      try {
+        const { data: actData } = await supabase.from('actividad').select('*').order('created_at', { ascending: false })
+        if (actData) setActividades(actData)
+      } catch (_) {}
     }
     load()
   }, [currentUser])
@@ -196,18 +202,21 @@ export default function App() {
     const del  = (set) => ({ old: r }) => set(p => p.filter(x => x.id !== r.id))
 
     const ch = supabase.channel('crm-sync')
-      .on('postgres_changes', { event:'INSERT', schema:'public', table:'leads'    }, ({ new: r }) => setLeads(p => p.some(x => x.id === r.id) ? p : [normLead(r), ...p]))
-      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'leads'    }, ({ new: r }) => setLeads(p => p.map(x => x.id === r.id ? normLead(r) : x)))
-      .on('postgres_changes', { event:'DELETE', schema:'public', table:'leads'    }, del(setLeads))
-      .on('postgres_changes', { event:'INSERT', schema:'public', table:'clientes' }, ins(setClientes))
-      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'clientes' }, upd(setClientes))
-      .on('postgres_changes', { event:'DELETE', schema:'public', table:'clientes' }, del(setClientes))
-      .on('postgres_changes', { event:'INSERT', schema:'public', table:'tareas'   }, ins(setTasks))
-      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'tareas'   }, upd(setTasks))
-      .on('postgres_changes', { event:'DELETE', schema:'public', table:'tareas'   }, del(setTasks))
-      .on('postgres_changes', { event:'INSERT', schema:'public', table:'proyectos'}, ins(setProyectos))
-      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'proyectos'}, upd(setProyectos))
-      .on('postgres_changes', { event:'DELETE', schema:'public', table:'proyectos'}, del(setProyectos))
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'leads'     }, ({ new: r }) => setLeads(p => p.some(x => x.id === r.id) ? p : [normLead(r), ...p]))
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'leads'     }, ({ new: r }) => setLeads(p => p.map(x => x.id === r.id ? normLead(r) : x)))
+      .on('postgres_changes', { event:'DELETE', schema:'public', table:'leads'     }, del(setLeads))
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'clientes'  }, ins(setClientes))
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'clientes'  }, upd(setClientes))
+      .on('postgres_changes', { event:'DELETE', schema:'public', table:'clientes'  }, del(setClientes))
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'tareas'    }, ins(setTasks))
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'tareas'    }, upd(setTasks))
+      .on('postgres_changes', { event:'DELETE', schema:'public', table:'tareas'    }, del(setTasks))
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'proyectos' }, ins(setProyectos))
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'proyectos' }, upd(setProyectos))
+      .on('postgres_changes', { event:'DELETE', schema:'public', table:'proyectos' }, del(setProyectos))
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'actividad' }, ins(setActividades))
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'actividad' }, upd(setActividades))
+      .on('postgres_changes', { event:'DELETE', schema:'public', table:'actividad' }, del(setActividades))
 
     if (isAdmin) {
       ch
@@ -237,25 +246,15 @@ export default function App() {
   // ── LEADS ──────────────────────────────────────────────────
   const addLead = async (lead) => {
     const { crearProyecto, origenCustom, yaCobrado: _y, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, vence_resto, ...leadData } = lead
-    try {
-      const { data: d, error } = await supabase.from('leads').insert([clean(leadData)]).select().single()
-      if (!error && d) {
-        setLeads(prev => [d, ...prev])
-        autoWinLead({ ...d, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, vence_resto })
-        showToast(`Lead «${leadData.empresa}» creado`)
-        return
-      }
-      if (error) {
-        console.error('[Supabase] addLead error:', error.message, error.details)
-        showToast(`Error Supabase: ${error.message}`, 'error')
-      }
-    } catch (e) {
-      console.error('[Supabase] addLead excepción:', e)
+    const { data: d, error } = await supabase.from('leads').insert([clean(leadData)]).select().single()
+    if (error || !d) {
+      console.error('[Supabase] addLead error:', error?.message)
+      showToast(`Error al guardar lead: ${error?.message || 'Sin respuesta de Supabase'}`, 'error')
+      return
     }
-    const local = { ...leadData, id: `l${Date.now()}` }
-    setLeads(prev => [local, ...prev])
-    autoWinLead({ ...local, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, vence_resto })
-    showToast(`Lead «${leadData.empresa}» creado (guardado local — revisar Supabase)`, 'error')
+    setLeads(prev => [d, ...prev])
+    autoWinLead({ ...d, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, vence_resto })
+    showToast(`Lead «${leadData.empresa}» creado`)
   }
 
   const autoWinLead = (lead) => {
@@ -494,12 +493,9 @@ export default function App() {
 
   // ── CLIENTES ───────────────────────────────────────────────
   const addCliente = async (cliente) => {
-    try {
-      const { data: d, error } = await supabase.from('clientes').insert([clean(cliente)]).select().single()
-      if (!error && d) { setClientes(prev => [d, ...prev]); showToast(`Cliente «${cliente.nombre}» creado`); return }
-    } catch (_) {}
-    setClientes(prev => [{ ...cliente, id: `c${Date.now()}` }, ...prev])
-    showToast(`Cliente «${cliente.nombre}» creado`)
+    const { data: d, error } = await supabase.from('clientes').insert([clean(cliente)]).select().single()
+    if (!error && d) { setClientes(prev => [d, ...prev]); showToast(`Cliente «${cliente.nombre}» creado`) }
+    else if (error) { console.error('[Supabase] addCliente:', error.message); showToast(`Error al guardar cliente: ${error.message}`, 'error') }
   }
 
   const updateCliente = async (id, updates) => {
@@ -528,13 +524,9 @@ export default function App() {
 
   // ── TAREAS ─────────────────────────────────────────────────
   const addTask = async (tarea) => {
-    try {
-      const { data: d, error } = await supabase.from('tareas').insert([clean(tarea)]).select().single()
-      if (!error && d) { setTasks(prev => [d, ...prev]); showToast('Tarea creada'); return }
-      if (error) console.error('[Supabase] addTask:', error.message)
-    } catch (e) { console.error('[Supabase] addTask excepción:', e) }
-    setTasks(prev => [{ ...tarea, id: `t${Date.now()}`, done: false }, ...prev])
-    showToast('Tarea creada')
+    const { data: d, error } = await supabase.from('tareas').insert([clean(tarea)]).select().single()
+    if (!error && d) { setTasks(prev => [d, ...prev]); showToast('Tarea creada') }
+    else if (error) console.error('[Supabase] addTask:', error.message)
   }
 
   const updateTask = async (id, updates) => {
@@ -555,11 +547,9 @@ export default function App() {
 
   // ── PROYECTOS ──────────────────────────────────────────────
   const addProyecto = async (proyecto) => {
-    try {
-      const { data: d, error } = await supabase.from('proyectos').insert([clean(proyecto)]).select().single()
-      if (!error && d) { setProyectos(prev => [d, ...prev]); return }
-    } catch (_) {}
-    setProyectos(prev => [{ ...proyecto, id: `p${Date.now()}` }, ...prev])
+    const { data: d, error } = await supabase.from('proyectos').insert([clean(proyecto)]).select().single()
+    if (!error && d) { setProyectos(prev => [d, ...prev]) }
+    else if (error) console.error('[Supabase] addProyecto:', error.message)
   }
 
   const updateProyecto = async (id, updates) => {
@@ -587,11 +577,9 @@ export default function App() {
 
   // ── GASTOS ─────────────────────────────────────────────────
   const addGasto = async (gasto) => {
-    try {
-      const { data: d, error } = await supabase.from('gastos').insert([clean(gasto)]).select().single()
-      if (!error && d) { setGastos(prev => [d, ...prev]); return }
-    } catch (_) {}
-    setGastos(prev => [{ ...gasto, id: `g${Date.now()}` }, ...prev])
+    const { data: d, error } = await supabase.from('gastos').insert([clean(gasto)]).select().single()
+    if (!error && d) { setGastos(prev => [d, ...prev]) }
+    else if (error) { console.error('[Supabase] addGasto:', error.message); showToast(`Error al guardar gasto: ${error.message}`, 'error') }
   }
 
   const updateGasto = async (id, updates) => {
@@ -611,15 +599,10 @@ export default function App() {
 
   // ── COBROS ─────────────────────────────────────────────────
   const addCobro = async (cobro) => {
-    try {
-      const { data: d, error } = await supabase.from('cobros').insert([clean(cobro)]).select().single()
-      if (!error && d) {
-        // Preserve our explicit pagado value — Supabase column may default to false
-        setCobros(prev => [{ ...cobro, id: d.id, created_at: d.created_at }, ...prev])
-        return
-      }
-    } catch (_) {}
-    setCobros(prev => [{ ...cobro, id: `cb${Date.now()}` }, ...prev])
+    const { data: d, error } = await supabase.from('cobros').insert([clean(cobro)]).select().single()
+    if (!error && d) {
+      setCobros(prev => [{ ...cobro, id: d.id, created_at: d.created_at }, ...prev])
+    } else if (error) console.error('[Supabase] addCobro:', error.message)
   }
 
   const updateCobro = async (id, updates) => {
@@ -682,7 +665,7 @@ export default function App() {
     cobros.filter(c => !c.pagado && (c.vencida || (c.vence && new Date(c.vence + 'T00:00:00') < _today))).length
 
   const data = {
-    leads, clientes, tasks, proyectos, gastos, cobros, teamMembers,
+    leads, clientes, tasks, proyectos, gastos, cobros, teamMembers, actividades,
     addLead, updateLead, deleteLead,
     addCliente, updateCliente, deleteCliente,
     addTask, updateTask, deleteTask,

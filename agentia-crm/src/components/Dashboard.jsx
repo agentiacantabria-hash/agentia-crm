@@ -3,12 +3,6 @@ import { I } from './Icons'
 import { STATE_COLORS, PIPELINE_COLS, STAGE, STAGES_CLOSED, eur } from './data'
 import { supabase } from '../lib/supabase'
 
-function getActLastDate(leadId) {
-  try {
-    const arr = JSON.parse(localStorage.getItem(`agentia_act_${leadId}`) || '[]')
-    return arr.length ? new Date(arr[0].fecha) : null
-  } catch { return null }
-}
 
 function effectiveGroup(task) {
   if (task.due_date) {
@@ -447,7 +441,8 @@ function EquipoSection({ usuarios, data, onSelect }) {
 
 // ── Dashboard principal ───────────────────────────────────────────
 export default function Dashboard({ role, setPage, openQuick, data, currentUser }) {
-  const { leads = [], tasks = [], proyectos = [], clientes = [], gastos = [], cobros = [], updateTask, showToast } = data || {}
+  const { leads = [], tasks = [], proyectos = [], clientes = [], gastos = [], cobros = [], actividades = [], updateTask, showToast } = data || {}
+  const actMap = actividades.reduce((m, a) => { (m[a.lead_id] || (m[a.lead_id] = [])).push(a); return m }, {})
   const [chartPeriod, setChartPeriod] = useState('mes')
   const [usuarios, setUsuarios] = useState([])
   const [selectedEmpleado, setSelectedEmpleado] = useState(null)
@@ -646,8 +641,9 @@ export default function Dashboard({ role, setPage, openQuick, data, currentUser 
       {role === 'admin' && (() => {
         const hotLeads = leads.filter(l => l.temp === 'hot' && !STAGES_CLOSED.includes(l.estado))
         const sinContacto = hotLeads.filter(l => {
-          const last = getActLastDate(l.id)
-          const ref = last || (l.created_at ? new Date(l.created_at) : new Date())
+          const acts = actMap[l.id] || []
+          const sorted = [...acts].sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
+          const ref = sorted.length ? new Date(sorted[0].created_at) : (l.created_at ? new Date(l.created_at) : new Date())
           return Math.floor((Date.now() - ref) / 86400000) >= 5
         })
         if (!sinContacto.length) return null
@@ -660,8 +656,9 @@ export default function Dashboard({ role, setPage, openQuick, data, currentUser 
             </div>
             <div>
               {sinContacto.map(l => {
-                const last = getActLastDate(l.id)
-                const ref = last || (l.created_at ? new Date(l.created_at) : new Date())
+                const acts = actMap[l.id] || []
+                const sorted = [...acts].sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
+                const ref = sorted.length ? new Date(sorted[0].created_at) : (l.created_at ? new Date(l.created_at) : new Date())
                 const dias = Math.floor((Date.now() - ref) / 86400000)
                 return (
                   <div key={l.id} className="task">

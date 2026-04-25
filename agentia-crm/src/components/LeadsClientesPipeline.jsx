@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { I } from './Icons'
 import { Modal, F, SelectOrText, CustomSelect } from './Modal'
 import { STATE_COLORS, PIPELINE_COLS, STAGE, STAGES_CLOSED, eur } from './data'
+import { supabase } from '../lib/supabase'
 
 function downloadCSV(rows, filename) {
   if (!rows.length) return
@@ -27,23 +28,16 @@ function getServicios() {
   } catch { return ['Web premium','Automatización WhatsApp','Chatbot de reservas'] }
 }
 
-// ── Activity log (localStorage) ─────────────────────────────────
+// ── Activity log ─────────────────────────────────────────────────
 const ACT_TYPES = [
   { id:'llamada', label:'Llamada', icon:'📞' },
   { id:'email',   label:'Email',   icon:'✉️' },
   { id:'reunion', label:'Reunión', icon:'🤝' },
   { id:'nota',    label:'Nota',    icon:'📝' },
 ]
-function getAct(leadId) {
-  if (!leadId) return []
-  try { return JSON.parse(localStorage.getItem(`agentia_act_${leadId}`) || '[]') } catch { return [] }
-}
-function saveAct(leadId, arr) {
-  localStorage.setItem(`agentia_act_${leadId}`, JSON.stringify(arr))
-}
-function diasSinActiv(leadId, createdAt) {
-  const acts = getAct(leadId)
-  const ref = acts.length ? new Date(acts[0].fecha) : (createdAt ? new Date(createdAt) : new Date())
+function diasSinActiv(acts, createdAt) {
+  const sorted = [...acts].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  const ref = sorted.length ? new Date(sorted[0].created_at) : (createdAt ? new Date(createdAt) : new Date())
   return Math.floor((Date.now() - ref) / 86400000)
 }
 function getStageTime(leadId) {
@@ -278,23 +272,33 @@ function RowMenu({ onEdit, onDelete }) {
 
 // ── ActivitySection ──────────────────────────────────────────────
 function ActivitySection({ leadId, defaultResp }) {
-  const [items, setItems] = useState(() => getAct(leadId))
+  const [items, setItems] = useState([])
   const [tipo, setTipo] = useState('nota')
   const [texto, setTexto] = useState('')
 
-  const add = () => {
+  useEffect(() => {
+    if (!leadId) return
+    supabase.from('actividad').select('*').eq('lead_id', leadId).order('created_at', { ascending: false })
+      .then(({ data }) => { if (data) setItems(data) })
+  }, [leadId])
+
+  const add = async () => {
     if (!texto.trim()) return
-    const entry = { id: Date.now(), tipo, texto: texto.trim(), fecha: new Date().toISOString(), resp: defaultResp || '' }
-    const updated = [entry, ...items]
-    setItems(updated)
-    saveAct(leadId, updated)
+    const t = texto.trim()
+    const optimistic = { id: `tmp-${Date.now()}`, lead_id: leadId, tipo, texto: t, resp: defaultResp || '', created_at: new Date().toISOString() }
+    setItems(prev => [optimistic, ...prev])
     setTexto('')
+    const { data, error } = await supabase.from('actividad').insert([{ lead_id: leadId, tipo, texto: t, resp: defaultResp || '' }]).select().single()
+    if (!error && data) {
+      setItems(prev => prev.map(i => i.id === optimistic.id ? data : i))
+    } else {
+      setItems(prev => prev.filter(i => i.id !== optimistic.id))
+    }
   }
 
-  const remove = (id) => {
-    const updated = items.filter(i => i.id !== id)
-    setItems(updated)
-    saveAct(leadId, updated)
+  const remove = async (id) => {
+    setItems(prev => prev.filter(i => i.id !== id))
+    await supabase.from('actividad').delete().eq('id', id)
   }
 
   const fmt = (iso) => {
@@ -646,9 +650,17 @@ function CobraRestoModal({ lead, onClose, onConfirm }) {
 export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser }) {
   const leads       = data?.leads       || []
   const teamMembers = data?.teamMembers || []
+  const actividades = data?.actividades || []
+  const actMap      = actividades.reduce((m, a) => { (m[a.lead_id] || (m[a.lead_id] = [])).push(a); return m }, {})
   const [view,     setView]     = useState('kanban')
   const [filter,   setFilter]   = useState('todos')
   const [filterResp, setFilterResp] = useState('todos')
+  const [filterServicio, setFilterServicio] = useState('')
+  const [montoMin,       setMontoMin]       = useState('')
+  const [montoMax,       setMontoMax]       = useState('')
+  const [fechaDesde,     setFechaDesde]     = useState('')
+  const [fechaHasta,     setFechaHasta]     = useState('')
+  const [showFilters,    setShowFilters]    = useState(false)
   const [movingId,       setMovingId]       = useState(null)
   const [editing,        setEditing]        = useState(null)
   const [creating,       setCreating]       = useState(false)
@@ -676,19 +688,30 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser 
   const closedLeads = leads.filter(l =>  STAGES_CLOSED.includes(l.estado))
   const base        = filter === 'cerrados' ? closedLeads : activeLeads
   const applyRespFilter = (items) => filterResp === 'todos' ? items : items.filter(l => l.responsable === filterResp)
+  const applyAdvFilters = (items) => {
+    let r = items
+    if (filterServicio) r = r.filter(l => l.servicio === filterServicio)
+    if (montoMin !== '') r = r.filter(l => (l.monto || 0) >= parseFloat(montoMin))
+    if (montoMax !== '') r = r.filter(l => (l.monto || 0) <= parseFloat(montoMax))
+    if (fechaDesde) r = r.filter(l => l.created_at && l.created_at.slice(0,10) >= fechaDesde)
+    if (fechaHasta) r = r.filter(l => l.created_at && l.created_at.slice(0,10) <= fechaHasta)
+    return r
+  }
+  const activeFilterCount = [filterServicio, montoMin, montoMax, fechaDesde, fechaHasta].filter(Boolean).length
+  const clearAdvFilters = () => { setFilterServicio(''); setMontoMin(''); setMontoMax(''); setFechaDesde(''); setFechaHasta('') }
 
   const filteredBase = (filter === 'todos' || filter === 'cerrados') ? base : base.filter(l => l.temp === filter)
-  const filtered    = applyRespFilter(filteredBase)
+  const filtered    = applyAdvFilters(applyRespFilter(filteredBase))
 
   const activeCols = PIPELINE_COLS.filter(l => !STAGES_CLOSED.includes(l)).map(label => ({
     label,
     color: STATE_COLORS[label]?.color || '#6B7590',
-    items: applyRespFilter(leads.filter(l => l.estado === label)),
+    items: applyAdvFilters(applyRespFilter(leads.filter(l => l.estado === label))),
   }))
   const closedCols = STAGES_CLOSED.map(label => ({
     label,
     color: STATE_COLORS[label]?.color || '#6B7590',
-    items: applyRespFilter(leads.filter(l => l.estado === label)),
+    items: applyAdvFilters(applyRespFilter(leads.filter(l => l.estado === label))),
   }))
 
   // Métricas de conversión
@@ -862,14 +885,50 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser 
         </div>
       </div>
 
-      {allResp.length > 1 && (
-        <div style={{display:'flex', gap:6, marginBottom:10, flexWrap:'wrap'}}>
-          {['todos', ...allResp].map(r => (
-            <button key={r} className={`btn sm ${filterResp === r ? 'primary' : 'ghost'}`}
-              onClick={() => setFilterResp(r)}>
-              {r === 'todos' ? 'Todos' : r}
+      <div style={{display:'flex', gap:6, marginBottom:8, flexWrap:'wrap', alignItems:'center'}}>
+        {allResp.length > 1 && ['todos', ...allResp].map(r => (
+          <button key={r} className={`btn sm ${filterResp === r ? 'primary' : 'ghost'}`}
+            onClick={() => setFilterResp(r)}>
+            {r === 'todos' ? 'Todos' : r}
+          </button>
+        ))}
+        <button className={`btn sm ${showFilters || activeFilterCount > 0 ? 'primary' : 'ghost'}`}
+          style={{marginLeft:'auto'}}
+          onClick={() => setShowFilters(v => !v)}>
+          ⚙ Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+        </button>
+      </div>
+
+      {showFilters && (
+        <div style={{display:'flex', gap:8, flexWrap:'wrap', alignItems:'flex-end', padding:'10px 12px', background:'var(--surface-2)', borderRadius:10, marginBottom:10, border:'1px solid var(--line-2)'}}>
+          <div style={{display:'flex', flexDirection:'column', gap:3, minWidth:140}}>
+            <span style={{fontSize:10, color:'var(--text-4)', fontWeight:600, textTransform:'uppercase', letterSpacing:.5}}>Servicio</span>
+            <select className="select" style={{padding:'0 8px', height:30, fontSize:12}} value={filterServicio} onChange={e => setFilterServicio(e.target.value)}>
+              <option value="">Todos</option>
+              {getServicios().map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div style={{display:'flex', flexDirection:'column', gap:3}}>
+            <span style={{fontSize:10, color:'var(--text-4)', fontWeight:600, textTransform:'uppercase', letterSpacing:.5}}>Monto (€)</span>
+            <div style={{display:'flex', gap:4, alignItems:'center'}}>
+              <input className="input" style={{width:80, height:30, fontSize:12, padding:'0 8px'}} type="number" min="0" placeholder="Mín" value={montoMin} onChange={e => setMontoMin(e.target.value)} />
+              <span style={{color:'var(--text-4)', fontSize:12}}>–</span>
+              <input className="input" style={{width:80, height:30, fontSize:12, padding:'0 8px'}} type="number" min="0" placeholder="Máx" value={montoMax} onChange={e => setMontoMax(e.target.value)} />
+            </div>
+          </div>
+          <div style={{display:'flex', flexDirection:'column', gap:3}}>
+            <span style={{fontSize:10, color:'var(--text-4)', fontWeight:600, textTransform:'uppercase', letterSpacing:.5}}>Fecha entrada</span>
+            <div style={{display:'flex', gap:4, alignItems:'center'}}>
+              <input className="input" style={{width:120, height:30, fontSize:12, padding:'0 8px'}} type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} />
+              <span style={{color:'var(--text-4)', fontSize:12}}>–</span>
+              <input className="input" style={{width:120, height:30, fontSize:12, padding:'0 8px'}} type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} />
+            </div>
+          </div>
+          {activeFilterCount > 0 && (
+            <button className="btn sm ghost" style={{color:'var(--danger)', height:30, alignSelf:'flex-end'}} onClick={clearAdvFilters}>
+              × Limpiar
             </button>
-          ))}
+          )}
         </div>
       )}
 
@@ -936,7 +995,7 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser 
                     : 0
                   const stageTime    = getStageTime(l.id)
                   const diasEnEtapa  = stageTime ? Math.floor((Date.now() - new Date(stageTime)) / 86400000) : null
-                  const diasInact    = diasSinActiv(l.id, l.created_at)
+                  const diasInact    = diasSinActiv(actMap[l.id] || [], l.created_at)
                   return (
                     <div className="kanban-card" key={l.id} draggable
                       onDragStart={e => e.dataTransfer.setData('leadId', l.id)}
