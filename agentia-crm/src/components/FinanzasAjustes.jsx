@@ -109,8 +109,10 @@ function PLView({ cobros, gastos }) {
     const pad = n => String(n).padStart(2, '0')
     const start = `${y}-${pad(m+1)}-01`
     const end   = `${y}-${pad(m+1)}-${pad(new Date(y, m+1, 0).getDate())}`
-    const ingresos    = cobros.filter(c => c.pagado && c.vence >= start && c.vence <= end)
-    const gastosPunt  = gastos.filter(g => !g.recurrente && g.fecha && g.fecha >= start && g.fecha <= end)
+    const cobroDate   = (c) => { const raw = c.vence || c.created_at; return raw ? (raw.length > 10 ? raw.slice(0,10) : raw) : null }
+    const gastoDate   = (g) => { const raw = g.fecha || g.created_at; return raw ? (raw.length > 10 ? raw.slice(0,10) : raw) : null }
+    const ingresos    = cobros.filter(c => { if (!c.pagado) return false; const d = cobroDate(c); return d && d >= start && d <= end })
+    const gastosPunt  = gastos.filter(g => { if (g.recurrente) return false; const d = gastoDate(g); return d && d >= start && d <= end })
     const gastosRec   = gastos.filter(g => g.recurrente && (!g.fecha || g.fecha <= end))
     const totalIng    = ingresos.reduce((a,c) => a+(c.monto||0), 0)
     const totalGPunt  = gastosPunt.reduce((a,g) => a+(g.monto||0), 0)
