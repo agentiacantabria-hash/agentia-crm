@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { I } from './Icons'
+import { supabase } from '../lib/supabase'
 
 
-export function Sidebar({ page, setPage, role, counts, isOpen, onClose, currentUser, onSignOut }) {
+export function Sidebar({ page, setPage, role, counts, isOpen, onClose, currentUser, onSignOut, onProfileOpen }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuPos, setMenuPos] = useState({ bottom: 80, right: 16 })
   const btnRef  = useRef(null)
@@ -110,6 +111,11 @@ export function Sidebar({ page, setPage, role, counts, isOpen, onClose, currentU
           boxShadow:'0 8px 30px rgba(0,0,0,0.5)',
           zIndex:400,
         }}>
+          <div className="row-menu-item" onPointerDown={() => { setMenuOpen(false); onProfileOpen?.() }}
+            style={{display:'flex', alignItems:'center', gap:10, padding:'10px 16px', cursor:'pointer', fontSize:13, color:'var(--text-1)'}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+            Mi perfil
+          </div>
           {role === 'admin' && (
             <div className="row-menu-item" onPointerDown={() => handleNav('ajustes')}
               style={{display:'flex', alignItems:'center', gap:10, padding:'10px 16px', cursor:'pointer', fontSize:13, color:'var(--text-1)'}}>
@@ -297,6 +303,92 @@ export function BellPanel({ open, onClose, tasks = [], cobros = [] }) {
             ))}
           </>
         )}
+      </div>
+    </>
+  )
+}
+
+export function ProfileModal({ currentUser, onClose, onSave }) {
+  const [nombre,   setNombre]   = useState(currentUser?.nombre   || '')
+  const [newPass,  setNewPass]  = useState('')
+  const [confirm,  setConfirm]  = useState('')
+  const [saving,   setSaving]   = useState(false)
+  const [msg,      setMsg]      = useState(null) // { type:'ok'|'err', text }
+
+  const handleSave = async (e) => {
+    e.preventDefault()
+    if (newPass && newPass !== confirm) { setMsg({ type:'err', text:'Las contraseñas no coinciden.' }); return }
+    if (newPass && newPass.length < 6)  { setMsg({ type:'err', text:'La contraseña debe tener al menos 6 caracteres.' }); return }
+    setSaving(true); setMsg(null)
+    try {
+      await onSave({ nombre: nombre.trim() || currentUser.nombre })
+      if (newPass) {
+        const { error } = await supabase.auth.updateUser({ password: newPass })
+        if (error) { setMsg({ type:'err', text:'No se pudo cambiar la contraseña.' }); setSaving(false); return }
+      }
+      setMsg({ type:'ok', text:'Perfil actualizado correctamente.' })
+      setNewPass(''); setConfirm('')
+    } catch {
+      setMsg({ type:'err', text:'Error al guardar. Inténtalo de nuevo.' })
+    }
+    setSaving(false)
+  }
+
+  const inp = { width:'100%', padding:'10px 13px', borderRadius:9, background:'var(--surface-3)', border:'1px solid var(--line-2)', color:'var(--text-0)', fontSize:14, outline:'none', boxSizing:'border-box' }
+  const lbl = { fontSize:11, fontWeight:600, color:'var(--text-4)', textTransform:'uppercase', letterSpacing:'0.05em', display:'block', marginBottom:5 }
+
+  return (
+    <>
+      <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.65)',zIndex:900,backdropFilter:'blur(4px)'}} onClick={onClose}/>
+      <div style={{position:'fixed',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:'min(420px,94vw)',background:'var(--surface-1)',border:'1px solid var(--line-2)',borderRadius:16,boxShadow:'0 24px 60px rgba(0,0,0,0.7)',zIndex:901,overflow:'hidden'}}>
+        <div style={{display:'flex',alignItems:'center',gap:12,padding:'18px 20px',borderBottom:'1px solid var(--line-1)'}}>
+          <div className="avatar" style={{width:40,height:40,fontSize:14,borderRadius:11,flexShrink:0}}>{currentUser?.iniciales}</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:15,fontWeight:700}}>Mi perfil</div>
+            <div style={{fontSize:12,color:'var(--text-4)',marginTop:1}}>{currentUser?.email || ''} · <span style={{textTransform:'uppercase',letterSpacing:'0.04em'}}>{currentUser?.rol}</span></div>
+          </div>
+          <button className="icon-btn" onClick={onClose}><I.Close size={14}/></button>
+        </div>
+
+        <form onSubmit={handleSave} style={{padding:'20px'}}>
+          <div style={{marginBottom:16}}>
+            <label style={lbl}>Nombre visible</label>
+            <input value={nombre} onChange={e => setNombre(e.target.value)} style={inp} placeholder="Tu nombre" autoFocus />
+          </div>
+
+          <div style={{marginBottom:6}}>
+            <label style={lbl}>Iniciales</label>
+            <input value={currentUser?.iniciales || ''} disabled style={{...inp, opacity:0.45, cursor:'not-allowed'}} />
+            <div style={{fontSize:11,color:'var(--text-4)',marginTop:5,lineHeight:1.5}}>Las iniciales identifican tu trabajo en el CRM. Para cambiarlas contacta con el administrador.</div>
+          </div>
+
+          <div style={{height:1,background:'var(--line-1)',margin:'20px 0'}}/>
+
+          <div style={{marginBottom:12,fontSize:12,fontWeight:600,color:'var(--text-3)',textTransform:'uppercase',letterSpacing:'0.05em'}}>Cambiar contraseña</div>
+          <div style={{marginBottom:12}}>
+            <label style={lbl}>Nueva contraseña</label>
+            <input type="password" value={newPass} onChange={e => setNewPass(e.target.value)} style={inp} placeholder="Dejar vacío para no cambiar" />
+          </div>
+          <div style={{marginBottom:16}}>
+            <label style={lbl}>Confirmar contraseña</label>
+            <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} style={inp} placeholder="Repite la nueva contraseña" />
+          </div>
+
+          {msg && (
+            <div style={{padding:'10px 13px',borderRadius:8,marginBottom:14,fontSize:13,
+              background: msg.type==='ok' ? 'rgba(62,207,142,0.08)' : 'rgba(255,90,106,0.08)',
+              border: `1px solid ${msg.type==='ok' ? 'rgba(62,207,142,0.25)' : 'rgba(255,90,106,0.25)'}`,
+              color: msg.type==='ok' ? 'var(--ok)' : 'var(--danger)',
+            }}>{msg.text}</div>
+          )}
+
+          <div style={{display:'flex',gap:10}}>
+            <button type="button" className="btn ghost" style={{flex:1}} onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn primary" style={{flex:2}} disabled={saving}>
+              {saving ? 'Guardando…' : 'Guardar cambios'}
+            </button>
+          </div>
+        </form>
       </div>
     </>
   )

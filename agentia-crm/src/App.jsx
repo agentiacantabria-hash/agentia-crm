@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Sidebar, Topbar, SearchModal, BellPanel } from './components/Shell'
+import { Sidebar, Topbar, SearchModal, BellPanel, ProfileModal } from './components/Shell'
 import { QuickLeadDrawer } from './components/Drawer'
 import Dashboard from './components/Dashboard'
 import { Clientes, Pipeline } from './components/LeadsClientesPipeline'
@@ -71,6 +71,7 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [bellOpen, setBellOpen] = useState(false)
   const [openItem, setOpenItem] = useState(null)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [hue, setHue]     = useState(225)
 
   const [leads,     setLeads]     = useState([])
@@ -168,6 +169,62 @@ export default function App() {
     }
     load()
   }, [currentUser])
+
+  // ── Real-time sync ─────────────────────────────────────────
+  useEffect(() => {
+    if (!currentUser) return
+    const isAdmin = currentUser.rol === 'Admin'
+    const today   = new Date(); today.setHours(0,0,0,0)
+
+    const stateMap = {
+      'Ganado':'Cobrado','Perdido':'Denegado','Nuevo':'Cliente Nuevo',
+      'Contactado':'Cliente Potencial','Interesado':'Cliente Interesado',
+      'Propuesta enviada':'En Revisión','En seguimiento':'En Revisión',
+    }
+    const normLead  = (l) => { const s = stateMap[l.estado]; return s ? { ...l, estado: s } : l }
+    const normCobro = (c) => {
+      if (c.pagado || !c.vence) return c
+      const d = new Date(c.vence); d.setHours(0,0,0,0)
+      return { ...c, vencida: d < today }
+    }
+
+    const ins  = (set) => ({ new: r }) => set(p => p.some(x => x.id === r.id) ? p : [r, ...p])
+    const upd  = (set, norm = x => x) => ({ new: r }) => set(p => p.map(x => x.id === r.id ? norm(r) : x))
+    const del  = (set) => ({ old: r }) => set(p => p.filter(x => x.id !== r.id))
+
+    const ch = supabase.channel('crm-sync')
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'leads'    }, ({ new: r }) => setLeads(p => p.some(x => x.id === r.id) ? p : [normLead(r), ...p]))
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'leads'    }, ({ new: r }) => setLeads(p => p.map(x => x.id === r.id ? normLead(r) : x)))
+      .on('postgres_changes', { event:'DELETE', schema:'public', table:'leads'    }, del(setLeads))
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'clientes' }, ins(setClientes))
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'clientes' }, upd(setClientes))
+      .on('postgres_changes', { event:'DELETE', schema:'public', table:'clientes' }, del(setClientes))
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'tareas'   }, ins(setTasks))
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'tareas'   }, upd(setTasks))
+      .on('postgres_changes', { event:'DELETE', schema:'public', table:'tareas'   }, del(setTasks))
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'proyectos'}, ins(setProyectos))
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'proyectos'}, upd(setProyectos))
+      .on('postgres_changes', { event:'DELETE', schema:'public', table:'proyectos'}, del(setProyectos))
+
+    if (isAdmin) {
+      ch
+        .on('postgres_changes', { event:'INSERT', schema:'public', table:'cobros' }, ({ new: r }) => setCobros(p => p.some(x => x.id === r.id) ? p : [normCobro(r), ...p]))
+        .on('postgres_changes', { event:'UPDATE', schema:'public', table:'cobros' }, ({ new: r }) => setCobros(p => p.map(x => x.id === r.id ? normCobro(r) : x)))
+        .on('postgres_changes', { event:'DELETE', schema:'public', table:'cobros' }, del(setCobros))
+        .on('postgres_changes', { event:'INSERT', schema:'public', table:'gastos' }, ins(setGastos))
+        .on('postgres_changes', { event:'UPDATE', schema:'public', table:'gastos' }, upd(setGastos))
+        .on('postgres_changes', { event:'DELETE', schema:'public', table:'gastos' }, del(setGastos))
+    }
+
+    ch.subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [currentUser])
+
+  // ── Actualizar perfil propio ────────────────────────────────
+  const updateProfile = async (updates) => {
+    const { data } = await supabase.from('usuarios').update(updates).eq('id', currentUser.id).select().single()
+    if (data) setCurrentUser(data)
+  }
 
   // Convierte strings vacíos a null para campos de tipo date en Supabase
   const clean = (obj) => Object.fromEntries(
@@ -663,7 +720,7 @@ export default function App() {
   return (
     <>
       <div className="app" data-screen-label={PAGES.find(p => p[0] === page)?.[1]}>
-        <Sidebar page={page} setPage={setPage} role={role} counts={counts} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} currentUser={currentUser} onSignOut={signOut} />
+        <Sidebar page={page} setPage={setPage} role={role} counts={counts} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} currentUser={currentUser} onSignOut={signOut} onProfileOpen={() => setProfileOpen(true)} />
         <div className="content">
           <Topbar crumb={crumbMap[page]} setDrawerOpen={setDrawer} role={role} onMenuClick={() => setSidebarOpen(o => !o)} notifCount={notifCount} onSearchOpen={() => setSearchOpen(true)} onBellOpen={() => setBellOpen(o => !o)} currentUser={currentUser} />
           <main className="main">{pageEl}</main>
@@ -671,6 +728,7 @@ export default function App() {
       </div>
 
       <QuickLeadDrawer open={drawer} onClose={() => setDrawer(false)} onSave={addLead} currentUser={currentUser} />
+      {profileOpen && <ProfileModal currentUser={currentUser} onClose={() => setProfileOpen(false)} onSave={updateProfile} />}
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} data={data} setPage={setPage}
         onSelect={r => { setPage(r.page); setOpenItem(r); setSearchOpen(false) }} />
       <BellPanel open={bellOpen} onClose={() => setBellOpen(false)} tasks={tasks} cobros={role === 'admin' ? cobros : []} />
