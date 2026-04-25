@@ -27,10 +27,6 @@ function getServicios() {
   } catch { return ['Web premium','Automatización WhatsApp','Chatbot de reservas'] }
 }
 
-function getResp() {
-  return []
-}
-
 // ── Activity log (localStorage) ─────────────────────────────────
 const ACT_TYPES = [
   { id:'llamada', label:'Llamada', icon:'📞' },
@@ -288,8 +284,7 @@ function ActivitySection({ leadId, defaultResp }) {
 
   const add = () => {
     if (!texto.trim()) return
-    const RESP = getResp()
-    const entry = { id: Date.now(), tipo, texto: texto.trim(), fecha: new Date().toISOString(), resp: defaultResp || RESP[0] || '' }
+    const entry = { id: Date.now(), tipo, texto: texto.trim(), fecha: new Date().toISOString(), resp: defaultResp || '' }
     const updated = [entry, ...items]
     setItems(updated)
     saveAct(leadId, updated)

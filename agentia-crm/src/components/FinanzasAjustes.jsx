@@ -722,10 +722,6 @@ const DEFAULT_SERVICIOS = [
   { id:5, n:'Campaña captación',        base:900,  activo:false, color:'#FF5A6A' },
 ]
 
-function initials(name) {
-  return (name || '').split(' ').map(w => w[0]).filter(Boolean).join('').slice(0,2).toUpperCase() || '?'
-}
-
 function UsuarioModal({ usuario, onClose, onSave, onDelete }) {
   const isNew = !usuario?.id
   const [form, setForm] = useState(usuario || { nombre:'', iniciales:'', rol:'Empleado', email:'', estado:'activo' })
