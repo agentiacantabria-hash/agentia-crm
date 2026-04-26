@@ -303,6 +303,19 @@ input, textarea, select { font-family: inherit; }
 }
 /* Btn nuevo lead no se encoge */
 .topbar > .btn { flex-shrink: 0; }
+
+/* En escritorio, el subtítulo del cliente en fin-table no es necesario */
+@media (min-width: 769px) {
+  .fin-cli-sub { display: none; }
+  .fin-table td, .fin-table th { padding: 14px; }
+  .fin-cobrar-btn { padding: 3px 10px !important; font-size: 12px !important; }
+}
+
+/* Kanban cards: evitar selección de texto y menú contextual en long-press */
+.kanban-card {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
 /* Elementos solo en móvil / solo en escritorio */
 .mobile-only   { display: inline-flex; flex-shrink: 0; }
 .desktop-only  { display: none; }
@@ -1214,6 +1227,26 @@ label.lbl {
 
   /* Finanzas */
   .fin-card { padding: 14px; }
+
+  /* Tabla de facturas: rediseño para móvil */
+  .fin-table thead th.hide-mobile { display: none; }
+  .fin-table td.hide-mobile       { display: none; }
+
+  /* Nombre cliente: mostrar concepto debajo como subtítulo */
+  .fin-cli { display: flex; flex-direction: column; gap: 2px; }
+  .fin-cli-sub { font-size: 11px; color: var(--text-4); display: block; }
+  /* En escritorio ocultamos el subtítulo (la columna Concepto ya lo muestra) */
+
+  /* Importe y estado: compactos */
+  .fin-imp  { font-size: 13px; white-space: nowrap; }
+  .fin-est  { white-space: nowrap; }
+
+  /* Acciones: icono × siempre visible, botón "✓ Cobrado" compacto */
+  .fin-act { display: flex; align-items: center; gap: 4px; justify-content: flex-end; white-space: nowrap; }
+  .fin-cobrar-btn { padding: 3px 8px !important; font-size: 11px !important; white-space: nowrap; }
+
+  /* Reducir padding general de celdas en móvil */
+  .fin-table td, .fin-table th { padding: 10px 8px; }
 
   /* Tareas */
   .task { padding: 10px 14px; }

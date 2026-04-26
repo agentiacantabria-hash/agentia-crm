@@ -512,16 +512,23 @@ export function Finanzas({ role, data }) {
                 {puntuales.length === 0 ? (
                   <div className="small" style={{color:'var(--text-4)', textAlign:'center', padding:'20px 0'}}>Sin facturas puntuales</div>
                 ) : (
-                  <div style={{overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
-                  <table className="table">
-                    <thead><tr><th>Cliente</th><th>Concepto</th><th style={{textAlign:'right'}}>Importe</th><th>Vencimiento</th><th>Estado</th><th></th></tr></thead>
+                  <table className="table fin-table">
+                    <thead><tr>
+                      <th>Cliente</th><th className="hide-mobile">Concepto</th>
+                      <th style={{textAlign:'right'}}>Importe</th>
+                      <th className="hide-mobile">Vencimiento</th>
+                      <th>Estado</th><th></th>
+                    </tr></thead>
                     <tbody>
                       {puntuales.map(c => (
-                        <tr key={c.id} style={{cursor:'pointer'}} onClick={() => setEditingCobro(c)}>
-                          <td><span className="primary">{c.cliente}</span></td>
-                          <td className="muted small">{c.concepto}</td>
-                          <td className="mono" style={{textAlign:'right'}}>€{eur(c.monto||0)}</td>
-                          <td className="muted">
+                        <tr key={c.id} className="fin-row" style={{cursor:'pointer'}} onClick={() => setEditingCobro(c)}>
+                          <td className="fin-cli">
+                            <span className="primary">{c.cliente}</span>
+                            <span className="fin-cli-sub">{c.concepto}</span>
+                          </td>
+                          <td className="muted small hide-mobile">{c.concepto}</td>
+                          <td className="mono fin-imp" style={{textAlign:'right'}}>€{eur(c.monto||0)}</td>
+                          <td className="muted hide-mobile">
                             {c.vence || '—'}
                             {!c.pagado && c.vence && (() => {
                               const dias = Math.floor((Date.now() - new Date(c.vence + 'T00:00:00')) / 86400000)
@@ -530,7 +537,7 @@ export function Finanzas({ role, data }) {
                               return <span style={{marginLeft:6, fontSize:10.5, fontWeight:600, color:col, fontFamily:'var(--font-mono)'}}>{dias === 0 ? 'Hoy' : `+${dias}d`}</span>
                             })()}
                           </td>
-                          <td>
+                          <td className="fin-est">
                             {c.pagado && (c.concepto || '').startsWith('Señal ·')
                               ? <span className="chip amber"><span className="dot"/>Señal pagada</span>
                               : c.pagado
@@ -540,14 +547,14 @@ export function Finanzas({ role, data }) {
                                   : <span className="chip amber"><span className="dot"/>Pendiente</span>
                             }
                           </td>
-                          <td style={{display:'flex', alignItems:'center', gap:6, justifyContent:'flex-end'}}>
+                          <td className="fin-act">
                             {!c.pagado && (
-                              <button className="btn sm" style={{padding:'3px 10px', fontSize:12}}
+                              <button className="btn sm fin-cobrar-btn"
                                 onClick={e => { e.stopPropagation(); data.updateCobro?.(c.id, { pagado: true, vencida: false }); showToast?.(`Cobro de ${c.cliente} marcado como pagado`) }}>
                                 ✓ Cobrado
                               </button>
                             )}
-                            <button className="icon-btn" style={{width:24, height:24, color:'var(--text-4)'}}
+                            <button className="icon-btn" style={{width:24, height:24, color:'var(--text-4)', flexShrink:0}}
                               onClick={e => { e.stopPropagation(); if (confirm(`¿Eliminar factura de ${c.cliente}?`)) data.deleteCobro?.(c.id) }}>
                               <I.Close size={11}/>
                             </button>
@@ -556,7 +563,6 @@ export function Finanzas({ role, data }) {
                       ))}
                     </tbody>
                   </table>
-                  </div>
                 )}
               </div>
             )

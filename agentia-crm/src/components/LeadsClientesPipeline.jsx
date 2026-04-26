@@ -805,6 +805,7 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser 
   const kanbanRef    = useRef(null)
   const touchDragRef = useRef(null)
   const moveCardRef  = useRef(null)
+  const longPressRef = useRef(null)   // long-press pendiente (antes de activar drag)
 
   const myIni   = currentUser?.rol !== 'Admin' ? currentUser?.iniciales : null
   const allResp = teamMembers.length
@@ -866,27 +867,56 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser 
 
   moveCardRef.current = moveCard
 
+  // En móvil: long-press (450 ms) para activar drag.
+  // Así el scroll horizontal no interfiere con las tarjetas.
   const handleCardTouchStart = (e, lead) => {
     if (e.touches.length !== 1) return
-    const touch = e.touches[0]
-    const rect  = e.currentTarget.getBoundingClientRect()
-    touchDragRef.current = {
-      leadId: lead.id,
-      leadName: lead.empresa,
-      leadEstado: lead.estado,
-      offsetX: touch.clientX - rect.left,
-      offsetY: touch.clientY - rect.top,
-      ghostX: touch.clientX,
-      ghostY: touch.clientY,
-      targetCol: null,
-      moved: false,
+    const touch  = e.touches[0]
+    const rect   = e.currentTarget.getBoundingClientRect()
+    const startX = touch.clientX
+    const startY = touch.clientY
+    const offsetX = touch.clientX - rect.left
+    const offsetY = touch.clientY - rect.top
+
+    // Cancelar cualquier long-press anterior
+    if (longPressRef.current) {
+      clearTimeout(longPressRef.current.timer)
+      longPressRef.current = null
     }
+
+    const timer = setTimeout(() => {
+      const pending = longPressRef.current
+      if (!pending) return
+      longPressRef.current = null
+      // Feedback háptico si el navegador lo soporta
+      navigator.vibrate?.(35)
+      touchDragRef.current = {
+        leadId: lead.id, leadName: lead.empresa, leadEstado: lead.estado,
+        offsetX, offsetY,
+        ghostX: startX, ghostY: startY,
+        targetCol: null, moved: false,
+      }
+      setTouchDrag({ leadId: lead.id, leadName: lead.empresa, ghostX: startX, ghostY: startY, targetCol: null })
+    }, 450)
+
+    longPressRef.current = { timer, startX, startY }
   }
 
   useEffect(() => {
     const el = kanbanRef.current
     if (!el) return
     const onTouchMove = (e) => {
+      // Long-press pendiente: si el dedo se mueve más de 8 px → scroll normal, cancelar drag
+      if (longPressRef.current) {
+        const touch = e.touches[0]
+        const dx = Math.abs(touch.clientX - longPressRef.current.startX)
+        const dy = Math.abs(touch.clientY - longPressRef.current.startY)
+        if (dx > 8 || dy > 8) {
+          clearTimeout(longPressRef.current.timer)
+          longPressRef.current = null
+        }
+        return // no bloquear el scroll mientras decidimos
+      }
       const drag = touchDragRef.current
       if (!drag) return
       e.preventDefault()
@@ -900,6 +930,11 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser 
       setTouchDrag({ leadId: drag.leadId, leadName: drag.leadName, ghostX, ghostY, targetCol })
     }
     const onTouchEnd = () => {
+      // Levantar el dedo antes del long-press → no drag, solo click normal
+      if (longPressRef.current) {
+        clearTimeout(longPressRef.current.timer)
+        longPressRef.current = null
+      }
       const drag = touchDragRef.current
       touchDragRef.current = null
       setTouchDrag(null)
