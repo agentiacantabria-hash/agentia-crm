@@ -822,11 +822,26 @@ export function Ajustes({ role, data }) {
   const saveUsuario = async (form) => {
     const { id, created_at, ...fields } = form
     if (id) {
-      const { data } = await supabase.from('usuarios').update(fields).eq('id', id).select().single()
-      if (data) setUsuarios(prev => prev.map(u => u.id === id ? data : u))
+      const oldUser = usuarios.find(u => u.id === id)
+      const oldIni  = oldUser?.iniciales
+      const newIni  = fields.iniciales
+      const { data: savedUser } = await supabase.from('usuarios').update(fields).eq('id', id).select().single()
+      if (savedUser) {
+        setUsuarios(prev => prev.map(u => u.id === id ? savedUser : u))
+        // Cascade: si cambian las iniciales, actualizar todas las tablas que las usan como FK textual
+        // Las actualizaciones en DB disparan realtime → App.jsx actualiza el estado local
+        if (oldIni && newIni && oldIni !== newIni) {
+          await Promise.all([
+            supabase.from('leads').update({ responsable: newIni }).eq('responsable', oldIni),
+            supabase.from('tareas').update({ resp: newIni }).eq('resp', oldIni),
+            supabase.from('proyectos').update({ resp: newIni }).eq('resp', oldIni),
+            supabase.from('clientes').update({ responsable: newIni }).eq('responsable', oldIni),
+          ])
+        }
+      }
     } else {
-      const { data } = await supabase.from('usuarios').insert([fields]).select().single()
-      if (data) setUsuarios(prev => [...prev, data])
+      const { data: newUser } = await supabase.from('usuarios').insert([fields]).select().single()
+      if (newUser) setUsuarios(prev => [...prev, newUser])
     }
     setEditingUsuario(null); setAddingUsuario(false)
   }
