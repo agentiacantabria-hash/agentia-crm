@@ -1353,3 +1353,23 @@ label.lbl {
     pointer-events: none;
   }
 }
+
+/* ── WowEffect ───────────────────────────────────────── */
+@keyframes wowPop {
+  0%   { transform: scale(0.3) translateY(20px); opacity: 0 }
+  60%  { transform: scale(1.08) translateY(-4px); opacity: 1 }
+  100% { transform: scale(1) translateY(0); opacity: 1 }
+}
+@keyframes wowFloat {
+  0%, 100% { transform: translateY(0) }
+  50%       { transform: translateY(-8px) }
+}
+.wow-overlay  { position: fixed; inset: 0; z-index: 9990; pointer-events: none; display: flex; align-items: center; justify-content: center; }
+.wow-canvas   { position: absolute; inset: 0; }
+.wow-card     { padding: 32px 48px; background: rgba(10,14,23,0.85); backdrop-filter: blur(20px) saturate(1.5); border: 1px solid rgba(255,255,255,0.12); border-radius: 24px; box-shadow: 0 40px 100px rgba(0,0,0,0.8); animation: wowPop 0.6s cubic-bezier(0.34,1.56,0.64,1) both; text-align: center; position: relative; z-index: 1; }
+.wow-icon     { line-height: 1; animation: wowFloat 1.4s ease-in-out infinite; }
+.wow-trophy   { font-size: 88px; filter: drop-shadow(0 0 40px rgba(255,215,0,0.9)); }
+.wow-money    { font-size: 66px; filter: drop-shadow(0 0 24px rgba(62,207,142,0.8)); }
+.wow-title    { font-weight: 900; letter-spacing: -0.03em; margin-top: 16px; line-height: 1.1; }
+.wow-cliente  { font-size: 18px; font-weight: 600; color: rgba(255,255,255,0.85); text-shadow: 0 2px 12px rgba(0,0,0,0.9); margin-top: 10px; }
+.wow-sub      { font-size: 14px; color: rgba(255,215,0,0.7); text-shadow: 0 2px 8px rgba(0,0,0,0.8); margin-top: 8px; letter-spacing: 0.04em; text-transform: uppercase; }

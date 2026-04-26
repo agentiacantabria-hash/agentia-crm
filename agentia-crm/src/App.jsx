@@ -9,6 +9,7 @@ import Equipo from './components/Equipo'
 import Login from './components/Login'
 import { supabase } from './lib/supabase'
 import { STAGE, STAGES_CLOSED } from './components/data'
+import { WowEffect } from './components/WowEffect'
 
 const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 
@@ -100,6 +101,8 @@ export default function App() {
   useEffect(() => { cobrosRef.current    = cobros    }, [cobros])
   useEffect(() => { tasksRef.current     = tasks     }, [tasks])
   useEffect(() => { proyectosRef.current = proyectos }, [proyectos])
+
+  const [wowEffect, setWowEffect] = useState(null)
 
   // Toast notifications
   const [toasts, setToasts] = useState([])
@@ -481,6 +484,7 @@ export default function App() {
     const seraDenegado = nuevoEstado === STAGE.DENEGADO
 
     if (seraCobrado && !eraCobrado) {
+      setWowEffect({ type: 'full', cliente: lead?.empresa })
       autoWinLead({ ...lead, ...safeUpdates, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, vence_resto })
     } else if (eraCobrado && nuevoEstado && !seraCobrado) {
       // Deja de ser Cobrado → eliminar cobro automático y cliente auto-creado
@@ -763,6 +767,7 @@ export default function App() {
         const proyecto = proyectosRef.current.find(p => p.cliente === cobro.cliente && p.estado !== 'Cerrado')
         if (proyecto) updateProyecto(proyecto.id, { progreso: 100, pago: 'Pagado' })
       }
+      setWowEffect(prev => prev ? prev : { type: todoPagado ? 'full' : 'partial', cliente: cobro.cliente })
     }
 
     // Si es un cobro recurrente que acaba de pagarse, generar el siguiente período
@@ -865,6 +870,8 @@ export default function App() {
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} data={data} setPage={setPage}
         onSelect={r => { setPage(r.page); setOpenItem(r); setSearchOpen(false) }} />
       <BellPanel open={bellOpen} onClose={() => setBellOpen(false)} tasks={tasks} cobros={role === 'admin' ? cobros : []} notificaciones={notificaciones} onMarkRead={markNotifsRead} />
+
+      {wowEffect && <WowEffect type={wowEffect.type} cliente={wowEffect.cliente} onDone={() => setWowEffect(null)} />}
 
       {/* Toast notifications */}
       <div className="toast-container" style={{position:'fixed', display:'flex', flexDirection:'column', gap:8, zIndex:9999, pointerEvents:'none'}}>
