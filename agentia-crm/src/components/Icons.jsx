@@ -41,4 +41,5 @@ export const I = {
   Layers:   (p) => <Icon {...p}><path d="M12 2l10 6-10 6L2 8z"/><path d="M2 14l10 6 10-6"/></Icon>,
   Bolt:     (p) => <Icon {...p}><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></Icon>,
   Command:  (p) => <Icon {...p}><rect x="5" y="5" width="14" height="14" rx="3"/></Icon>,
+  BarChart: (p) => <Icon {...p}><path d="M3 3v18h18"/><rect x="7" y="9" width="3" height="9" rx="1"/><rect x="12" y="5" width="3" height="13" rx="1"/><rect x="17" y="12" width="3" height="6" rx="1"/></Icon>,
 }

@@ -5,6 +5,7 @@ import Dashboard from './components/Dashboard'
 import { Clientes, Pipeline } from './components/LeadsClientesPipeline'
 import { Tareas, Proyectos } from './components/TareasProyectos'
 import { Finanzas, Ajustes } from './components/FinanzasAjustes'
+import Equipo from './components/Equipo'
 import Login from './components/Login'
 import { supabase } from './lib/supabase'
 import { STAGE, STAGES_CLOSED } from './components/data'
@@ -15,6 +16,7 @@ const PAGES = [
   ['clientes','Clientes'],
   ['tareas','Tareas'],
   ['proyectos','Proyectos'],
+  ['equipo','Equipo'],
   ['finanzas','Finanzas'],
   ['ajustes','Ajustes'],
 ]
@@ -25,6 +27,7 @@ const crumbMap = {
   clientes:  ['Agentia','Comercial','Clientes'],
   tareas:    ['Agentia','Operativo','Tareas'],
   proyectos: ['Agentia','Entrega','Proyectos'],
+  equipo:    ['Agentia','Administración','Equipo'],
   finanzas:  ['Agentia','Administración','Finanzas'],
   ajustes:   ['Agentia','Administración','Ajustes'],
 }
@@ -83,6 +86,7 @@ export default function App() {
   const [teamMembers,    setTeamMembers]    = useState([])
   const [actividades,    setActividades]    = useState([])
   const [notificaciones, setNotificaciones] = useState([])
+  const [usuarios,       setUsuarios]       = useState([])
 
   // Refs para siempre tener el valor actual en callbacks sin stale closures
   const clientesRef  = useRef(clientes)
@@ -161,7 +165,10 @@ export default function App() {
         if (!t.error && t.data)  setTasks(t.data)
         if (!p.error && p.data)  setProyectos(p.data)
         if (!g.error && g.data)  setGastos(g.data)
-        if (tm.data) setTeamMembers(tm.data.map(u => u.iniciales).filter(Boolean))
+        if (tm.data) {
+          setTeamMembers(tm.data.map(u => u.iniciales).filter(Boolean))
+          setUsuarios(tm.data.filter(u => u.iniciales))
+        }
         if (!co.error && co.data) {
           const today = new Date(); today.setHours(0,0,0,0)
           setCobros(co.data.map(c => {
@@ -699,7 +706,7 @@ export default function App() {
     notificaciones.filter(n => !n.leida).length
 
   const data = {
-    leads, clientes, tasks, proyectos, gastos, cobros, teamMembers, actividades,
+    leads, clientes, tasks, proyectos, gastos, cobros, teamMembers, actividades, usuarios,
     addLead, updateLead, deleteLead,
     addCliente, updateCliente, deleteCliente,
     addTask, updateTask, deleteTask,
@@ -731,6 +738,7 @@ export default function App() {
       case 'clientes':  return <Clientes data={data} openItem={openItem} onItemOpened={clearOpenItem} currentUser={currentUser} />
       case 'tareas':    return <Tareas data={data} openItem={openItem} onItemOpened={clearOpenItem} currentUser={currentUser} />
       case 'proyectos': return <Proyectos data={data} currentUser={currentUser} />
+      case 'equipo':    return role === 'admin' ? <Equipo data={data} /> : null
       case 'finanzas':  return role === 'admin' ? <Finanzas role={role} data={data} /> : null
       case 'ajustes':   return role === 'admin' ? <Ajustes role={role} data={data} currentUser={currentUser} /> : null
       default:          return null

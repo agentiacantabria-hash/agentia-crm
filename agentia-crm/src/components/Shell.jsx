@@ -33,6 +33,7 @@ export function Sidebar({ page, setPage, role, counts, isOpen, onClose, currentU
     { key:'proyectos', label:'Proyectos', icon: I.Projects, count: counts.proyectos },
   ]
   const admin = [
+    { key:'equipo',   label:'Equipo',   icon: I.BarChart, adminOnly: true },
     { key:'finanzas', label:'Finanzas', icon: I.Finance,  adminOnly: true },
     { key:'ajustes',  label:'Ajustes',  icon: I.Settings, adminOnly: true },
   ]
