@@ -558,19 +558,25 @@ export default function App() {
     // Cobrado: "Quitar del pipeline" conserva el cliente (es historial real)
     if (lead?.estado === STAGE.COBRADO) return
 
-    // Señal pagada: limpiar cobros de señal y resto creados al confirmar la señal
+    // Señal pagada: limpiar cobros de señal y resto, y cliente auto-creado si no tiene historial
     if (lead?.estado === STAGE.SEÑAL) {
       const señalVal = parseFloat(lead.señal_cobrada) || 0
-      if (señalVal > 0) {
-        const señalCobro = cobrosRef.current.find(c =>
-          c.cliente === lead.empresa && (c.concepto || '').startsWith('Señal ·') && c.monto === señalVal
-        )
-        if (señalCobro) deleteCobro(señalCobro.id)
-      }
+      const señalCobro = señalVal > 0 ? cobrosRef.current.find(c =>
+        c.cliente === lead.empresa && (c.concepto || '').startsWith('Señal ·') && c.monto === señalVal
+      ) : null
       const restoCobro = cobrosRef.current.find(c =>
         c.cliente === lead.empresa && (c.concepto || '').startsWith('Resto ·') && !c.pagado
       )
+      const otherPaid = cobrosRef.current.some(co =>
+        co.cliente === lead.empresa && co.pagado && co.id !== señalCobro?.id
+      )
+      if (señalCobro) deleteCobro(señalCobro.id)
       if (restoCobro) deleteCobro(restoCobro.id)
+      const clienteAuto = clientesRef.current.find(c => c.nombre === lead.empresa)
+      if (clienteAuto && !otherPaid) {
+        deleteCliente(clienteAuto.id) // deleteCliente ya cascadea tareas y proyectos
+        return
+      }
     }
 
     // Leads activos: limpiar cobro automático si lo había
