@@ -483,9 +483,24 @@ export default function App() {
     const seraCobrado  = nuevoEstado === STAGE.COBRADO
     const seraDenegado = nuevoEstado === STAGE.DENEGADO
 
+    // Señal pagada → efecto parcial
+    if (nuevoEstado === STAGE.SEÑAL && lead?.estado !== STAGE.SEÑAL) {
+      setWowEffect(prev => prev ? prev : { type: 'partial', cliente: lead?.empresa })
+    }
+
     if (seraCobrado && !eraCobrado) {
-      setWowEffect({ type: 'full', cliente: lead?.empresa })
       autoWinLead({ ...lead, ...safeUpdates, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, vence_resto })
+      // WowEffect según tipo de pago:
+      // - tieneSeñal: updateCobro gestiona internamente cuando se paga el 'Resto' existente
+      // - dividido sin señal_cobrada: señal creada como paid, resto pendiente → parcial
+      // - simple (un solo pago): cobro creado como paid → completo
+      const monto = parseFloat(safeUpdates.monto ?? lead?.monto) || 0
+      const esRecurrente = (tipo || lead?.tipo) === 'Recurrente'
+      const esDividido = pagoDividido || lead?.pagoDividido
+      const tieneSeñal = (parseFloat(lead?.señal_cobrada) || 0) > 0
+      if (!tieneSeñal && !esRecurrente && monto > 0) {
+        setWowEffect(prev => prev ? prev : { type: esDividido ? 'partial' : 'full', cliente: lead?.empresa })
+      }
     } else if (eraCobrado && nuevoEstado && !seraCobrado) {
       // Deja de ser Cobrado → eliminar cobro automático y cliente auto-creado
       const c = findCobroAuto(lead)

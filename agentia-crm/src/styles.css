@@ -247,6 +247,13 @@ input, textarea, select { font-family: inherit; }
   z-index: 30;
   overflow: hidden;
 }
+/* móvil: respetar safe-area del sistema (notch, dynamic island, etc.) */
+@media (max-width: 768px) {
+  .topbar {
+    padding-top: env(safe-area-inset-top, 0px);
+    height: calc(54px + env(safe-area-inset-top, 0px));
+  }
+}
 /* escritorio: completo */
 @media (min-width: 769px) {
   .topbar { height: 58px; padding: 0 24px; gap: 16px; overflow: visible; }
