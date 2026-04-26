@@ -478,6 +478,15 @@ export default function App() {
       // Deja de ser Cobrado → eliminar cobro automático y cliente auto-creado
       const c = findCobroAuto(lead)
       if (c) deleteCobro(c.id)
+      // pagoDividido: los cobros 'Señal (X%) · ...' y 'Resto (X%) · ...' no son detectados por
+      // findCobroAuto (concepto distinto al servicio); el Señal pagado queda como historial,
+      // pero el Resto sin pagar hay que eliminarlo para no dejar cargos pendientes huérfanos
+      const restoDivididoCobro = cobrosRef.current.find(co =>
+        co.cliente === lead.empresa &&
+        (co.concepto || '').startsWith('Resto (') &&
+        !co.pagado && !co.recurrente
+      )
+      if (restoDivididoCobro) deleteCobro(restoDivididoCobro.id)
       const clienteAuto = clientesRef.current.find(cl => cl.nombre === lead.empresa)
       if (clienteAuto) {
         // Solo borrar si no hay otros cobros pagados — protege clientes pre-existentes con historial
