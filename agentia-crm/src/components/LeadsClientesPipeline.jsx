@@ -335,7 +335,7 @@ function ActivitySection({ leadId, defaultResp }) {
                 <span style={{fontSize:11.5, fontWeight:600, color:'var(--text-2)'}}>{t.label}</span>
                 <div style={{display:'flex', alignItems:'center', gap:6, flexShrink:0}}>
                   {item.resp && <div className="avatar xs" style={{fontSize:9,width:17,height:17}}>{item.resp}</div>}
-                  <span style={{fontSize:10.5, color:'var(--text-4)'}}>{fmt(item.fecha)}</span>
+                  <span style={{fontSize:10.5, color:'var(--text-4)'}}>{fmt(item.created_at)}</span>
                   <button style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-4)',fontSize:14,lineHeight:1,padding:'0 2px',display:'flex',alignItems:'center'}} onClick={() => remove(item.id)}>×</button>
                 </div>
               </div>

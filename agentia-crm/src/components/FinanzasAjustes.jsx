@@ -747,7 +747,7 @@ function UsuarioModal({ usuario, onClose, onSave, onDelete }) {
           <input value={form.email||''} onChange={e => set('email', e.target.value)} placeholder="juan@agentia.com" />
         </F>
         <F label="Rol">
-          <CustomSelect value={form.rol||'Empleado'} onChange={v => set('rol', v)} options={['Admin','Empleado']} />
+          <CustomSelect value={form.rol||'Empleado'} onChange={v => set('rol', v)} options={['Admin','Manager','Empleado']} />
         </F>
       </div>
       <F label="Estado">
@@ -965,7 +965,9 @@ export function Ajustes({ role, data }) {
                     <td>
                       {u.rol==='Admin'
                         ? <span className="chip blue"><span className="dot"/>Admin</span>
-                        : <span className="chip gray"><span className="dot"/>Empleado</span>
+                        : u.rol==='Manager'
+                          ? <span className="chip amber"><span className="dot"/>Manager</span>
+                          : <span className="chip gray"><span className="dot"/>Empleado</span>
                       }
                     </td>
                     <td>

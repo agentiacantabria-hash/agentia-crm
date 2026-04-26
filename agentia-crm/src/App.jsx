@@ -273,7 +273,7 @@ export default function App() {
     if (incluirLeads) {
       const targets = leads.filter(l => l.responsable === de && !STAGES_CLOSED.includes(l.estado))
       if (targets.length) {
-        await supabase.from('leads').update({ responsable: a }).eq('responsable', de).not('estado', 'in', `("${STAGES_CLOSED.join('","')}")`)
+        await supabase.from('leads').update({ responsable: a }).eq('responsable', de).not('estado', 'in', `(${STAGES_CLOSED.join(',')})`)
         setLeads(prev => prev.map(l => l.responsable === de && !STAGES_CLOSED.includes(l.estado) ? { ...l, responsable: a } : l))
         count += targets.length
       }
@@ -590,10 +590,10 @@ export default function App() {
 
     // Cascade: borrar tareas, proyectos y cobros de este cliente
     if (cliente) {
-      tasks.filter(t => t.cliente === cliente.nombre).forEach(t => deleteTask(t.id))
-      proyectos.filter(p => p.cliente === cliente.nombre).forEach(p => deleteProyecto(p.id))
+      tasksRef.current.filter(t => t.cliente === cliente.nombre).forEach(t => deleteTask(t.id))
+      proyectosRef.current.filter(p => p.cliente === cliente.nombre).forEach(p => deleteProyecto(p.id))
       // Solo borrar cobros NO pagados — los pagados son historial financiero
-      cobros.filter(c => c.cliente === cliente.nombre && !c.pagado).forEach(c => deleteCobro(c.id))
+      cobrosRef.current.filter(c => c.cliente === cliente.nombre && !c.pagado).forEach(c => deleteCobro(c.id))
     }
   }
 
@@ -684,7 +684,7 @@ export default function App() {
   const addCobro = async (cobro) => {
     const { data: d, error } = await supabase.from('cobros').insert([clean(cobro)]).select().single()
     if (!error && d) {
-      setCobros(prev => [{ ...cobro, id: d.id, created_at: d.created_at }, ...prev])
+      setCobros(prev => [d, ...prev])
     } else if (error) console.error('[Supabase] addCobro:', error.message)
   }
 
