@@ -27,7 +27,7 @@ export function Sidebar({ page, setPage, role, counts, isOpen, onClose, currentU
 
   const nav = [
     { key:'dashboard', label:'Inicio',    icon: I.Home },
-    { key:'pipeline',  label:'Pipeline',  icon: I.Pipeline, count: counts.leads },
+    { key:'pipeline',  label:'Pipeline',  icon: I.Pipeline },
     { key:'clientes',  label:'Clientes',  icon: I.Users,    count: counts.clientes },
     { key:'tareas',    label:'Tareas',    icon: I.Tasks,    count: counts.tareas },
     { key:'proyectos', label:'Proyectos', icon: I.Projects, count: counts.proyectos },
@@ -448,7 +448,7 @@ export function ProfileModal({ currentUser, onClose, onSave }) {
 export function BottomNav({ page, setPage, counts = {} }) {
   const items = [
     { key: 'dashboard', label: 'Inicio',     icon: I.Home },
-    { key: 'pipeline',  label: 'Pipeline',   icon: I.Pipeline,  count: counts.leads },
+    { key: 'pipeline',  label: 'Pipeline',   icon: I.Pipeline },
     { key: 'tareas',    label: 'Tareas',     icon: I.Tasks,     count: counts.tareas },
     { key: 'clientes',  label: 'Clientes',   icon: I.Users },
     { key: 'proyectos', label: 'Proyectos',  icon: I.Projects,  count: counts.proyectos },

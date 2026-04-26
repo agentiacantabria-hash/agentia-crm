@@ -49,27 +49,30 @@ function effectiveGroup(task) {
   return task.when_group || 'semana'
 }
 
+// Fecha local en formato YYYY-MM-DD (evita el desfase UTC)
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+
 function todayIso() {
-  return new Date().toISOString().slice(0,10)
+  return ymd(new Date())
 }
 
 function tomorrowIso() {
   const d = new Date(); d.setDate(d.getDate()+1)
-  return d.toISOString().slice(0,10)
+  return ymd(d)
 }
 
 function weekIso() {
   const d = new Date(); d.setDate(d.getDate()+3)
-  return d.toISOString().slice(0,10)
+  return ymd(d)
 }
 
 function taskDisplayDate(task) {
   if (task.due_date) return task.due_date
   const t = new Date(); t.setHours(0,0,0,0)
   const tomorrow = new Date(t); tomorrow.setDate(t.getDate() + 1)
-  if (task.when_group === 'hoy')     return t.toISOString().slice(0,10)
-  if (task.when_group === 'mañana')  return tomorrow.toISOString().slice(0,10)
-  if (task.when_group === 'vencida') return t.toISOString().slice(0,10)
+  if (task.when_group === 'hoy')     return ymd(t)
+  if (task.when_group === 'mañana')  return ymd(tomorrow)
+  if (task.when_group === 'vencida') return ymd(t)
   return null
 }
 
@@ -84,7 +87,7 @@ function getMonday(date) {
 
 function CalendarioView({ tasks, onEdit, onAdd }) {
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()))
-  const today = new Date().toISOString().slice(0,10)
+  const today = ymd(new Date())
 
   const days = useMemo(() => Array.from({length: 7}, (_, i) => {
     const d = new Date(weekStart); d.setDate(weekStart.getDate() + i)
@@ -117,7 +120,7 @@ function CalendarioView({ tasks, onEdit, onAdd }) {
 
       <div style={{display:'grid', gridTemplateColumns:'repeat(7, minmax(120px, 1fr))', gap:8, overflowX:'auto', paddingBottom:8}}>
         {days.map(d => {
-          const key   = d.toISOString().slice(0,10)
+          const key   = ymd(d)
           const isToday = key === today
           const isPast  = key < today
           const dayTasks = tasks.filter(t => taskDisplayDate(t) === key).sort((a,b) => {
@@ -184,7 +187,7 @@ function CalendarioView({ tasks, onEdit, onAdd }) {
 
 function MesView({ tasks, onEdit, onAdd }) {
   const [month, setMonth] = useState(() => { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d })
-  const today = new Date().toISOString().slice(0,10)
+  const today = ymd(new Date())
 
   const prevMonth = () => setMonth(d => { const n = new Date(d); n.setMonth(n.getMonth()-1); return n })
   const nextMonth = () => setMonth(d => { const n = new Date(d); n.setMonth(n.getMonth()+1); return n })
@@ -219,7 +222,7 @@ function MesView({ tasks, onEdit, onAdd }) {
           <div key={d} style={{fontSize:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-4)', textAlign:'center', padding:'2px 0 8px'}}>{d}</div>
         ))}
         {days.map(d => {
-          const key = d.toISOString().slice(0,10)
+          const key = ymd(d)
           const isCurrentMonth = d.getMonth() === month.getMonth()
           const isToday = key === today
           const dayTasks  = tasks.filter(t => taskDisplayDate(t) === key)
