@@ -384,22 +384,15 @@ export default function App() {
           const restoUpdates = { pagado: true, vencida: false }
           if (lead.vence_resto) restoUpdates.vence = lead.vence_resto
           updateCobro(existingResto.id, restoUpdates)
+          // updateCobro dispara el WowEffect internamente
         } else if (!esRecurrente) {
+          // No hay cobro Resto previo pero el lead está en COBRADO → todo pagado
           addCobro({
             cliente: lead.empresa, concepto: `Resto · ${servicio}`,
-            monto: restoMonto, vence: venceResto,
-            pagado: false, vencida: false, recurrente: false,
+            monto: restoMonto, vence: lead.vence_resto || null,
+            pagado: true, vencida: false, recurrente: false,
           })
-          addTask({
-            title: `Cobrar resto · ${lead.empresa}`,
-            cliente: lead.empresa,
-            when_group: 'semana',
-            due_date: venceResto,
-            prio: 'alta',
-            resp: lead.responsable || '',
-            done: false,
-            tag: 'Finanzas',
-          })
+          setWowEffect(prev => prev ? prev : { type: 'full', cliente: lead.empresa })
         }
       }
     } else if (dividido && monto > 0) {
