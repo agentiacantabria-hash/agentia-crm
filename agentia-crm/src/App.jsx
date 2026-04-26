@@ -750,14 +750,11 @@ export default function App() {
 
   const updateCobro = async (id, updates) => {
     const cobro = cobrosRef.current.find(c => c.id === id)
-    let ok = false
+    setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
     try {
       const { error } = await supabase.from('cobros').update(clean(updates)).eq('id', id)
-      if (!error) { setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c)); ok = true }
-    } catch (_) {
-      setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c)); ok = true
-    }
-    if (!ok) return
+      if (error) console.error('[Supabase] updateCobro:', error.message)
+    } catch (_) {}
     // Auto-update proyecto: si todos los cobros del cliente quedan pagados, marcar progreso 100%
     if (updates.pagado === true && cobro && !cobro.pagado) {
       const allCobros = cobrosRef.current

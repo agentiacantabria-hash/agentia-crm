@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react'
 
-const C_PARTIAL = ['#FFD700','#3ECF8E','#FFB547','#4F8BFF','#FFFFFF','#9A7BFF']
-const C_FULL    = ['#FFD700','#FF5A6A','#3ECF8E','#4F8BFF','#9A7BFF','#FFB547','#FF69B4','#00CED1','#FFFFFF','#FF4500']
+const EMOJIS_FULL    = ['💰','💵','💴','💶','💷','🤑','🪙','💎','🏆','⭐','✨','🎉','🎊','💸']
+const EMOJIS_PARTIAL = ['💰','💵','🪙','💸','✨','🎉']
+const C_PARTIAL      = ['#FFD700','#3ECF8E','#FFB547','#4F8BFF','#FFFFFF','#9A7BFF']
 
 const DURATION   = 5000
 const FADE_START = 3500
@@ -10,7 +11,6 @@ export function WowEffect({ type, cliente, onDone }) {
   const canvasRef = useRef(null)
   const stateRef  = useRef(null)
   const isFull    = type === 'full'
-  const COLORS    = isFull ? C_FULL : C_PARTIAL
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -24,46 +24,56 @@ export function WowEffect({ type, cliente, onDone }) {
     const state = { particles: [], start: Date.now(), lastRain: 0, lastBurst: 0, raf: null }
     stateRef.current = state
 
-    const mkParticle = (x, y, born, speedMult = 1, rain = false) => ({
+    const EMOJIS = isFull ? EMOJIS_FULL : EMOJIS_PARTIAL
+
+    const mkEmoji = (x, y, born, speedMult = 1, rain = false) => ({
       x, y,
       vx: rain ? (Math.random() - 0.5) * 3 : (Math.random() - 0.5) * 14 * speedMult,
       vy: rain ? Math.random() * 4 + 2 : (Math.random() * -14 - 4) * speedMult,
-      color: COLORS[Math.floor(Math.random() * COLORS.length)],
-      size: Math.random() * (isFull ? 13 : 9) + 4,
+      emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
+      size: Math.random() * (isFull ? 30 : 22) + (isFull ? 18 : 14),
       rot: Math.random() * 360,
-      rotV: (Math.random() - 0.5) * (rain ? 6 : 16),
-      shape: rain ? (Math.random() > 0.5 ? 'rect' : 'circle')
-                  : ['rect','rect','circle','star'][Math.floor(Math.random() * 4)],
+      rotV: (Math.random() - 0.5) * (rain ? 4 : 12),
       gravity: rain ? 0.05 : 0.26,
       born,
     })
+
+    // Para partial: mezcla emojis + confetti geométrico
+    const mkConfetti = (x, y, born, speedMult = 1, rain = false) => ({
+      x, y,
+      vx: rain ? (Math.random() - 0.5) * 3 : (Math.random() - 0.5) * 14 * speedMult,
+      vy: rain ? Math.random() * 4 + 2 : (Math.random() * -14 - 4) * speedMult,
+      color: C_PARTIAL[Math.floor(Math.random() * C_PARTIAL.length)],
+      size: Math.random() * 9 + 4,
+      rot: Math.random() * 360,
+      rotV: (Math.random() - 0.5) * (rain ? 6 : 16),
+      shape: rain ? (Math.random() > 0.5 ? 'rect' : 'circle')
+                  : ['rect','rect','circle'][Math.floor(Math.random() * 3)],
+      gravity: rain ? 0.05 : 0.26,
+      born,
+      isConfetti: true,
+    })
+
+    const mkParticle = (x, y, born, speedMult = 1, rain = false) => {
+      if (isFull) return mkEmoji(x, y, born, speedMult, rain)
+      // partial: 40% emojis, 60% confetti
+      return Math.random() < 0.4
+        ? mkEmoji(x, y, born, speedMult, rain)
+        : mkConfetti(x, y, born, speedMult, rain)
+    }
 
     const burst = (x, y, count, speedMult = 1, born = 0) => {
       for (let i = 0; i < count; i++) state.particles.push(mkParticle(x, y, born, speedMult, false))
     }
 
     const rain = (born) => {
-      const n = isFull ? 12 : 6
+      const n = isFull ? 10 : 5
       for (let i = 0; i < n; i++) {
         const x = Math.random() * canvas.width
         state.particles.push(mkParticle(x, -30, born, 1, true))
       }
     }
 
-    const drawStar = (r) => {
-      ctx.beginPath()
-      for (let i = 0; i < 5; i++) {
-        const a  = (Math.PI * 2 / 5) * i - Math.PI / 2
-        const a2 = a + Math.PI / 5
-        if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r)
-        else          ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r)
-        ctx.lineTo(Math.cos(a2) * r * 0.38, Math.sin(a2) * r * 0.38)
-      }
-      ctx.closePath()
-      ctx.fill()
-    }
-
-    // Bursts iniciales
     const cx = canvas.width / 2, cy = canvas.height / 2
     burst(cx, cy, isFull ? 120 : 60, isFull ? 2.4 : 1.5, 0)
     if (isFull) {
@@ -82,11 +92,9 @@ export function WowEffect({ type, cliente, onDone }) {
         return
       }
 
-      // lluvia continua
       if (elapsed - state.lastRain > (isFull ? 65 : 130) && elapsed < 3800) {
         state.lastRain = elapsed; rain(elapsed)
       }
-      // bursts aleatorios para full
       if (isFull && elapsed > 500 && elapsed < 2800 && elapsed - state.lastBurst > 700) {
         state.lastBurst = elapsed
         burst(
@@ -97,7 +105,6 @@ export function WowEffect({ type, cliente, onDone }) {
       }
 
       const gFade = elapsed > FADE_START ? 1 - (elapsed - FADE_START) / (DURATION - FADE_START) : 1
-
       ctx.clearRect(0, 0, canvas.width, canvas.height)
 
       const { particles } = state
@@ -115,11 +122,19 @@ export function WowEffect({ type, cliente, onDone }) {
         ctx.globalAlpha = op
         ctx.translate(p.x, p.y)
         ctx.rotate(p.rot * Math.PI / 180)
-        ctx.fillStyle = p.color
-        const s = p.size
-        if      (p.shape === 'rect')   ctx.fillRect(-s / 2, -s / 4, s, s / 2)
-        else if (p.shape === 'circle') { ctx.beginPath(); ctx.arc(0, 0, s / 2, 0, Math.PI * 2); ctx.fill() }
-        else                           drawStar(s / 2)
+
+        if (p.isConfetti) {
+          ctx.fillStyle = p.color
+          const s = p.size
+          if      (p.shape === 'rect')   ctx.fillRect(-s / 2, -s / 4, s, s / 2)
+          else if (p.shape === 'circle') { ctx.beginPath(); ctx.arc(0, 0, s / 2, 0, Math.PI * 2); ctx.fill() }
+        } else {
+          ctx.font = `${p.size}px serif`
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(p.emoji, 0, 0)
+        }
+
         ctx.restore()
       }
 
