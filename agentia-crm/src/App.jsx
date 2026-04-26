@@ -371,30 +371,17 @@ export default function App() {
     }
 
     if (tieneSeñal) {
-      // Garantizar que el cobro de señal existe (puede haberse borrado al mover el lead entre etapas)
-      const existingSeñal = cobrosRef.current.find(c =>
-        c.cliente === lead.empresa && (c.concepto || '').startsWith('Señal ·')
-      )
-      if (!existingSeñal) {
-        addCobro({ cliente: lead.empresa, concepto: `Señal · ${servicio}`, monto: señalCobrada, vence: null, pagado: true, vencida: false, recurrente: false })
-      }
+      // Borrar cobros previos de Señal· y Resto· (pueden ser stale de entradas anteriores a COBRADO)
+      cobrosRef.current
+        .filter(c => c.cliente === lead.empresa && !c.recurrente &&
+          ((c.concepto || '').startsWith('Señal ·') || (c.concepto || '').startsWith('Resto ·')))
+        .forEach(c => deleteCobro(c.id))
+      // Recrear siempre frescos para garantizar totales correctos
+      addCobro({ cliente: lead.empresa, concepto: `Señal · ${servicio}`, monto: señalCobrada, vence: null, pagado: true, vencida: false, recurrente: false })
       const restoMonto = monto - señalCobrada
       if (restoMonto > 0 && !esRecurrente) {
-        const existingResto = cobrosRef.current.find(c =>
-          c.cliente === lead.empresa && (c.concepto || '').startsWith('Resto ·') && !c.pagado
-        )
-        if (existingResto) {
-          const restoUpdates = { pagado: true, vencida: false }
-          if (lead.vence_resto) restoUpdates.vence = lead.vence_resto
-          updateCobro(existingResto.id, restoUpdates)
-        } else {
-          addCobro({
-            cliente: lead.empresa, concepto: `Resto · ${servicio}`,
-            monto: restoMonto, vence: lead.vence_resto || null,
-            pagado: true, vencida: false, recurrente: false,
-          })
-          setWowEffect(prev => prev ? prev : { type: 'full', cliente: lead.empresa })
-        }
+        addCobro({ cliente: lead.empresa, concepto: `Resto · ${servicio}`, monto: restoMonto, vence: lead.vence_resto || null, pagado: true, vencida: false, recurrente: false })
+        setWowEffect(prev => prev ? prev : { type: 'full', cliente: lead.empresa })
       }
     } else if (dividido && monto > 0) {
       const señalMonto = Math.round(monto * señalPct / 100)
@@ -502,15 +489,15 @@ export default function App() {
       // Deja de ser Cobrado → eliminar cobros auto-creados y cliente auto-creado
       const c = findCobroAuto(lead)
       if (c) deleteCobro(c.id)
-      // Limpiar cobros divididos (Señal (X%) y Resto (X%)) — ambos, no solo el resto
-      const cobrosDiv = cobrosRef.current.filter(co =>
+      // Limpiar todos los cobros auto-creados: divididos (X%) y tieneSeñal (·)
+      const cobrosAuto = cobrosRef.current.filter(co =>
         co.cliente === lead.empresa && !co.recurrente &&
-        (/^Señal \(/.test(co.concepto || '') || /^Resto \(/.test(co.concepto || ''))
+        (/^Señal [·(]/.test(co.concepto || '') || /^Resto [·(]/.test(co.concepto || ''))
       )
-      cobrosDiv.forEach(co => deleteCobro(co.id))
+      cobrosAuto.forEach(co => deleteCobro(co.id))
       const clienteAuto = clientesRef.current.find(cl => cl.nombre === lead.empresa)
       if (clienteAuto) {
-        const deletingIds = new Set([c?.id, ...cobrosDiv.map(co => co.id)])
+        const deletingIds = new Set([c?.id, ...cobrosAuto.map(co => co.id)])
         const otherPaid = cobrosRef.current.some(co =>
           co.cliente === lead.empresa && co.pagado && !deletingIds.has(co.id)
         )
@@ -794,11 +781,11 @@ export default function App() {
   }
 
   const deleteCobro = async (id) => {
+    setCobros(prev => prev.filter(c => c.id !== id))
     try {
       const { error } = await supabase.from('cobros').delete().eq('id', id)
-      if (!error) { setCobros(prev => prev.filter(c => c.id !== id)); return }
+      if (error) console.error('[Supabase] deleteCobro:', error.message)
     } catch (_) {}
-    setCobros(prev => prev.filter(c => c.id !== id))
   }
 
   // ──────────────────────────────────────────────────────────
