@@ -339,7 +339,7 @@ export default function App() {
     const señalPct       = lead.señalPct || 50
     const servicio       = lead.servicio || 'Servicio'
     const señalCobrada   = parseFloat(lead.señal_cobrada) || 0
-    const tieneSeñal     = señalCobrada > 0 && !esRecurrente
+    const tieneSeñal     = señalCobrada > 0
 
     const yaExiste = clientesRef.current.some(c => c.nombre === lead.empresa)
     if (!yaExiste) {
@@ -370,7 +370,7 @@ export default function App() {
           const restoUpdates = { pagado: true, vencida: false }
           if (lead.vence_resto) restoUpdates.vence = lead.vence_resto
           updateCobro(existingResto.id, restoUpdates)
-        } else {
+        } else if (!esRecurrente) {
           addCobro({
             cliente: lead.empresa, concepto: `Resto · ${servicio}`,
             monto: restoMonto, vence: venceResto,
