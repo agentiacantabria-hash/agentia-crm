@@ -405,10 +405,13 @@ export default function App() {
     } else if (dividido && monto > 0) {
       const señalMonto = Math.round(monto * señalPct / 100)
       const restoMonto = monto - señalMonto
-      addCobro({ cliente: lead.empresa, concepto: `Señal (${señalPct}%) · ${servicio}`, monto: señalMonto, vence: null, pagado: true, vencida: false, recurrente: false })
-      addCobro({ cliente: lead.empresa, concepto: `Resto (${100 - señalPct}%) · ${servicio}`, monto: restoMonto, vence: null, pagado: false, vencida: false, recurrente: false })
+      const yaSeñal = cobrosRef.current.some(c => c.cliente === lead.empresa && /^Señal \(/.test(c.concepto || ''))
+      const yaResto  = cobrosRef.current.some(c => c.cliente === lead.empresa && /^Resto \(/.test(c.concepto || '') && !c.pagado)
+      if (!yaSeñal) addCobro({ cliente: lead.empresa, concepto: `Señal (${señalPct}%) · ${servicio}`, monto: señalMonto, vence: null, pagado: true, vencida: false, recurrente: false })
+      if (!yaResto)  addCobro({ cliente: lead.empresa, concepto: `Resto (${100 - señalPct}%) · ${servicio}`, monto: restoMonto, vence: null, pagado: false, vencida: false, recurrente: false })
     } else if (!esRecurrente && monto > 0) {
-      addCobro({ cliente: lead.empresa, concepto: servicio, monto, vence: null, pagado: true, vencida: false, recurrente: false })
+      const yaSimple = cobrosRef.current.some(c => c.cliente === lead.empresa && c.concepto === servicio && c.monto === monto && !c.recurrente)
+      if (!yaSimple) addCobro({ cliente: lead.empresa, concepto: servicio, monto, vence: null, pagado: true, vencida: false, recurrente: false })
     }
 
     if (esRecurrente && montoRec > 0) {
@@ -502,22 +505,21 @@ export default function App() {
         setWowEffect(prev => prev ? prev : { type: esDividido ? 'partial' : 'full', cliente: lead?.empresa })
       }
     } else if (eraCobrado && nuevoEstado && !seraCobrado) {
-      // Deja de ser Cobrado → eliminar cobro automático y cliente auto-creado
+      // Deja de ser Cobrado → eliminar cobros auto-creados y cliente auto-creado
       const c = findCobroAuto(lead)
       if (c) deleteCobro(c.id)
-      // pagoDividido: los cobros 'Señal (X%) · ...' y 'Resto (X%) · ...' no son detectados por
-      // findCobroAuto (concepto distinto al servicio); el Señal pagado queda como historial,
-      // pero el Resto sin pagar hay que eliminarlo para no dejar cargos pendientes huérfanos
-      const restoDivididoCobro = cobrosRef.current.find(co =>
-        co.cliente === lead.empresa &&
-        (co.concepto || '').startsWith('Resto (') &&
-        !co.pagado && !co.recurrente
+      // Limpiar cobros divididos (Señal (X%) y Resto (X%)) — ambos, no solo el resto
+      const cobrosDiv = cobrosRef.current.filter(co =>
+        co.cliente === lead.empresa && !co.recurrente &&
+        (/^Señal \(/.test(co.concepto || '') || /^Resto \(/.test(co.concepto || ''))
       )
-      if (restoDivididoCobro) deleteCobro(restoDivididoCobro.id)
+      cobrosDiv.forEach(co => deleteCobro(co.id))
       const clienteAuto = clientesRef.current.find(cl => cl.nombre === lead.empresa)
       if (clienteAuto) {
-        // Solo borrar si no hay otros cobros pagados — protege clientes pre-existentes con historial
-        const otherPaid = cobrosRef.current.some(co => co.cliente === lead.empresa && co.pagado && co.id !== c?.id)
+        const deletingIds = new Set([c?.id, ...cobrosDiv.map(co => co.id)])
+        const otherPaid = cobrosRef.current.some(co =>
+          co.cliente === lead.empresa && co.pagado && !deletingIds.has(co.id)
+        )
         if (!otherPaid) deleteCliente(clienteAuto.id)
       }
     } else if (eraCobrado && !nuevoEstado && updates.monto !== undefined) {
