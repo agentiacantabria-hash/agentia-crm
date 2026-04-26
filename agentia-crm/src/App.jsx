@@ -176,7 +176,7 @@ export default function App() {
           const today = new Date(); today.setHours(0,0,0,0)
           setCobros(co.data.map(c => {
             if (c.pagado || !c.vence) return c
-            const venceDate = new Date(c.vence); venceDate.setHours(0,0,0,0)
+            const venceDate = new Date(c.vence + 'T00:00:00')
             return { ...c, vencida: venceDate < today }
           }))
         }
@@ -214,7 +214,7 @@ export default function App() {
     const normLead  = (l) => { const s = stateMap[l.estado]; return s ? { ...l, estado: s } : l }
     const normCobro = (c) => {
       if (c.pagado || !c.vence) return c
-      const d = new Date(c.vence); d.setHours(0,0,0,0)
+      const d = new Date(c.vence + 'T00:00:00')
       return { ...c, vencida: d < today }
     }
 

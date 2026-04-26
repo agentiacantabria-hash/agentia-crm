@@ -473,8 +473,8 @@ export default function Dashboard({ role, setPage, openQuick, data, currentUser 
   const clientesRecurrentesN = clientes.filter(c => c.tipo === 'Recurrente' || c.estado === 'Recurrente').length
 
   const leadsActivos   = leads.filter(l => !STAGES_CLOSED.includes(l.estado))
-  const leadsCalientes = leads.filter(l => l.temp === 'hot')
-  const leadesTibios   = leads.filter(l => l.temp === 'warm')
+  const leadsCalientes = leads.filter(l => l.temp === 'hot' && !STAGES_CLOSED.includes(l.estado))
+  const leadesTibios   = leads.filter(l => l.temp === 'warm' && !STAGES_CLOSED.includes(l.estado))
   const urgentes       = tasks.filter(t => t.prio === 'alta' && !t.done && ['hoy','vencida'].includes(effectiveGroup(t)))
 
   const clientesActivos    = clientes.length
