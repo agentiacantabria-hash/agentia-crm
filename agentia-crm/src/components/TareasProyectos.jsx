@@ -668,7 +668,7 @@ function ProyectoModal({ proyecto, onClose, onSave, onDelete, cobros = [], updat
                 {c.pagado
                   ? <span style={{fontSize:11, color:'var(--ok)', minWidth:60, textAlign:'right'}}>✓ cobrado</span>
                   : <button className="btn sm primary" style={{fontSize:11, minWidth:60}}
-                      onMouseDown={e => { e.preventDefault(); updateCobro?.(c.id, { pagado: true }) }}>
+                      onMouseDown={e => { e.preventDefault(); updateCobro?.(c.id, { pagado: true, vencida: false }) }}>
                       Cobrar
                     </button>
                 }
