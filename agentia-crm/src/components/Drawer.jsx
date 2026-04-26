@@ -21,7 +21,7 @@ const EMPTY = {
 }
 
 export function QuickLeadDrawer({ open, onClose, onSave, currentUser }) {
-  const isEmpleado = currentUser?.rol !== 'Admin'
+  const isEmpleado = currentUser?.rol === 'Empleado'
   const myIni = currentUser?.iniciales || ''
 
   const [mode, setMode] = useState('quick')

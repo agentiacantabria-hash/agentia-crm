@@ -279,7 +279,7 @@ export default function App() {
       }
     }
     if (incluirTareas) {
-      const targets = tasks.filter(t => t.resp === de && !t.done)
+      const targets = tasksRef.current.filter(t => t.resp === de && !t.done)
       if (targets.length) {
         await supabase.from('tareas').update({ resp: a }).eq('resp', de).eq('done', false)
         setTasks(prev => prev.map(t => t.resp === de && !t.done ? { ...t, resp: a } : t))
@@ -287,7 +287,7 @@ export default function App() {
       }
     }
     if (incluirProyectos) {
-      const targets = proyectos.filter(p => p.resp === de && p.estado !== 'Cerrado')
+      const targets = proyectosRef.current.filter(p => p.resp === de && p.estado !== 'Cerrado')
       if (targets.length) {
         await supabase.from('proyectos').update({ resp: a }).eq('resp', de).neq('estado', 'Cerrado')
         setProyectos(prev => prev.map(p => p.resp === de && p.estado !== 'Cerrado' ? { ...p, resp: a } : p))
@@ -582,7 +582,7 @@ export default function App() {
   }
 
   const deleteCliente = async (id) => {
-    const cliente = clientes.find(c => c.id === id)
+    const cliente = clientesRef.current.find(c => c.id === id)
     try {
       await supabase.from('clientes').delete().eq('id', id)
     } catch (_) {}
@@ -685,17 +685,21 @@ export default function App() {
     const { data: d, error } = await supabase.from('cobros').insert([clean(cobro)]).select().single()
     if (!error && d) {
       setCobros(prev => [d, ...prev])
+    } else if (error?.code === 'PGRST116') {
+      // INSERT ok pero sin acceso SELECT (rol no-admin) — cobro guardado en DB, no es error real
     } else if (error) console.error('[Supabase] addCobro:', error.message)
   }
 
   const updateCobro = async (id, updates) => {
     const cobro = cobrosRef.current.find(c => c.id === id)
+    let ok = false
     try {
       const { error } = await supabase.from('cobros').update(clean(updates)).eq('id', id)
-      if (!error) { setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c)); }
+      if (!error) { setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c)); ok = true }
     } catch (_) {
-      setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
+      setCobros(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c)); ok = true
     }
+    if (!ok) return
     // Auto-update proyecto: si todos los cobros del cliente quedan pagados, marcar progreso 100%
     if (updates.pagado === true && cobro && !cobro.pagado) {
       const allCobros = cobrosRef.current
