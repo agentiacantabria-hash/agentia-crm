@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Sidebar, Topbar, SearchModal, BellPanel, ProfileModal } from './components/Shell'
+import { Sidebar, Topbar, SearchModal, BellPanel, ProfileModal, BottomNav } from './components/Shell'
 import { QuickLeadDrawer } from './components/Drawer'
 import Dashboard from './components/Dashboard'
 import { Clientes, Pipeline } from './components/LeadsClientesPipeline'
@@ -844,6 +844,9 @@ export default function App() {
         </div>
       </div>
 
+      {/* Navegación inferior — solo visible en móvil */}
+      <BottomNav page={page} setPage={setPage} counts={counts} />
+
       <QuickLeadDrawer open={drawer} onClose={() => setDrawer(false)} onSave={addLead} currentUser={currentUser} />
       {profileOpen && <ProfileModal currentUser={currentUser} onClose={() => setProfileOpen(false)} onSave={updateProfile} />}
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} data={data} setPage={setPage}
@@ -851,7 +854,7 @@ export default function App() {
       <BellPanel open={bellOpen} onClose={() => setBellOpen(false)} tasks={tasks} cobros={role === 'admin' ? cobros : []} notificaciones={notificaciones} onMarkRead={markNotifsRead} />
 
       {/* Toast notifications */}
-      <div style={{position:'fixed', bottom:24, right:24, display:'flex', flexDirection:'column', gap:8, zIndex:9999, pointerEvents:'none'}}>
+      <div className="toast-container" style={{position:'fixed', display:'flex', flexDirection:'column', gap:8, zIndex:9999, pointerEvents:'none'}}>
         {toasts.map(t => (
           <div key={t.id} style={{
             background: t.type === 'error' ? 'rgba(255,90,106,0.15)' : 'rgba(15,28,50,0.97)',

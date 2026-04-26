@@ -227,13 +227,19 @@ export function Topbar({ crumb, setDrawerOpen, role, onMenuClick, notifCount = 0
         </span>
       ))}</div>
 
+      {/* Búsqueda solo en móvil (icono) */}
+      <button className="icon-btn mobile-only" title="Buscar" aria-label="Buscar" onClick={onSearchOpen}>
+        <I.Search size={16} />
+      </button>
+
+      {/* Barra de búsqueda solo en escritorio */}
       <div className="topbar-search" style={{cursor:'pointer'}} onClick={onSearchOpen}>
         <I.Search size={14} />
         <span>Buscar clientes, leads, tareas, proyectos…</span>
         <kbd>⌘K</kbd>
       </div>
 
-      <button className="icon-btn" title="Notificaciones" style={{position:'relative'}} onClick={onBellOpen}>
+      <button className="icon-btn" title="Notificaciones" aria-label="Notificaciones" style={{position:'relative'}} onClick={onBellOpen}>
         <I.Bell size={16} />
         {notifCount > 0 && <span className="dot" style={{position:'absolute', top:6, right:6}} />}
       </button>
@@ -279,7 +285,7 @@ export function BellPanel({ open, onClose, tasks = [], cobros = [], notificacion
     <>
       <div style={{position:'fixed',inset:0,zIndex:800}} onClick={onClose}/>
       <div style={{
-        position:'fixed', top:60, right:16, width:340,
+        position:'fixed', top:56, right:16, width:'min(340px, calc(100vw - 32px))',
         background:'var(--surface-1)', border:'1px solid var(--line-2)',
         borderRadius:14, boxShadow:'0 16px 50px rgba(0,0,0,0.6)', zIndex:801,
         overflow:'hidden', maxHeight:'80vh', overflowY:'auto',
@@ -436,5 +442,35 @@ export function ProfileModal({ currentUser, onClose, onSave }) {
         </form>
       </div>
     </>
+  )
+}
+
+export function BottomNav({ page, setPage, counts = {} }) {
+  const items = [
+    { key: 'dashboard', label: 'Inicio',     icon: I.Home },
+    { key: 'pipeline',  label: 'Pipeline',   icon: I.Pipeline,  count: counts.leads },
+    { key: 'tareas',    label: 'Tareas',     icon: I.Tasks,     count: counts.tareas },
+    { key: 'clientes',  label: 'Clientes',   icon: I.Users },
+    { key: 'proyectos', label: 'Proyectos',  icon: I.Projects,  count: counts.proyectos },
+  ]
+  return (
+    <nav className="bottom-nav">
+      {items.map(item => (
+        <button
+          key={item.key}
+          className={`bottom-nav-item ${page === item.key ? 'active' : ''}`}
+          onClick={() => setPage(item.key)}
+          aria-label={item.label}
+        >
+          <div style={{ position: 'relative', display: 'inline-flex' }}>
+            <item.icon size={21} />
+            {item.count > 0 && (
+              <span className="bottom-nav-badge">{item.count > 99 ? '99+' : item.count}</span>
+            )}
+          </div>
+          <span>{item.label}</span>
+        </button>
+      ))}
+    </nav>
   )
 }
