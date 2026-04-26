@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { I } from './Icons'
-import { STATE_COLORS, PIPELINE_COLS, STAGE, STAGES_CLOSED, eur } from './data'
+import { STATE_COLORS, PIPELINE_COLS, STAGE, STAGES_CLOSED, STAGES_VALOR, eur } from './data'
 import { supabase } from '../lib/supabase'
 
 
@@ -216,7 +216,7 @@ function EmpleadoDetalleModal({ empleado, data, onClose }) {
   const activos    = misLeads.filter(l => !STAGES_CLOSED.includes(l.estado))
   const cerrados   = misLeads.filter(l => l.estado === STAGE.COBRADO)
   const montoGen   = cerrados.reduce((a,l) => a + (l.monto||0), 0)
-  const pipelineV  = activos.reduce((a,l) => a + (l.monto||0), 0)
+  const pipelineV  = activos.filter(l => STAGES_VALOR.includes(l.estado)).reduce((a,l) => a + (l.monto||0), 0)
   const pendTareas = misTareas.filter(t => !t.done)
 
   return (
@@ -379,7 +379,7 @@ function EquipoSection({ usuarios, data, onSelect }) {
     const tareasHoy  = pendTareas.filter(t => ['hoy','vencida'].includes(effectiveGroup(t)))
     const proyActivos = proyectos.filter(p => p.resp === ini && p.estado !== 'Cerrado')
     const montoGen   = cerrados.reduce((a,l) => a + (l.monto||0), 0)
-    const pipelineV  = activos.reduce((a,l) => a + (l.monto||0), 0)
+    const pipelineV  = activos.filter(l => STAGES_VALOR.includes(l.estado)).reduce((a,l) => a + (l.monto||0), 0)
     return { u, activos, cerrados, pendTareas, tareasHoy, proyActivos, montoGen, pipelineV }
   })
 
@@ -482,7 +482,7 @@ export default function Dashboard({ role, setPage, openQuick, data, currentUser 
   const clientesRecurrentes = clientes.filter(c => c.estado === 'Recurrente').length
   const clientesAjustes    = clientes.filter(c => c.ajustes > 0).length
 
-  const pipelineTotal = leadsActivos.reduce((a,l) => a + (l.monto||0), 0)
+  const pipelineTotal = leadsActivos.filter(l => STAGES_VALOR.includes(l.estado)).reduce((a,l) => a + (l.monto||0), 0)
 
   // Para empleado: cuánto ha generado él mismo
   const myIni = currentUser?.iniciales || ''

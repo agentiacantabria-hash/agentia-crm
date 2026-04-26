@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { I } from './Icons'
 import { Modal, F, SelectOrText, CustomSelect } from './Modal'
-import { STATE_COLORS, PIPELINE_COLS, STAGE, STAGES_CLOSED, eur } from './data'
+import { STATE_COLORS, PIPELINE_COLS, STAGE, STAGES_CLOSED, STAGES_VALOR, eur } from './data'
 import { supabase } from '../lib/supabase'
 
 function downloadCSV(rows, filename) {
@@ -1005,7 +1005,7 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser 
     setCobrarRestoLead(null)
   }
 
-  const totalAbierto = activeLeads.reduce((a,l) => {
+  const totalAbierto = activeLeads.filter(l => STAGES_VALOR.includes(l.estado)).reduce((a,l) => {
     if (l.estado === STAGE.SEÑAL) return a + Math.max(0, (l.monto||0) - (parseFloat(l.señal_cobrada)||0))
     return a + (l.monto||0)
   }, 0)
