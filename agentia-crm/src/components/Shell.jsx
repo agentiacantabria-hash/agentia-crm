@@ -262,7 +262,8 @@ export function BellPanel({ open, onClose, tasks = [], cobros = [], notificacion
     lead_estado:      'var(--ok)',
     tarea_asignada:   'var(--violet)',
     tarea_reasignada: 'var(--violet)',
-    mencion:          '#FFB547',
+    mencion:             '#FFB547',
+    reasignacion_masiva: 'var(--brand-2)',
   }
   const tipoLabel = {
     lead_asignado:    'Lead asignado',
@@ -270,7 +271,8 @@ export function BellPanel({ open, onClose, tasks = [], cobros = [], notificacion
     lead_estado:      'Cambio de estado',
     tarea_asignada:   'Tarea asignada',
     tarea_reasignada: 'Tarea reasignada',
-    mencion:          'Te mencionaron',
+    mencion:             'Te mencionaron',
+    reasignacion_masiva: 'Reasignación recibida',
   }
 
   return (

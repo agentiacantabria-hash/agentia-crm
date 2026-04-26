@@ -267,6 +267,41 @@ export default function App() {
     setNotificaciones(prev => prev.map(n => ({ ...n, leida: true })))
   }
 
+  // ── Reasignación masiva ────────────────────────────────────
+  const reasignarMasivo = async ({ de, a, incluirLeads, incluirTareas, incluirProyectos }) => {
+    let count = 0
+    if (incluirLeads) {
+      const targets = leads.filter(l => l.responsable === de && !STAGES_CLOSED.includes(l.estado))
+      if (targets.length) {
+        await supabase.from('leads').update({ responsable: a }).eq('responsable', de).not('estado', 'in', `("${STAGES_CLOSED.join('","')}")`)
+        setLeads(prev => prev.map(l => l.responsable === de && !STAGES_CLOSED.includes(l.estado) ? { ...l, responsable: a } : l))
+        count += targets.length
+      }
+    }
+    if (incluirTareas) {
+      const targets = tasks.filter(t => t.resp === de && !t.done)
+      if (targets.length) {
+        await supabase.from('tareas').update({ resp: a }).eq('resp', de).eq('done', false)
+        setTasks(prev => prev.map(t => t.resp === de && !t.done ? { ...t, resp: a } : t))
+        count += targets.length
+      }
+    }
+    if (incluirProyectos) {
+      const targets = proyectos.filter(p => p.resp === de && p.estado !== 'Cerrado')
+      if (targets.length) {
+        await supabase.from('proyectos').update({ resp: a }).eq('resp', de).neq('estado', 'Cerrado')
+        setProyectos(prev => prev.map(p => p.resp === de && p.estado !== 'Cerrado' ? { ...p, resp: a } : p))
+        count += targets.length
+      }
+    }
+    if (count > 0) {
+      createNotif(a, 'reasignacion_masiva', `${count} elementos reasignados a ti`, `Transferido de ${de}`)
+      showToast(`${count} elemento${count > 1 ? 's' : ''} reasignado${count > 1 ? 's' : ''} de ${de} → ${a}`)
+    } else {
+      showToast('No había elementos que reasignar', 'ok')
+    }
+  }
+
   // ── Actualizar perfil propio ────────────────────────────────
   const updateProfile = async (updates) => {
     const { data } = await supabase.from('usuarios').update(updates).eq('id', currentUser.id).select().single()
@@ -715,6 +750,7 @@ export default function App() {
 
   const data = {
     leads, clientes, tasks, proyectos, gastos, cobros, teamMembers, actividades, usuarios, plantillas,
+    reasignarMasivo,
     addLead, updateLead, deleteLead,
     addCliente, updateCliente, deleteCliente,
     addTask, updateTask, deleteTask,
