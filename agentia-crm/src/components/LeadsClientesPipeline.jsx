@@ -888,8 +888,9 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser 
       const pending = longPressRef.current
       if (!pending) return
       longPressRef.current = null
-      // Feedback háptico si el navegador lo soporta
       navigator.vibrate?.(35)
+      // Bloquear scroll del kanban mientras dura el drag
+      if (kanbanRef.current) kanbanRef.current.style.overflow = 'hidden'
       touchDragRef.current = {
         leadId: lead.id, leadName: lead.empresa, leadEstado: lead.estado,
         offsetX, offsetY,
@@ -906,7 +907,7 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser 
     const el = kanbanRef.current
     if (!el) return
     const onTouchMove = (e) => {
-      // Long-press pendiente: si el dedo se mueve más de 8 px → scroll normal, cancelar drag
+      // Long-press pendiente: cancelar si el dedo se mueve > 8 px (scroll normal)
       if (longPressRef.current) {
         const touch = e.touches[0]
         const dx = Math.abs(touch.clientX - longPressRef.current.startX)
@@ -915,11 +916,11 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser 
           clearTimeout(longPressRef.current.timer)
           longPressRef.current = null
         }
-        return // no bloquear el scroll mientras decidimos
+        return
       }
       const drag = touchDragRef.current
       if (!drag) return
-      e.preventDefault()
+      // No llamamos e.preventDefault() — usamos overflow:hidden en kanban para bloquear scroll
       const touch = e.touches[0]
       const ghostX = touch.clientX - drag.offsetX
       const ghostY = touch.clientY - drag.offsetY
@@ -930,11 +931,12 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser 
       setTouchDrag({ leadId: drag.leadId, leadName: drag.leadName, ghostX, ghostY, targetCol })
     }
     const onTouchEnd = () => {
-      // Levantar el dedo antes del long-press → no drag, solo click normal
       if (longPressRef.current) {
         clearTimeout(longPressRef.current.timer)
         longPressRef.current = null
       }
+      // Restaurar scroll del kanban
+      if (kanbanRef.current) kanbanRef.current.style.overflow = ''
       const drag = touchDragRef.current
       touchDragRef.current = null
       setTouchDrag(null)
@@ -943,7 +945,8 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser 
         moveCardRef.current?.(drag.leadId, drag.targetCol)
       }
     }
-    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    // passive:true → el navegador puede hacer scroll nativo sin esperar al JS
+    el.addEventListener('touchmove', onTouchMove, { passive: true })
     el.addEventListener('touchend',    onTouchEnd)
     el.addEventListener('touchcancel', onTouchEnd)
     return () => {

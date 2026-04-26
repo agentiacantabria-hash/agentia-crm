@@ -1228,25 +1228,33 @@ label.lbl {
   /* Finanzas */
   .fin-card { padding: 14px; }
 
-  /* Tabla de facturas: rediseño para móvil */
-  .fin-table thead th.hide-mobile { display: none; }
-  .fin-table td.hide-mobile       { display: none; }
+  /* Tabla de facturas: convertir a lista de items en móvil */
+  .fin-table,
+  .fin-table tbody,
+  .fin-table tr { display: block; }
+  .fin-table thead { display: none; }
+  .fin-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line-1);
+    cursor: pointer;
+  }
+  .fin-table tr:last-child { border-bottom: none; }
+  .fin-table td { display: block; padding: 0; border: none; }
+  .fin-table td.hide-mobile { display: none !important; }
 
-  /* Nombre cliente: mostrar concepto debajo como subtítulo */
-  .fin-cli { display: flex; flex-direction: column; gap: 2px; }
-  .fin-cli-sub { font-size: 11px; color: var(--text-4); display: block; }
-  /* En escritorio ocultamos el subtítulo (la columna Concepto ya lo muestra) */
+  /* Cliente: línea completa arriba */
+  .fin-cli { width: 100%; order: 1; }
+  .fin-cli-sub { font-size: 11px; color: var(--text-4); display: block; margin-top: 1px; }
 
-  /* Importe y estado: compactos */
-  .fin-imp  { font-size: 13px; white-space: nowrap; }
-  .fin-est  { white-space: nowrap; }
-
-  /* Acciones: icono × siempre visible, botón "✓ Cobrado" compacto */
-  .fin-act { display: flex; align-items: center; gap: 4px; justify-content: flex-end; white-space: nowrap; }
-  .fin-cobrar-btn { padding: 3px 8px !important; font-size: 11px !important; white-space: nowrap; }
-
-  /* Reducir padding general de celdas en móvil */
-  .fin-table td, .fin-table th { padding: 10px 8px; }
+  /* Segunda línea: estado + importe + acciones */
+  .fin-est { order: 2; flex: 1; }
+  .fin-imp { order: 3; font-size: 13px; font-weight: 600; font-family: var(--font-mono); }
+  .fin-act { order: 4; display: flex; align-items: center; gap: 6px; }
+  .fin-cobrar-btn { padding: 3px 8px !important; font-size: 11px !important; }
 
   /* Tareas */
   .task { padding: 10px 14px; }
