@@ -152,14 +152,15 @@ export function SearchModal({ open, onClose, data, setPage, onSelect }) {
   const { leads = [], clientes = [], tasks = [], proyectos = [] } = data || {}
   const ql = q.toLowerCase().trim()
 
+  const match = (v) => v?.toLowerCase().includes(ql)
   const results = ql.length < 1 ? [] : [
-    ...leads.filter(l => l.empresa?.toLowerCase().includes(ql) || l.servicio?.toLowerCase().includes(ql))
-      .slice(0,4).map(l => ({ type:'Lead', label: l.empresa, sub: l.estado, page:'pipeline', color:'var(--brand-2)', item: l })),
-    ...clientes.filter(c => c.nombre?.toLowerCase().includes(ql) || c.servicio?.toLowerCase().includes(ql))
-      .slice(0,4).map(c => ({ type:'Cliente', label: c.nombre, sub: c.servicio, page:'clientes', color:'var(--ok)', item: c })),
-    ...tasks.filter(t => t.title?.toLowerCase().includes(ql) || t.cliente?.toLowerCase().includes(ql))
+    ...leads.filter(l => match(l.empresa) || match(l.servicio) || match(l.contacto) || match(l.email) || match(l.notas) || match(l.ciudad) || match(l.sector))
+      .slice(0,5).map(l => ({ type:'Lead', label: l.empresa, sub: [l.contacto, l.estado].filter(Boolean).join(' · '), page:'pipeline', color:'var(--brand-2)', item: l })),
+    ...clientes.filter(c => match(c.nombre) || match(c.servicio) || match(c.contacto) || match(c.email))
+      .slice(0,4).map(c => ({ type:'Cliente', label: c.nombre, sub: [c.contacto, c.servicio].filter(Boolean).join(' · '), page:'clientes', color:'var(--ok)', item: c })),
+    ...tasks.filter(t => match(t.title) || match(t.cliente))
       .slice(0,4).map(t => ({ type:'Tarea', label: t.title, sub: t.cliente, page:'tareas', color:'var(--violet)', item: t })),
-    ...proyectos.filter(p => p.cliente?.toLowerCase().includes(ql) || p.servicio?.toLowerCase().includes(ql))
+    ...proyectos.filter(p => match(p.cliente) || match(p.servicio))
       .slice(0,3).map(p => ({ type:'Proyecto', label: p.cliente, sub: p.servicio ? `${p.servicio} · ${p.estado||''}` : p.estado, page:'proyectos', color:'#FFB547', item: p })),
   ]
 
@@ -170,7 +171,7 @@ export function SearchModal({ open, onClose, data, setPage, onSelect }) {
         <div style={{display:'flex',alignItems:'center',gap:12,padding:'14px 18px',borderBottom:'1px solid var(--line-1)'}}>
           <I.Search size={16} style={{color:'var(--text-3)',flexShrink:0}}/>
           <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)}
-            placeholder="Buscar leads, clientes, tareas, proyectos…"
+            placeholder="Buscar por empresa, contacto, email, notas…"
             style={{flex:1,background:'none',border:'none',outline:'none',fontSize:15,color:'var(--text-0)'}}
             onKeyDown={e => { if (e.key === 'Escape') onClose() }}
           />

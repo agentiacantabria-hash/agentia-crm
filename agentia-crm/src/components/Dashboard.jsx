@@ -637,10 +637,11 @@ export default function Dashboard({ role, setPage, openQuick, data, currentUser 
         </div>
       )}
 
-      {/* ── Alerta leads calientes sin contacto (admin) ── */}
-      {role === 'admin' && (() => {
+      {/* ── Alerta leads calientes sin contacto ── */}
+      {(() => {
         const hotLeads = leads.filter(l => l.temp === 'hot' && !STAGES_CLOSED.includes(l.estado))
-        const sinContacto = hotLeads.filter(l => {
+        const visibles = role === 'admin' ? hotLeads : hotLeads.filter(l => l.responsable === myIni)
+        const sinContacto = visibles.filter(l => {
           const acts = actMap[l.id] || []
           const sorted = [...acts].sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
           const ref = sorted.length ? new Date(sorted[0].created_at) : (l.created_at ? new Date(l.created_at) : new Date())
@@ -665,9 +666,52 @@ export default function Dashboard({ role, setPage, openQuick, data, currentUser 
                     <div style={{width:30,height:30,borderRadius:8,background:'rgba(255,90,106,0.12)',display:'inline-flex',alignItems:'center',justifyContent:'center',color:'#FF5A6A',flexShrink:0,fontSize:14}}>🔥</div>
                     <div style={{minWidth:0,flex:1}}>
                       <div className="title">{l.empresa}</div>
-                      <div className="sub">{l.servicio} · {l.estado} · resp. {l.responsable}</div>
+                      <div className="sub">{l.servicio} · {l.estado}{role === 'admin' ? ` · resp. ${l.responsable}` : ''}</div>
                     </div>
                     <span className="chip red"><span className="dot"/>{dias}d sin contacto</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── Alerta cobros próximos (admin) ── */}
+      {role === 'admin' && (() => {
+        const hoy = new Date(); hoy.setHours(0,0,0,0)
+        const en7 = new Date(hoy); en7.setDate(en7.getDate() + 7)
+        const proximos = cobros
+          .filter(c => {
+            if (c.pagado || !c.vence) return false
+            const vd = new Date(c.vence + 'T00:00:00')
+            return vd >= hoy && vd <= en7
+          })
+          .sort((a,b) => a.vence.localeCompare(b.vence))
+        if (!proximos.length) return null
+        return (
+          <div className="card" style={{marginBottom:16, borderColor:'rgba(255,181,71,0.3)'}}>
+            <div className="card-head">
+              <h3>💰 Cobros que vencen esta semana</h3>
+              <span className="sub">· {proximos.length} cobro{proximos.length!==1?'s':''}</span>
+              <div className="right"><button className="btn sm ghost" onClick={() => setPage('finanzas')}>Ver finanzas <I.ChevronR size={12}/></button></div>
+            </div>
+            <div>
+              {proximos.map(c => {
+                const vd = new Date(c.vence + 'T00:00:00')
+                const dias = Math.floor((vd - hoy) / 86400000)
+                const label = dias === 0 ? 'hoy' : dias === 1 ? 'mañana' : `en ${dias}d`
+                return (
+                  <div key={c.id} className="task">
+                    <div style={{width:30,height:30,borderRadius:8,background:'rgba(255,181,71,0.12)',display:'inline-flex',alignItems:'center',justifyContent:'center',color:'#FFB547',flexShrink:0,fontSize:14}}>💰</div>
+                    <div style={{minWidth:0,flex:1}}>
+                      <div className="title">{c.cliente}</div>
+                      <div className="sub">{c.concepto}</div>
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:3,flexShrink:0}}>
+                      <span style={{fontSize:13,fontWeight:700,color:'var(--text-0)'}}>€{eur(c.monto)}</span>
+                      <span className={`chip ${dias === 0 ? 'red' : 'amber'}`}><span className="dot"/>{label}</span>
+                    </div>
                   </div>
                 )
               })}
