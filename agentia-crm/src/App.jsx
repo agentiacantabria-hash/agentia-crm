@@ -463,7 +463,7 @@ export default function App() {
       cobrosRef.current.filter(c => c.cliente === oldName).forEach(c => updateCobro(c.id, { cliente: newName }))
       tasksRef.current.filter(t => t.cliente === oldName).forEach(t => updateTask(t.id, { cliente: newName }))
       proyectosRef.current.filter(p => p.cliente === oldName).forEach(p => updateProyecto(p.id, { cliente: newName }))
-      clientesRef.current.filter(c => c.nombre === oldName).forEach(c => updateCliente(c.id, { nombre: newName }))
+      clientesRef.current.filter(c => c.nombre === oldName).forEach(c => updateCliente(c.id, { nombre: newName }, { skipCascade: true }))
     }
 
     const nuevoEstado  = safeUpdates.estado
@@ -590,14 +590,15 @@ export default function App() {
     else if (error) { console.error('[Supabase] addCliente:', error.message); showToast(`Error al guardar cliente: ${error.message}`, 'error') }
   }
 
-  const updateCliente = async (id, updates) => {
+  const updateCliente = async (id, updates, { skipCascade = false } = {}) => {
     const cliente = clientesRef.current.find(c => c.id === id)
     try {
       await supabase.from('clientes').update(clean(updates)).eq('id', id)
     } catch (_) {}
     setClientes(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
     // Cascade: si cambia el nombre, actualizar cobros, tareas y proyectos que lo referencian
-    if (updates.nombre && cliente?.nombre && updates.nombre !== cliente.nombre) {
+    // skipCascade=true cuando se llama desde updateLead (que ya ha cascadeado directamente)
+    if (!skipCascade && updates.nombre && cliente?.nombre && updates.nombre !== cliente.nombre) {
       const oldName = cliente.nombre
       const newName = updates.nombre
       cobrosRef.current.filter(c => c.cliente === oldName).forEach(c => updateCobro(c.id, { cliente: newName }))
