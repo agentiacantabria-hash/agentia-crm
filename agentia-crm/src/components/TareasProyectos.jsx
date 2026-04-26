@@ -256,9 +256,86 @@ function MesView({ tasks, onEdit, onAdd }) {
   )
 }
 
+// ── ClienteSearch ─────────────────────────────────────────────────
+function ClienteSearch({ value, onChange, clientes = [], leads = [] }) {
+  const [q, setQ] = useState(value || '')
+  const [open, setOpen] = useState(false)
+  const ref = React.useRef(null)
+
+  useEffect(() => { setQ(value || '') }, [value])
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const STAGES_CLOSED = ['Cobrado', 'Denegado']
+  const clienteNames = clientes.map(c => c.nombre)
+  const leadNames = leads
+    .filter(l => !STAGES_CLOSED.includes(l.estado))
+    .map(l => l.empresa)
+    .filter(n => !clienteNames.includes(n))
+
+  const ql = q.toLowerCase()
+  const filteredClientes = clienteNames.filter(n => n.toLowerCase().includes(ql))
+  const filteredLeads = leadNames.filter(n => n.toLowerCase().includes(ql))
+  const hasResults = filteredClientes.length > 0 || filteredLeads.length > 0
+
+  const select = (name) => { onChange(name); setQ(name); setOpen(false) }
+  const clear = () => { onChange(''); setQ(''); setOpen(false) }
+
+  return (
+    <div ref={ref} style={{position:'relative'}}>
+      <div style={{display:'flex', gap:4}}>
+        <input className="input" style={{flex:1}} value={q}
+          placeholder="Buscar cliente o lead…"
+          onChange={e => { setQ(e.target.value); setOpen(true) }}
+          onFocus={() => setOpen(true)}
+        />
+        {q && <button style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-4)',padding:'0 6px',fontSize:16}} onClick={clear}>×</button>}
+      </div>
+      {open && (
+        <div style={{position:'absolute',top:'calc(100% + 4px)',left:0,right:0,background:'var(--surface-1)',border:'1px solid var(--line-2)',borderRadius:10,zIndex:200,maxHeight:200,overflowY:'auto',boxShadow:'0 8px 24px rgba(0,0,0,0.4)'}}>
+          {!hasResults && q && (
+            <div style={{padding:'10px 14px',fontSize:12,color:'var(--text-4)'}}>Sin resultados — se usará "{q}" como texto libre</div>
+          )}
+          {filteredClientes.length > 0 && (
+            <>
+              <div style={{padding:'6px 14px 2px',fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:.5,color:'var(--text-4)'}}>Clientes</div>
+              {filteredClientes.map(n => (
+                <div key={n} style={{padding:'9px 14px',cursor:'pointer',fontSize:13,color:'var(--text-0)'}}
+                  onMouseDown={() => select(n)}
+                  onMouseEnter={e => e.currentTarget.style.background='var(--surface-2)'}
+                  onMouseLeave={e => e.currentTarget.style.background=''}
+                >{n}</div>
+              ))}
+            </>
+          )}
+          {filteredLeads.length > 0 && (
+            <>
+              <div style={{padding:'6px 14px 2px',fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:.5,color:'var(--text-4)',borderTop: filteredClientes.length ? '1px solid var(--line-2)' : 'none', marginTop: filteredClientes.length ? 4 : 0}}>Pipeline</div>
+              {filteredLeads.map(n => (
+                <div key={n} style={{padding:'9px 14px',cursor:'pointer',fontSize:13,color:'var(--text-0)'}}
+                  onMouseDown={() => select(n)}
+                  onMouseEnter={e => e.currentTarget.style.background='var(--surface-2)'}
+                  onMouseLeave={e => e.currentTarget.style.background=''}
+                >{n}</div>
+              ))}
+            </>
+          )}
+          {!q && !hasResults && (
+            <div style={{padding:'10px 14px',fontSize:12,color:'var(--text-4)'}}>Sin clientes ni leads aún</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Tareas ───────────────────────────────────────────────────────
 
-function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [], resp: respOptions = [] }) {
+function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [], leads = [], resp: respOptions = [] }) {
   const isNew = !tarea?.id
   const defaultResp = respOptions[0] || ''
 
@@ -282,10 +359,7 @@ function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [], resp: res
       </F>
       <div className="form-2col">
         <F label="Cliente / empresa">
-          {clientes.length > 0
-            ? <CustomSelect value={form.cliente||''} onChange={v => set('cliente', v)} options={[{value:'',label:'— Sin cliente —'},...clientes.map(c=>({value:c.nombre,label:c.nombre}))]} />
-            : <input value={form.cliente||''} onChange={e => set('cliente', e.target.value)} placeholder="Ej: Clínica Marbella" />
-          }
+          <ClienteSearch value={form.cliente||''} onChange={v => set('cliente', v)} clientes={clientes} leads={leads} />
         </F>
         <F label="Hora">
           <input value={form.time||''} onChange={e => set('time', e.target.value)} placeholder="14:00" />
@@ -321,7 +395,7 @@ function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [], resp: res
 }
 
 export function Tareas({ data, openItem, onItemOpened, currentUser }) {
-  const { tasks = [], clientes = [], teamMembers = [], updateTask, addTask, deleteTask } = data || {}
+  const { tasks = [], clientes = [], leads = [], teamMembers = [], updateTask, addTask, deleteTask } = data || {}
   const myIni   = currentUser?.rol !== 'Admin' ? currentUser?.iniciales : null
   const allResp = teamMembers.length
     ? teamMembers
@@ -474,6 +548,7 @@ export function Tareas({ data, openItem, onItemOpened, currentUser }) {
           onSave={handleSave}
           onDelete={deleteTask}
           clientes={clientes}
+          leads={leads}
           resp={allResp}
         />
       )}
