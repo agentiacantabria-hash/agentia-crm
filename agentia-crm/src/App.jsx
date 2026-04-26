@@ -371,12 +371,15 @@ export default function App() {
     }
 
     if (tieneSeñal) {
+      // Garantizar que el cobro de señal existe (puede haberse borrado al mover el lead entre etapas)
+      const existingSeñal = cobrosRef.current.find(c =>
+        c.cliente === lead.empresa && (c.concepto || '').startsWith('Señal ·')
+      )
+      if (!existingSeñal) {
+        addCobro({ cliente: lead.empresa, concepto: `Señal · ${servicio}`, monto: señalCobrada, vence: null, pagado: true, vencida: false, recurrente: false })
+      }
       const restoMonto = monto - señalCobrada
-      if (restoMonto > 0) {
-        const venceResto = lead.vence_resto || (() => {
-          const d = new Date(); d.setDate(d.getDate() + 30); return ymd(d)
-        })()
-        // El cobro Resto ya fue creado en handleSeñalConfirm — marcarlo como pagado al cerrar el lead
+      if (restoMonto > 0 && !esRecurrente) {
         const existingResto = cobrosRef.current.find(c =>
           c.cliente === lead.empresa && (c.concepto || '').startsWith('Resto ·') && !c.pagado
         )
@@ -384,9 +387,7 @@ export default function App() {
           const restoUpdates = { pagado: true, vencida: false }
           if (lead.vence_resto) restoUpdates.vence = lead.vence_resto
           updateCobro(existingResto.id, restoUpdates)
-          // updateCobro dispara el WowEffect internamente
-        } else if (!esRecurrente) {
-          // No hay cobro Resto previo pero el lead está en COBRADO → todo pagado
+        } else {
           addCobro({
             cliente: lead.empresa, concepto: `Resto · ${servicio}`,
             monto: restoMonto, vence: lead.vence_resto || null,
