@@ -4,6 +4,8 @@ import { Modal, F, SelectOrText, CustomSelect } from './Modal'
 import { PIPELINE_COLS, STATE_COLORS, eur } from './data'
 import { supabase } from '../lib/supabase'
 
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+
 // ── CSV export helper ────────────────────────────────────────────
 function downloadCSV(rows, filename) {
   if (!rows.length) return
@@ -577,7 +579,7 @@ export function Finanzas({ role, data }) {
               if (!fechaStr) return null
               const d = new Date(fechaStr + 'T00:00:00')
               d.setMonth(d.getMonth() + 1)
-              return d.toISOString().slice(0, 10)
+              return ymd(d)
             }
             const subs = gastos.filter(g => g.recurrente)
             const mrc  = subs.reduce((a, g) => a + (g.monto || 0), 0)

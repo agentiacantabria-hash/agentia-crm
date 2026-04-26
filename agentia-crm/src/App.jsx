@@ -10,6 +10,8 @@ import Login from './components/Login'
 import { supabase } from './lib/supabase'
 import { STAGE, STAGES_CLOSED } from './components/data'
 
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+
 const PAGES = [
   ['dashboard','Inicio'],
   ['pipeline','Pipeline'],
@@ -369,7 +371,7 @@ export default function App() {
       const restoMonto = monto - señalCobrada
       if (restoMonto > 0) {
         const venceResto = lead.vence_resto || (() => {
-          const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0,10)
+          const d = new Date(); d.setDate(d.getDate() + 30); return ymd(d)
         })()
         // El cobro Resto ya fue creado en handleSeñalConfirm — marcarlo como pagado al cerrar el lead
         const existingResto = cobrosRef.current.find(c =>
@@ -414,7 +416,7 @@ export default function App() {
       addCobro({
         cliente: lead.empresa,
         concepto: `Mantenimiento ${frecuencia.toLowerCase()} · ${servicio}`,
-        monto: montoRec, vence: next.toISOString().slice(0,10),
+        monto: montoRec, vence: ymd(next),
         pagado: false, vencida: false, recurrente: true, frecuencia,
       })
     }
@@ -532,7 +534,7 @@ export default function App() {
         title: `Revisar devolución señal · ${lead.empresa}`,
         cliente: lead.empresa,
         when_group: 'mañana',
-        due_date: tomorrow.toISOString().slice(0,10),
+        due_date: ymd(tomorrow),
         prio: 'alta',
         resp: lead.responsable || '',
         done: false,
@@ -761,7 +763,7 @@ export default function App() {
       else                         base.setMonth(base.getMonth() + 1)
       addCobro({
         cliente: cobro.cliente, concepto: cobro.concepto,
-        monto: cobro.monto, vence: base.toISOString().slice(0,10),
+        monto: cobro.monto, vence: ymd(base),
         pagado: false, vencida: false, recurrente: true, frecuencia: freq,
       })
     }

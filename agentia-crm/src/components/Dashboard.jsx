@@ -3,6 +3,8 @@ import { I } from './Icons'
 import { STATE_COLORS, PIPELINE_COLS, STAGE, STAGES_CLOSED, STAGES_VALOR, eur } from './data'
 import { supabase } from '../lib/supabase'
 
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+
 
 function effectiveGroup(task) {
   if (task.due_date) {
@@ -24,11 +26,11 @@ function buildChartData(cobros, period) {
     const days = []
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now); d.setDate(d.getDate() - i); d.setHours(0,0,0,0)
-      days.push({ key: d.toISOString().slice(0,10), label: d.toLocaleDateString('es-ES', { weekday:'short' }), value: 0 })
+      days.push({ key: ymd(d), label: d.toLocaleDateString('es-ES', { weekday:'short' }), value: 0 })
     }
     paid.forEach(c => {
       const raw = c.vence || c.created_at
-      const key = raw ? new Date(raw.length === 10 ? raw + 'T00:00:00' : raw).toISOString().slice(0,10) : null
+      const key = raw ? (raw.length === 10 ? raw : ymd(new Date(raw))) : null
       const m = key ? days.find(m => m.key === key) : null
       if (m) m.value += (c.monto || 0)
     })

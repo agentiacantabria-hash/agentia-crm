@@ -4,6 +4,8 @@ import { Modal, F, SelectOrText, CustomSelect } from './Modal'
 import { STATE_COLORS, PIPELINE_COLS, STAGE, STAGES_CLOSED, STAGES_VALOR, eur } from './data'
 import { supabase } from '../lib/supabase'
 
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+
 function downloadCSV(rows, filename) {
   if (!rows.length) return
   const headers = Object.keys(rows[0])
@@ -730,7 +732,7 @@ function CobraRestoModal({ lead, onClose, onConfirm }) {
   const total        = parseFloat(lead.monto) || 0
   const señalCobrada = parseFloat(lead.señal_cobrada) || 0
   const restoAuto    = total - señalCobrada
-  const defaultVence = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0,10) })()
+  const defaultVence = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return ymd(d) })()
   const [vence, setVence]               = useState(defaultVence)
   const [tipo, setTipo]                 = useState('Proyecto')
   const [crearProyecto, setCrearProyecto] = useState(false)
@@ -959,7 +961,7 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser 
   const handleSeñalConfirm = (señalMonto) => {
     const lead = señalLead
     const servicio = lead.servicio || 'Servicio'
-    const today = new Date().toISOString().slice(0,10)
+    const today = ymd(new Date())
     const total = parseFloat(lead.monto) || 0
     const resto = Math.max(0, total - señalMonto)
 
@@ -975,7 +977,7 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser 
     })
     // Cobro del resto (pendiente) — aparece en "Por cobrar"
     if (resto > 0) {
-      const venceResto = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0,10) })()
+      const venceResto = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return ymd(d) })()
       data.addCobro?.({
         cliente: lead.empresa,
         concepto: `Resto · ${servicio}`,
