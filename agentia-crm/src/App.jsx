@@ -66,7 +66,7 @@ export default function App() {
     setNoProfile(false)
   }
 
-  const role = currentUser?.rol === 'Admin' ? 'admin' : 'empleado'
+  const role = currentUser?.rol === 'Admin' ? 'admin' : currentUser?.rol === 'Manager' ? 'manager' : 'empleado'
 
   const [page, setPage]   = useState(() => { const p = localStorage.getItem('agentia_page') || 'dashboard'; return p === 'leads' ? 'pipeline' : p })
   const [drawer, setDrawer] = useState(false)
@@ -87,6 +87,7 @@ export default function App() {
   const [actividades,    setActividades]    = useState([])
   const [notificaciones, setNotificaciones] = useState([])
   const [usuarios,       setUsuarios]       = useState([])
+  const [plantillas,     setPlantillas]     = useState([])
 
   // Refs para siempre tener el valor actual en callbacks sin stale closures
   const clientesRef  = useRef(clientes)
@@ -109,7 +110,8 @@ export default function App() {
   useEffect(() => { localStorage.setItem('agentia_page', page) }, [page])
   // Redirigir empleados fuera de secciones admin si acceden por caché
   useEffect(() => {
-    if (currentUser && role === 'empleado' && ['finanzas','ajustes'].includes(page)) setPage('dashboard')
+    if (currentUser && role !== 'admin' && ['finanzas','ajustes'].includes(page)) setPage('dashboard')
+    if (currentUser && role === 'empleado' && page === 'equipo') setPage('dashboard')
   }, [currentUser, role, page])
 
   useEffect(() => {
@@ -124,8 +126,9 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) return
     async function load() {
-      const isAdmin = currentUser.rol === 'Admin'
-      const ini     = currentUser.iniciales
+      const isAdmin   = currentUser.rol === 'Admin'
+      const isManager = currentUser.rol === 'Manager'
+      const ini       = currentUser.iniciales
       try {
         let lQ  = supabase.from('leads').select('*').order('created_at', { ascending: false })
         let cQ  = supabase.from('clientes').select('*').order('created_at', { ascending: false })
@@ -133,9 +136,9 @@ export default function App() {
         let pQ  = supabase.from('proyectos').select('*').order('created_at', { ascending: false })
         const gQ  = isAdmin ? supabase.from('gastos').select('*').order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null })
         const coQ = isAdmin ? supabase.from('cobros').select('*').order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null })
-        const tmQ = isAdmin ? supabase.from('usuarios').select('iniciales,nombre').eq('estado','activo').order('nombre') : Promise.resolve({ data: null, error: null })
+        const tmQ = (isAdmin || isManager) ? supabase.from('usuarios').select('iniciales,nombre').eq('estado','activo').order('nombre') : Promise.resolve({ data: null, error: null })
 
-        if (!isAdmin && ini) {
+        if (!isAdmin && !isManager && ini) {
           lQ  = lQ.eq('responsable', ini)
           cQ  = cQ.eq('responsable', ini)
           tQ  = tQ.eq('resp', ini)
@@ -187,6 +190,11 @@ export default function App() {
       try {
         const { data: notifData } = await supabase.from('notificaciones').select('*').order('created_at', { ascending: false }).limit(60)
         if (notifData) setNotificaciones(notifData)
+      } catch (_) {}
+      // Cargar plantillas de tareas
+      try {
+        const { data: pData } = await supabase.from('plantillas_tareas').select('*').order('nombre')
+        if (pData) setPlantillas(pData)
       } catch (_) {}
     }
     load()
@@ -706,7 +714,7 @@ export default function App() {
     notificaciones.filter(n => !n.leida).length
 
   const data = {
-    leads, clientes, tasks, proyectos, gastos, cobros, teamMembers, actividades, usuarios,
+    leads, clientes, tasks, proyectos, gastos, cobros, teamMembers, actividades, usuarios, plantillas,
     addLead, updateLead, deleteLead,
     addCliente, updateCliente, deleteCliente,
     addTask, updateTask, deleteTask,
@@ -738,7 +746,7 @@ export default function App() {
       case 'clientes':  return <Clientes data={data} openItem={openItem} onItemOpened={clearOpenItem} currentUser={currentUser} />
       case 'tareas':    return <Tareas data={data} openItem={openItem} onItemOpened={clearOpenItem} currentUser={currentUser} />
       case 'proyectos': return <Proyectos data={data} currentUser={currentUser} />
-      case 'equipo':    return role === 'admin' ? <Equipo data={data} /> : null
+      case 'equipo':    return (role === 'admin' || role === 'manager') ? <Equipo data={data} /> : null
       case 'finanzas':  return role === 'admin' ? <Finanzas role={role} data={data} /> : null
       case 'ajustes':   return role === 'admin' ? <Ajustes role={role} data={data} currentUser={currentUser} /> : null
       default:          return null

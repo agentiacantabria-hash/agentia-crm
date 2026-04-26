@@ -33,9 +33,9 @@ export function Sidebar({ page, setPage, role, counts, isOpen, onClose, currentU
     { key:'proyectos', label:'Proyectos', icon: I.Projects, count: counts.proyectos },
   ]
   const admin = [
-    { key:'equipo',   label:'Equipo',   icon: I.BarChart, adminOnly: true },
-    { key:'finanzas', label:'Finanzas', icon: I.Finance,  adminOnly: true },
-    { key:'ajustes',  label:'Ajustes',  icon: I.Settings, adminOnly: true },
+    { key:'equipo',   label:'Equipo',   icon: I.BarChart, minRole: 'manager' },
+    { key:'finanzas', label:'Finanzas', icon: I.Finance,  minRole: 'admin' },
+    { key:'ajustes',  label:'Ajustes',  icon: I.Settings, minRole: 'admin' },
   ]
 
   const handleNav = (key) => { setPage(key); onClose?.(); setMenuOpen(false) }
@@ -74,7 +74,8 @@ export function Sidebar({ page, setPage, role, counts, isOpen, onClose, currentU
 
         <div className="nav-section-label">Administración</div>
         {admin.map(n => {
-          const disabled = n.adminOnly && role !== 'admin'
+          const roleRank = { admin: 2, manager: 1, empleado: 0 }
+          const disabled = (roleRank[role] ?? 0) < (roleRank[n.minRole] ?? 0)
           return (
             <div key={n.key}
                  className={`nav-item ${page === n.key ? 'active' : ''}`}
@@ -261,6 +262,7 @@ export function BellPanel({ open, onClose, tasks = [], cobros = [], notificacion
     lead_estado:      'var(--ok)',
     tarea_asignada:   'var(--violet)',
     tarea_reasignada: 'var(--violet)',
+    mencion:          '#FFB547',
   }
   const tipoLabel = {
     lead_asignado:    'Lead asignado',
@@ -268,6 +270,7 @@ export function BellPanel({ open, onClose, tasks = [], cobros = [], notificacion
     lead_estado:      'Cambio de estado',
     tarea_asignada:   'Tarea asignada',
     tarea_reasignada: 'Tarea reasignada',
+    mencion:          'Te mencionaron',
   }
 
   return (

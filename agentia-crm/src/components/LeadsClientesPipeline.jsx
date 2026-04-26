@@ -115,7 +115,7 @@ Los presupuestos no incluyen IVA.</div>
 
 // ── Leads ────────────────────────────────────────────────────────
 
-function LeadModal({ lead, onClose, onSave, onDelete, resp: RESP = [] }) {
+function LeadModal({ lead, onClose, onSave, onDelete, resp: RESP = [], currentUser, teamMembers = [] }) {
   const isNew = !lead?.id
   const SERVICIOS = getServicios()
   const [form, setForm] = useState(lead ? { ...lead, monto: lead.monto ?? '', crearProyecto: false, tipo: lead.tipo || 'Proyecto', montoRecurrente: '', frecuencia: 'Mensual', pagoDividido: false, señalPct: 50 } : {
@@ -171,6 +171,7 @@ function LeadModal({ lead, onClose, onSave, onDelete, resp: RESP = [] }) {
       <F label="Notas"><textarea value={form.notas||''} onChange={e => set('notas', e.target.value)} placeholder="Detalles adicionales…" /></F>
 
       {!isNew && <ActivitySection leadId={lead?.id} defaultResp={form.responsable} />}
+      {!isNew && <ComentariosSection leadId={lead?.id} currentUser={currentUser} teamMembers={teamMembers} />}
 
       {form.estado === 'Cobrado' && (
         <div style={{display:'flex', flexDirection:'column', gap:10, padding:'14px', background:'rgba(62,207,142,0.06)', border:'1px solid rgba(62,207,142,0.2)', borderRadius:10}}>
@@ -343,6 +344,132 @@ function ActivitySection({ leadId, defaultResp }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// ── Comentarios con menciones ────────────────────────────────────
+
+function ComentariosSection({ leadId, currentUser, teamMembers = [] }) {
+  const [items,    setItems]    = useState([])
+  const [texto,    setTexto]    = useState('')
+  const [mention,  setMention]  = useState(null) // { query, start }
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    if (!leadId) return
+    supabase.from('comentarios').select('*').eq('lead_id', leadId).order('created_at', { ascending: true })
+      .then(({ data }) => { if (data) setItems(data) })
+  }, [leadId])
+
+  const handleChange = (e) => {
+    const val = e.target.value
+    setTexto(val)
+    const cursor = e.target.selectionStart
+    const before = val.slice(0, cursor)
+    const atIdx = before.lastIndexOf('@')
+    if (atIdx !== -1 && !before.slice(atIdx + 1).includes(' ')) {
+      setMention({ query: before.slice(atIdx + 1).toUpperCase(), start: atIdx })
+    } else {
+      setMention(null)
+    }
+  }
+
+  const insertMention = (ini) => {
+    const atIdx = mention.start
+    const after = texto.slice(atIdx + 1 + mention.query.length)
+    const newText = texto.slice(0, atIdx) + '@' + ini + ' ' + after
+    setTexto(newText)
+    setMention(null)
+    inputRef.current?.focus()
+  }
+
+  const add = async () => {
+    if (!texto.trim() || !currentUser) return
+    const t = texto.trim()
+    setTexto('')
+    setMention(null)
+    const { data, error } = await supabase.from('comentarios').insert([{
+      lead_id: leadId, autor: currentUser.iniciales, texto: t,
+    }]).select().single()
+    if (!error && data) {
+      setItems(prev => [...prev, data])
+      const mencionados = [...new Set((t.match(/@([A-Z]{1,4})/g) || []).map(m => m.slice(1)))]
+      for (const ini of mencionados) {
+        if (ini !== currentUser.iniciales && teamMembers.includes(ini)) {
+          await supabase.from('notificaciones').insert([{
+            para: ini, tipo: 'mencion',
+            titulo: `@${currentUser.iniciales} te mencionó en un lead`,
+            subtitulo: t.length > 60 ? t.slice(0, 60) + '…' : t,
+          }])
+        }
+      }
+    }
+  }
+
+  const fmt = (iso) => {
+    const days = Math.floor((Date.now() - new Date(iso)) / 86400000)
+    if (days === 0) return 'hoy'
+    if (days === 1) return 'ayer'
+    if (days < 7) return `hace ${days}d`
+    return new Date(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+  }
+
+  const renderTexto = (t) => {
+    const parts = t.split(/(@[A-Z]{1,4})/g)
+    return parts.map((p, i) =>
+      p.startsWith('@') && teamMembers.includes(p.slice(1))
+        ? <span key={i} style={{ color: 'var(--brand-2)', fontWeight: 600 }}>{p}</span>
+        : p
+    )
+  }
+
+  const suggestions = mention
+    ? teamMembers.filter(m => m.startsWith(mention.query) && m !== currentUser?.iniciales).slice(0, 5)
+    : []
+
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: .5, color: 'var(--text-4)', padding: '14px 0 10px', borderTop: '1px solid var(--line-2)', marginTop: 8 }}>
+        Comentarios
+      </div>
+      {items.map(c => (
+        <div key={c.id} style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--line-1)' }}>
+          <div className="avatar xs" style={{ fontSize: 9, width: 22, height: 22, flexShrink: 0, marginTop: 2 }}>{c.autor}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 3 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-2)' }}>{c.autor}</span>
+              <span style={{ fontSize: 10.5, color: 'var(--text-4)' }}>{fmt(c.created_at)}</span>
+            </div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-1)', lineHeight: 1.5, wordBreak: 'break-word' }}>
+              {renderTexto(c.texto)}
+            </div>
+          </div>
+        </div>
+      ))}
+      {items.length === 0 && (
+        <div style={{ fontSize: 12, color: 'var(--text-4)', textAlign: 'center', padding: '6px 0 8px' }}>Sin comentarios aún</div>
+      )}
+      <div style={{ position: 'relative', marginTop: 10 }}>
+        {suggestions.length > 0 && (
+          <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: 4, background: 'var(--surface-1)', border: '1px solid var(--line-2)', borderRadius: 8, overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.4)', zIndex: 10 }}>
+            {suggestions.map(ini => (
+              <div key={ini} onMouseDown={e => { e.preventDefault(); insertMention(ini) }}
+                style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--text-0)' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                @{ini}
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 6 }}>
+          <input ref={inputRef} className="input" style={{ flex: 1 }} placeholder="Escribe un comentario… usa @INI para mencionar"
+            value={texto} onChange={handleChange}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); add() } }} />
+          <button className="btn primary sm" onClick={add} style={{ flexShrink: 0, padding: '0 12px' }}>+</button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -1158,6 +1285,8 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser 
           onSave={handleSave}
           onDelete={id => { data.deleteLead?.(id); setEditing(null) }}
           resp={allResp}
+          currentUser={currentUser}
+          teamMembers={teamMembers}
         />
       )}
 
@@ -1168,6 +1297,8 @@ export function Pipeline({ data, openQuick, openItem, onItemOpened, currentUser 
           onSave={(form) => { data.updateLead?.(form.id, form); setCobradoLead(null) }}
           onDelete={id => { data.deleteLead?.(id); setCobradoLead(null) }}
           resp={allResp}
+          currentUser={currentUser}
+          teamMembers={teamMembers}
         />
       )}
 

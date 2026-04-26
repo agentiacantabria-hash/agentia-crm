@@ -335,7 +335,7 @@ function ClienteSearch({ value, onChange, clientes = [], leads = [] }) {
 
 // ── Tareas ───────────────────────────────────────────────────────
 
-function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [], leads = [], resp: respOptions = [] }) {
+function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [], leads = [], resp: respOptions = [], plantillas = [] }) {
   const isNew = !tarea?.id
   const defaultResp = respOptions[0] || ''
 
@@ -344,6 +344,15 @@ function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [], leads = [
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const [confirmDel, setConfirmDel] = useState(false)
+  const [showPlantillas, setShowPlantillas] = useState(false)
+
+  const applyPlantilla = (p) => {
+    const titulo = p.titulo.replace('{cliente}', form.cliente || '…')
+    set('title', titulo)
+    if (p.tag)  set('tag', p.tag)
+    if (p.prio) set('prio', p.prio)
+    setShowPlantillas(false)
+  }
 
   const handleSave = () => {
     if (!form.title.trim()) return
@@ -354,6 +363,27 @@ function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [], leads = [
   return (
     <Modal open title={isNew ? 'Nueva tarea' : 'Editar tarea'}
       onClose={onClose} onSave={handleSave} saveLabel={isNew ? 'Crear tarea' : 'Guardar'}>
+      {isNew && plantillas.length > 0 && (
+        <div style={{ marginBottom: 12, position: 'relative' }}>
+          <button className="btn ghost sm" onClick={() => setShowPlantillas(o => !o)}
+            style={{ fontSize: 12, padding: '4px 10px', color: 'var(--brand-2)' }}>
+            ⚡ Usar plantilla
+          </button>
+          {showPlantillas && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, background: 'var(--surface-1)', border: '1px solid var(--line-2)', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 20, minWidth: 280, overflow: 'hidden' }}>
+              {plantillas.map(p => (
+                <div key={p.id} onClick={() => applyPlantilla(p)}
+                  style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--line-1)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{ fontSize: 13, color: 'var(--text-0)', fontWeight: 500 }}>{p.nombre}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-4)', marginTop: 2 }}>{p.titulo}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <F label="Título">
         <input value={form.title} onChange={e => set('title', e.target.value)} placeholder="¿Qué hay que hacer?" autoFocus />
       </F>
@@ -395,7 +425,7 @@ function TareaModal({ tarea, onClose, onSave, onDelete, clientes = [], leads = [
 }
 
 export function Tareas({ data, openItem, onItemOpened, currentUser }) {
-  const { tasks = [], clientes = [], leads = [], teamMembers = [], updateTask, addTask, deleteTask } = data || {}
+  const { tasks = [], clientes = [], leads = [], teamMembers = [], plantillas = [], updateTask, addTask, deleteTask } = data || {}
   const myIni   = currentUser?.rol !== 'Admin' ? currentUser?.iniciales : null
   const allResp = teamMembers.length
     ? teamMembers
@@ -550,6 +580,7 @@ export function Tareas({ data, openItem, onItemOpened, currentUser }) {
           clientes={clientes}
           leads={leads}
           resp={allResp}
+          plantillas={plantillas}
         />
       )}
     </div>
