@@ -80,8 +80,9 @@ export default function App() {
   const [proyectos,   setProyectos]   = useState([])
   const [gastos,      setGastos]      = useState([])
   const [cobros,      setCobros]      = useState([])
-  const [teamMembers, setTeamMembers] = useState([])
-  const [actividades, setActividades] = useState([])
+  const [teamMembers,    setTeamMembers]    = useState([])
+  const [actividades,    setActividades]    = useState([])
+  const [notificaciones, setNotificaciones] = useState([])
 
   // Refs para siempre tener el valor actual en callbacks sin stale closures
   const clientesRef  = useRef(clientes)
@@ -175,6 +176,11 @@ export default function App() {
         const { data: actData } = await supabase.from('actividad').select('*').order('created_at', { ascending: false })
         if (actData) setActividades(actData)
       } catch (_) {}
+      // Cargar notificaciones
+      try {
+        const { data: notifData } = await supabase.from('notificaciones').select('*').order('created_at', { ascending: false }).limit(60)
+        if (notifData) setNotificaciones(notifData)
+      } catch (_) {}
     }
     load()
   }, [currentUser])
@@ -214,9 +220,11 @@ export default function App() {
       .on('postgres_changes', { event:'INSERT', schema:'public', table:'proyectos' }, ins(setProyectos))
       .on('postgres_changes', { event:'UPDATE', schema:'public', table:'proyectos' }, upd(setProyectos))
       .on('postgres_changes', { event:'DELETE', schema:'public', table:'proyectos' }, del(setProyectos))
-      .on('postgres_changes', { event:'INSERT', schema:'public', table:'actividad' }, ins(setActividades))
-      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'actividad' }, upd(setActividades))
-      .on('postgres_changes', { event:'DELETE', schema:'public', table:'actividad' }, del(setActividades))
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'actividad'      }, ins(setActividades))
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'actividad'      }, upd(setActividades))
+      .on('postgres_changes', { event:'DELETE', schema:'public', table:'actividad'      }, del(setActividades))
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'notificaciones' }, ins(setNotificaciones))
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'notificaciones' }, upd(setNotificaciones))
 
     if (isAdmin) {
       ch
@@ -231,6 +239,18 @@ export default function App() {
     ch.subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [currentUser])
+
+  // ── Notificaciones ─────────────────────────────────────────
+  const createNotif = async (para, tipo, titulo, subtitulo = null) => {
+    if (!para || para === currentUser?.iniciales) return
+    await supabase.from('notificaciones').insert([{ para, tipo, titulo, subtitulo }])
+  }
+  const markNotifsRead = async () => {
+    const unread = notificaciones.filter(n => !n.leida).map(n => n.id)
+    if (!unread.length) return
+    await supabase.from('notificaciones').update({ leida: true }).in('id', unread)
+    setNotificaciones(prev => prev.map(n => ({ ...n, leida: true })))
+  }
 
   // ── Actualizar perfil propio ────────────────────────────────
   const updateProfile = async (updates) => {
@@ -255,6 +275,7 @@ export default function App() {
     setLeads(prev => [d, ...prev])
     autoWinLead({ ...d, crearProyecto, tipo, montoRecurrente, frecuencia, pagoDividido, señalPct, vence_resto })
     showToast(`Lead «${leadData.empresa}» creado`)
+    if (d.responsable) createNotif(d.responsable, 'lead_asignado', `Lead asignado: ${d.empresa}`, d.servicio || null)
   }
 
   const autoWinLead = (lead) => {
@@ -366,6 +387,10 @@ export default function App() {
       await supabase.from('leads').update(clean(safeUpdates)).eq('id', id)
     } catch (_) {}
     setLeads(prev => prev.map(l => l.id === id ? { ...l, ...safeUpdates } : l))
+    if (safeUpdates.responsable && safeUpdates.responsable !== lead?.responsable)
+      createNotif(safeUpdates.responsable, 'lead_reasignado', `Lead reasignado: ${lead?.empresa}`, safeUpdates.estado || lead?.estado)
+    if (safeUpdates.estado && safeUpdates.estado !== lead?.estado && lead?.responsable)
+      createNotif(lead.responsable, 'lead_estado', `${lead?.empresa} → ${safeUpdates.estado}`, lead?.servicio || null)
 
     // Cascade: si cambia el nombre de empresa, actualizar cobros, tareas, proyectos y clientes
     if (safeUpdates.empresa && lead?.empresa && safeUpdates.empresa !== lead.empresa) {
@@ -525,14 +550,22 @@ export default function App() {
   // ── TAREAS ─────────────────────────────────────────────────
   const addTask = async (tarea) => {
     const { data: d, error } = await supabase.from('tareas').insert([clean(tarea)]).select().single()
-    if (!error && d) { setTasks(prev => [d, ...prev]); showToast('Tarea creada') }
-    else if (error) console.error('[Supabase] addTask:', error.message)
+    if (!error && d) {
+      setTasks(prev => [d, ...prev]); showToast('Tarea creada')
+      if (d.resp) createNotif(d.resp, 'tarea_asignada', `Nueva tarea: ${d.title}`, d.cliente || null)
+    } else if (error) console.error('[Supabase] addTask:', error.message)
   }
 
   const updateTask = async (id, updates) => {
+    const task = tasksRef.current.find(t => t.id === id)
     try {
       const { error } = await supabase.from('tareas').update(clean(updates)).eq('id', id)
-      if (!error) { setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t)); return }
+      if (!error) {
+        setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t))
+        if (updates.resp && updates.resp !== task?.resp)
+          createNotif(updates.resp, 'tarea_reasignada', `Tarea reasignada: ${task?.title}`, task?.cliente || null)
+        return
+      }
     } catch (_) {}
     setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t))
   }
@@ -662,7 +695,8 @@ export default function App() {
       if (t.due_date) return new Date(t.due_date + 'T00:00:00') < _today
       return t.when_group === 'vencida'
     }).length +
-    cobros.filter(c => !c.pagado && (c.vencida || (c.vence && new Date(c.vence + 'T00:00:00') < _today))).length
+    cobros.filter(c => !c.pagado && (c.vencida || (c.vence && new Date(c.vence + 'T00:00:00') < _today))).length +
+    notificaciones.filter(n => !n.leida).length
 
   const data = {
     leads, clientes, tasks, proyectos, gastos, cobros, teamMembers, actividades,
@@ -717,7 +751,7 @@ export default function App() {
       {profileOpen && <ProfileModal currentUser={currentUser} onClose={() => setProfileOpen(false)} onSave={updateProfile} />}
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} data={data} setPage={setPage}
         onSelect={r => { setPage(r.page); setOpenItem(r); setSearchOpen(false) }} />
-      <BellPanel open={bellOpen} onClose={() => setBellOpen(false)} tasks={tasks} cobros={role === 'admin' ? cobros : []} />
+      <BellPanel open={bellOpen} onClose={() => setBellOpen(false)} tasks={tasks} cobros={role === 'admin' ? cobros : []} notificaciones={notificaciones} onMarkRead={markNotifsRead} />
 
       {/* Toast notifications */}
       <div style={{position:'fixed', bottom:24, right:24, display:'flex', flexDirection:'column', gap:8, zIndex:9999, pointerEvents:'none'}}>

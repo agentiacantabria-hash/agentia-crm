@@ -242,7 +242,7 @@ export function Topbar({ crumb, setDrawerOpen, role, onMenuClick, notifCount = 0
   )
 }
 
-export function BellPanel({ open, onClose, tasks = [], cobros = [] }) {
+export function BellPanel({ open, onClose, tasks = [], cobros = [], notificaciones = [], onMarkRead }) {
   if (!open) return null
   const today = new Date(); today.setHours(0,0,0,0)
   const urgentes = tasks.filter(t => {
@@ -251,7 +251,23 @@ export function BellPanel({ open, onClose, tasks = [], cobros = [] }) {
     return t.when_group === 'vencida'
   })
   const cobrosVencidos = cobros.filter(c => !c.pagado && (c.vencida || (c.vence && new Date(c.vence.length === 10 ? c.vence + 'T00:00:00' : c.vence) < today)))
-  const total = urgentes.length + cobrosVencidos.length
+  const unread = notificaciones.filter(n => !n.leida)
+  const total = urgentes.length + cobrosVencidos.length + unread.length
+
+  const tipoColor = {
+    lead_asignado:    'var(--brand-2)',
+    lead_reasignado:  'var(--brand-3)',
+    lead_estado:      'var(--ok)',
+    tarea_asignada:   'var(--violet)',
+    tarea_reasignada: 'var(--violet)',
+  }
+  const tipoLabel = {
+    lead_asignado:    'Lead asignado',
+    lead_reasignado:  'Lead reasignado',
+    lead_estado:      'Cambio de estado',
+    tarea_asignada:   'Tarea asignada',
+    tarea_reasignada: 'Tarea reasignada',
+  }
 
   return (
     <>
@@ -265,13 +281,35 @@ export function BellPanel({ open, onClose, tasks = [], cobros = [] }) {
         <div style={{display:'flex', alignItems:'center', gap:8, padding:'14px 16px', borderBottom:'1px solid var(--line-1)', position:'sticky', top:0, background:'var(--surface-1)'}}>
           <I.Bell size={15} style={{color:'var(--brand-2)'}}/>
           <span style={{fontSize:13.5, fontWeight:600}}>Notificaciones</span>
-          <span style={{marginLeft:'auto', fontSize:11, color:'var(--text-4)'}}>{total} pendientes</span>
+          {unread.length > 0 ? (
+            <button onClick={onMarkRead} className="btn ghost" style={{marginLeft:'auto', fontSize:11, padding:'3px 10px', height:'auto'}}>
+              Marcar todo leído
+            </button>
+          ) : (
+            <span style={{marginLeft:'auto', fontSize:11, color:'var(--text-4)'}}>{total > 0 ? `${total} alertas` : 'Todo al día'}</span>
+          )}
         </div>
 
         {total === 0 && (
           <div style={{padding:'32px 16px', textAlign:'center', color:'var(--text-4)', fontSize:13}}>
             Sin alertas — todo al día ✓
           </div>
+        )}
+
+        {unread.length > 0 && (
+          <>
+            <div style={{fontSize:10.5, fontWeight:600, color:'var(--text-4)', padding:'10px 16px 4px', textTransform:'uppercase', letterSpacing:'0.07em'}}>Nuevas</div>
+            {unread.slice(0,10).map(n => (
+              <div key={n.id} style={{display:'flex', alignItems:'flex-start', gap:10, padding:'10px 16px', borderBottom:'1px solid var(--line-1)', background:'rgba(var(--brand-rgb,99,102,241),0.04)'}}>
+                <div style={{width:7, height:7, borderRadius:'50%', background: tipoColor[n.tipo] || 'var(--brand-2)', marginTop:5, flexShrink:0}}/>
+                <div style={{flex:1, minWidth:0}}>
+                  <div style={{fontSize:13, color:'var(--text-0)', lineHeight:1.4}}>{n.titulo}</div>
+                  {n.subtitulo && <div style={{fontSize:11.5, color:'var(--text-3)', marginTop:2}}>{n.subtitulo}</div>}
+                  <div style={{fontSize:10.5, color:'var(--text-4)', marginTop:3}}>{tipoLabel[n.tipo] || n.tipo}</div>
+                </div>
+              </div>
+            ))}
+          </>
         )}
 
         {urgentes.length > 0 && (
