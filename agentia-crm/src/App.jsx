@@ -455,8 +455,14 @@ export default function App() {
       if (clienteVinculado && clienteVinculado.responsable === lead?.responsable)
         updateCliente(clienteVinculado.id, { responsable: safeUpdates.responsable })
     }
-    if (safeUpdates.estado && safeUpdates.estado !== lead?.estado && lead?.responsable)
-      createNotif(lead.responsable, 'lead_estado', `${lead?.empresa} → ${safeUpdates.estado}`, lead?.servicio || null)
+    if (safeUpdates.estado && safeUpdates.estado !== lead?.estado && lead?.responsable) {
+      const newEst = safeUpdates.estado
+      const tipo = newEst === STAGE.COBRADO ? 'lead_cobrado'
+                 : newEst === STAGE.SEÑAL   ? 'lead_señal'
+                 : newEst === STAGE.DENEGADO ? 'lead_denegado'
+                 : 'lead_estado'
+      createNotif(lead.responsable, tipo, `${lead?.empresa} → ${newEst}`, lead?.servicio || null)
+    }
 
     // Cascade: si cambia el nombre de empresa, actualizar cobros, tareas, proyectos y clientes
     if (safeUpdates.empresa && lead?.empresa && safeUpdates.empresa !== lead.empresa) {
@@ -603,8 +609,11 @@ export default function App() {
   // ── CLIENTES ───────────────────────────────────────────────
   const addCliente = async (cliente) => {
     const { data: d, error } = await supabase.from('clientes').insert([clean(cliente)]).select().single()
-    if (!error && d) { setClientes(prev => [d, ...prev]); showToast(`Cliente «${cliente.nombre}» creado`) }
-    else if (error) { console.error('[Supabase] addCliente:', error.message); showToast(`Error al guardar cliente: ${error.message}`, 'error') }
+    if (!error && d) {
+      setClientes(prev => [d, ...prev])
+      showToast(`Cliente «${cliente.nombre}» creado`)
+      if (d.responsable) createNotif(d.responsable, 'cliente_asignado', `Cliente asignado: ${d.nombre}`, d.servicio || null)
+    } else if (error) { console.error('[Supabase] addCliente:', error.message); showToast(`Error al guardar cliente: ${error.message}`, 'error') }
   }
 
   const updateCliente = async (id, updates, { skipCascade = false } = {}) => {
@@ -674,8 +683,10 @@ export default function App() {
   // ── PROYECTOS ──────────────────────────────────────────────
   const addProyecto = async (proyecto) => {
     const { data: d, error } = await supabase.from('proyectos').insert([clean(proyecto)]).select().single()
-    if (!error && d) { setProyectos(prev => [d, ...prev]) }
-    else if (error) console.error('[Supabase] addProyecto:', error.message)
+    if (!error && d) {
+      setProyectos(prev => [d, ...prev])
+      if (d.resp) createNotif(d.resp, 'proyecto_asignado', `Proyecto asignado: ${d.cliente}`, d.servicio || null)
+    } else if (error) console.error('[Supabase] addProyecto:', error.message)
   }
 
   const updateProyecto = async (id, updates) => {
