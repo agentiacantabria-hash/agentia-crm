@@ -3,7 +3,7 @@ create table if not exists plantillas_tareas (
   nombre     text not null,
   titulo     text not null,
   tag        text,
-  prio       text not null default 'normal',
+  prio       text not null default 'media',
   created_at timestamptz not null default now()
 );
 
@@ -21,8 +21,8 @@ create policy "all_plantillas_select" on plantillas_tareas
 insert into plantillas_tareas (nombre, titulo, tag, prio) values
   ('Primer contacto',     'Llamada de primer contacto con {cliente}',   'Comercial', 'alta'),
   ('Enviar propuesta',    'Preparar y enviar propuesta a {cliente}',     'Comercial', 'alta'),
-  ('Seguimiento',         'Seguimiento propuesta — {cliente}',           'Comercial', 'normal'),
+  ('Seguimiento',         'Seguimiento propuesta — {cliente}',           'Comercial', 'media'),
   ('Onboarding cliente',  'Onboarding inicial con {cliente}',            'Entrega',   'alta'),
-  ('Revisión entrega',    'Revisión y ajustes finales — {cliente}',      'Entrega',   'normal'),
+  ('Revisión entrega',    'Revisión y ajustes finales — {cliente}',      'Entrega',   'media'),
   ('Cobrar resto',        'Cobrar resto del proyecto — {cliente}',       'Finanzas',  'alta'),
-  ('Reunión de equipo',   'Reunión semanal de equipo',                   'Interno',   'normal');
+  ('Reunión de equipo',   'Reunión semanal de equipo',                   'Interno',   'media');

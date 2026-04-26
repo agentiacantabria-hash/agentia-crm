@@ -22,6 +22,7 @@ create table if not exists leads (
   temp           text default 'cold' check (temp in ('hot','warm','cold')),
   notas          text,
   señal_cobrada  numeric default 0,
+  señal_fecha    text,
   vence_resto    text,
   created_at     timestamptz default now(),
   updated_at     timestamptz default now()
