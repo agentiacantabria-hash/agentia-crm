@@ -12,20 +12,22 @@ function Stat({ label, value, warn }) {
 
 function ReasignarModal({ member, allMembers, onClose, onConfirm }) {
   const otros = allMembers.filter(u => u.iniciales !== member.iniciales)
-  const [destino,    setDestino]    = useState(otros[0]?.iniciales || '')
-  const [chkLeads,   setChkLeads]   = useState(member.myLeads.length > 0)
-  const [chkTareas,  setChkTareas]  = useState(member.myTasks.length > 0)
-  const [chkProy,    setChkProy]    = useState(member.myProyectos.length > 0)
-  const [loading,    setLoading]    = useState(false)
+  const [destino,      setDestino]      = useState(otros[0]?.iniciales || '')
+  const [chkLeads,     setChkLeads]     = useState(member.myLeads.length > 0)
+  const [chkTareas,    setChkTareas]    = useState(member.myTasks.length > 0)
+  const [chkProy,      setChkProy]      = useState(member.myProyectos.length > 0)
+  const [chkClientes,  setChkClientes]  = useState(member.myClientes.length > 0)
+  const [loading,      setLoading]      = useState(false)
 
   const total = (chkLeads ? member.myLeads.length : 0)
               + (chkTareas ? member.myTasks.length : 0)
               + (chkProy ? member.myProyectos.length : 0)
+              + (chkClientes ? member.myClientes.length : 0)
 
   const handleConfirm = async () => {
     if (!destino || total === 0) return
     setLoading(true)
-    await onConfirm({ de: member.iniciales, a: destino, incluirLeads: chkLeads, incluirTareas: chkTareas, incluirProyectos: chkProy })
+    await onConfirm({ de: member.iniciales, a: destino, incluirLeads: chkLeads, incluirTareas: chkTareas, incluirProyectos: chkProy, incluirClientes: chkClientes })
     onClose()
   }
 
@@ -54,9 +56,10 @@ function ReasignarModal({ member, allMembers, onClose, onConfirm }) {
         <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10 }}>Qué incluir</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
           {[
-            { key: 'leads',   label: 'Leads activos',      count: member.myLeads.length,    checked: chkLeads,   set: setChkLeads },
-            { key: 'tareas',  label: 'Tareas pendientes',  count: member.myTasks.length,    checked: chkTareas,  set: setChkTareas },
-            { key: 'proy',    label: 'Proyectos activos',  count: member.myProyectos.length, checked: chkProy,   set: setChkProy },
+            { key: 'leads',    label: 'Leads activos',      count: member.myLeads.length,    checked: chkLeads,    set: setChkLeads },
+            { key: 'tareas',   label: 'Tareas pendientes',  count: member.myTasks.length,    checked: chkTareas,   set: setChkTareas },
+            { key: 'proy',     label: 'Proyectos activos',  count: member.myProyectos.length, checked: chkProy,    set: setChkProy },
+            { key: 'clientes', label: 'Clientes activos',   count: member.myClientes.length, checked: chkClientes, set: setChkClientes },
           ].map(({ key, label, count, checked, set }) => (
             <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: count === 0 ? 'not-allowed' : 'pointer', opacity: count === 0 ? 0.4 : 1 }}>
               <input type="checkbox" checked={checked} disabled={count === 0} onChange={e => set(e.target.checked)}
@@ -156,7 +159,7 @@ function MemberCard({ member, maxLoad, onReasignar }) {
 }
 
 export default function Equipo({ data }) {
-  const { tasks, leads, proyectos, usuarios, reasignarMasivo } = data
+  const { tasks, leads, clientes, proyectos, usuarios, reasignarMasivo } = data
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const [reasignando, setReasignando] = useState(null)
 
@@ -166,8 +169,9 @@ export default function Equipo({ data }) {
     const overdue     = myTasks.filter(t => t.due_date && new Date(t.due_date + 'T00:00:00') < today)
     const myLeads     = leads.filter(l => l.responsable === ini && !STAGES_CLOSED.includes(l.estado))
     const myProyectos = proyectos.filter(p => p.resp === ini && p.estado !== 'Cerrado')
+    const myClientes  = (clientes || []).filter(c => c.responsable === ini && c.estado !== 'Cerrado')
     const load        = myTasks.length + myLeads.length * 0.5 + myProyectos.length * 0.5 + overdue.length * 2
-    return { ...u, myTasks, overdue, myLeads, myProyectos, load }
+    return { ...u, myTasks, overdue, myLeads, myProyectos, myClientes, load }
   }).sort((a, b) => b.load - a.load)
 
   const maxLoad = Math.max(...workload.map(w => w.load), 1)

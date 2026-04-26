@@ -268,7 +268,7 @@ export default function App() {
   }
 
   // ── Reasignación masiva ────────────────────────────────────
-  const reasignarMasivo = async ({ de, a, incluirLeads, incluirTareas, incluirProyectos }) => {
+  const reasignarMasivo = async ({ de, a, incluirLeads, incluirTareas, incluirProyectos, incluirClientes }) => {
     let count = 0
     if (incluirLeads) {
       const targets = leads.filter(l => l.responsable === de && !STAGES_CLOSED.includes(l.estado))
@@ -291,6 +291,15 @@ export default function App() {
       if (targets.length) {
         await supabase.from('proyectos').update({ resp: a }).eq('resp', de).neq('estado', 'Cerrado')
         setProyectos(prev => prev.map(p => p.resp === de && p.estado !== 'Cerrado' ? { ...p, resp: a } : p))
+        count += targets.length
+      }
+    }
+    if (incluirClientes) {
+      // Sin clientes, el empleado destino no verá los clientes reasignados (RLS filtra por responsable)
+      const targets = clientesRef.current.filter(c => c.responsable === de && c.estado !== 'Cerrado')
+      if (targets.length) {
+        await supabase.from('clientes').update({ responsable: a }).eq('responsable', de).neq('estado', 'Cerrado')
+        setClientes(prev => prev.map(c => c.responsable === de && c.estado !== 'Cerrado' ? { ...c, responsable: a } : c))
         count += targets.length
       }
     }
@@ -437,8 +446,13 @@ export default function App() {
       await supabase.from('leads').update(clean(safeUpdates)).eq('id', id)
     } catch (_) {}
     setLeads(prev => prev.map(l => l.id === id ? { ...l, ...safeUpdates } : l))
-    if (safeUpdates.responsable && safeUpdates.responsable !== lead?.responsable)
+    if (safeUpdates.responsable && safeUpdates.responsable !== lead?.responsable) {
       createNotif(safeUpdates.responsable, 'lead_reasignado', `Lead reasignado: ${lead?.empresa}`, safeUpdates.estado || lead?.estado)
+      // Cascade: si el cliente asociado tiene el mismo responsable que el lead anterior, actualizarlo
+      const clienteVinculado = clientesRef.current.find(c => c.nombre === lead?.empresa)
+      if (clienteVinculado && clienteVinculado.responsable === lead?.responsable)
+        updateCliente(clienteVinculado.id, { responsable: safeUpdates.responsable })
+    }
     if (safeUpdates.estado && safeUpdates.estado !== lead?.estado && lead?.responsable)
       createNotif(lead.responsable, 'lead_estado', `${lead?.empresa} → ${safeUpdates.estado}`, lead?.servicio || null)
 
@@ -464,8 +478,12 @@ export default function App() {
       // Deja de ser Cobrado → eliminar cobro automático y cliente auto-creado
       const c = findCobroAuto(lead)
       if (c) deleteCobro(c.id)
-      const clienteAuto = clientesRef.current.find(c => c.nombre === lead.empresa)
-      if (clienteAuto) deleteCliente(clienteAuto.id)
+      const clienteAuto = clientesRef.current.find(cl => cl.nombre === lead.empresa)
+      if (clienteAuto) {
+        // Solo borrar si no hay otros cobros pagados — protege clientes pre-existentes con historial
+        const otherPaid = cobrosRef.current.some(co => co.cliente === lead.empresa && co.pagado && co.id !== c?.id)
+        if (!otherPaid) deleteCliente(clienteAuto.id)
+      }
     } else if (eraCobrado && !nuevoEstado && updates.monto !== undefined) {
       // Sigue Cobrado pero cambia el importe → actualizar cobro
       const c = findCobroAuto(lead)
@@ -475,25 +493,24 @@ export default function App() {
     // Señal pagada → atrás: borrar cobro de señal + cobro del resto + cliente auto-creado
     if (eraSeñal && nuevoEstado && !seraCobrado && !seraDenegado) {
       const señalVal = parseFloat(lead.señal_cobrada) || 0
-      // Borrar cobro de la señal
-      if (señalVal > 0) {
-        const señalCobro = cobrosRef.current.find(c =>
-          c.cliente === lead.empresa &&
-          (c.concepto || '').startsWith('Señal ·') &&
-          c.monto === señalVal
-        )
-        if (señalCobro) deleteCobro(señalCobro.id)
-      }
-      // Borrar cobro del resto (pendiente creado al confirmar señal)
+      const señalCobro = señalVal > 0 ? cobrosRef.current.find(c =>
+        c.cliente === lead.empresa &&
+        (c.concepto || '').startsWith('Señal ·') &&
+        c.monto === señalVal
+      ) : null
       const restoCobro = cobrosRef.current.find(c =>
         c.cliente === lead.empresa &&
         (c.concepto || '').startsWith('Resto ·') &&
         !c.pagado
       )
+      // Comprobar otros pagados ANTES de borrar la señal (que es un cobro pagado)
+      const otherPaid = cobrosRef.current.some(co =>
+        co.cliente === lead.empresa && co.pagado && co.id !== señalCobro?.id
+      )
+      if (señalCobro) deleteCobro(señalCobro.id)
       if (restoCobro) deleteCobro(restoCobro.id)
-      // Borrar cliente auto-creado (si existe con ese nombre)
       const clienteAuto = clientesRef.current.find(c => c.nombre === lead.empresa)
-      if (clienteAuto) deleteCliente(clienteAuto.id)
+      if (clienteAuto && !otherPaid) deleteCliente(clienteAuto.id)
     }
     // Señal pagada → Denegado: mantener cobro señal (dinero recibido), borrar resto pendiente
     if (eraSeñal && seraDenegado) {
@@ -574,11 +591,19 @@ export default function App() {
   }
 
   const updateCliente = async (id, updates) => {
+    const cliente = clientesRef.current.find(c => c.id === id)
     try {
-      const { error } = await supabase.from('clientes').update(clean(updates)).eq('id', id)
-      if (!error) { setClientes(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c)); return }
+      await supabase.from('clientes').update(clean(updates)).eq('id', id)
     } catch (_) {}
     setClientes(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
+    // Cascade: si cambia el nombre, actualizar cobros, tareas y proyectos que lo referencian
+    if (updates.nombre && cliente?.nombre && updates.nombre !== cliente.nombre) {
+      const oldName = cliente.nombre
+      const newName = updates.nombre
+      cobrosRef.current.filter(c => c.cliente === oldName).forEach(c => updateCobro(c.id, { cliente: newName }))
+      tasksRef.current.filter(t => t.cliente === oldName).forEach(t => updateTask(t.id, { cliente: newName }))
+      proyectosRef.current.filter(p => p.cliente === oldName).forEach(p => updateProyecto(p.id, { cliente: newName }))
+    }
   }
 
   const deleteCliente = async (id) => {
