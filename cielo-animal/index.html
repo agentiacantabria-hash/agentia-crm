@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cielo Animal — Guardería, Hotel y Cuidado integral en Palencia</title>
+<meta name="description" content="Guardería de día, hotel canino y felino, peluquería, ozonoterapia, fisioterapia y último adiós. En Palencia. Cada mascota, parte de la familia." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@300;400;500;600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a href="#top" class="nav-logo" aria-label="Cielo Animal">
+      <img src="assets/logo.jpeg" alt="" class="nav-logo-img"/>
+      <span class="nav-logo-text">
+        <span class="nav-logo-title">Cielo Animal</span>
+        <span class="nav-logo-sub">Palencia</span>
+      </span>
+    </a>
+    <nav class="nav-links" aria-label="Principal">
+      <a href="#servicios">Servicios</a>
+      <a href="#instalaciones">Instalaciones</a>
+      <a href="#sobre">Sobre nosotros</a>
+      <a href="#resenas">Reseñas</a>
+      <a href="#contacto">Contacto</a>
+    </nav>
+    <div class="nav-cta">
+      <a href="tel:+34655933233" class="nav-phone" aria-label="Llamar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        <span>655 93 32 33</span>
+      </a>
+      <a href="#contacto" class="btn btn-primary nav-btn">Reservar visita</a>
+    </div>
+    <button class="nav-burger" aria-label="Abrir menú" id="burger">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+  <div class="nav-mobile" id="navMobile">
+    <a href="#servicios">Servicios</a>
+    <a href="#instalaciones">Instalaciones</a>
+    <a href="#sobre">Sobre nosotros</a>
+    <a href="#resenas">Reseñas</a>
+    <a href="#contacto">Contacto</a>
+    <a href="#contacto" class="btn btn-primary">Reservar visita</a>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <div class="hero-cloud-bg" aria-hidden="true">
+    <svg viewBox="0 0 1400 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <radialGradient id="sunGlow" cx="50%" cy="35%" r="60%">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+          <stop offset="100%" stop-color="#d8e8f5" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect width="1400" height="900" fill="url(#sunGlow)"/>
+      <g opacity="0.35" fill="#b8d0e6">
+        <ellipse cx="200" cy="720" rx="240" ry="60"/>
+        <ellipse cx="1200" cy="760" rx="280" ry="70"/>
+        <ellipse cx="700" cy="820" rx="400" ry="80"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="hero-inner">
+    <div class="hero-copy">
+      <div class="hero-eyebrow">
+        <span class="dot"></span>
+        <span>Cuidado integral para tu mascota · Palencia</span>
+      </div>
+      <h1 class="hero-title">
+        Tu mascota,<br/>
+        <em>en las mejores manos</em><br/>
+        de la tierra… y del cielo.
+      </h1>
+      <p class="hero-lead">
+        Un espacio hecho con cariño donde perros, gatos y pequeños roedores encuentran lo que necesitan en cada momento de su vida. Desde el juego y el descanso hasta el último adiós.
+      </p>
+
+      <div class="hero-ctas">
+        <a href="#contacto" class="btn btn-primary">
+          <span>Reservar visita</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </a>
+        <a href="#servicios" class="btn btn-ghost">Ver servicios</a>
+        <a href="https://www.instagram.com/cieloanimal?igsh=ZG1uN2lrN3g1eXZv" target="_blank" rel="noopener" class="btn btn-ig" aria-label="Ver nuestro Instagram">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="0.9" fill="currentColor" stroke="none"/></svg>
+          <span>Síguenos en Instagram</span>
+        </a>
+      </div>
+
+      <div class="hero-meta">
+        <div>
+          <span class="hero-meta-num">6</span>
+          <span class="hero-meta-label">Servicios integrales</span>
+        </div>
+        <div>
+          <span class="hero-meta-num">+500</span>
+          <span class="hero-meta-label">Familias de confianza</span>
+        </div>
+        <div>
+          <span class="hero-meta-num">4.9<small>★</small></span>
+          <span class="hero-meta-label">Valoración media</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="hero-visual-main">
+        <img src="assets/golden-sit.jpeg" alt="Golden retriever feliz en la guardería Cielo Animal" />
+        <div class="hero-visual-badge">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg>
+          <span>Abierto hoy · 08:00 — 20:00</span>
+        </div>
+      </div>
+      <div class="hero-visual-side">
+        <img src="assets/cats-fountain.jpeg" alt="Gatos bebiendo en la zona felina"/>
+      </div>
+      <div class="hero-visual-decor" aria-hidden="true">
+        <svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="80" fill="none" stroke="#a8c5e0" stroke-width="1" stroke-dasharray="3 6"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <a href="#servicios" class="hero-scroll" aria-label="Desplazar">
+    <span>Descubrir</span>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+  </a>
+</section>
+
+<!-- ============ MARQUEE ============ -->
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track">
+    <ul class="marquee-group">
+      <li>Guardería de día</li><li aria-hidden="true">·</li>
+      <li>Hotel canino, felino y roedores</li><li aria-hidden="true">·</li>
+      <li>Peluquería</li><li aria-hidden="true">·</li>
+      <li>Ozonoterapia</li><li aria-hidden="true">·</li>
+      <li>Fisioterapia</li><li aria-hidden="true">·</li>
+      <li>Último adiós</li><li aria-hidden="true">·</li>
+    </ul>
+    <ul class="marquee-group" aria-hidden="true">
+      <li>Guardería de día</li><li>·</li>
+      <li>Hotel canino, felino y roedores</li><li>·</li>
+      <li>Peluquería</li><li>·</li>
+      <li>Ozonoterapia</li><li>·</li>
+      <li>Fisioterapia</li><li>·</li>
+      <li>Último adiós</li><li>·</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============ SERVICIOS ============ -->
+<section class="services" id="servicios">
+  <div class="container">
+    <header class="section-head">
+      <div class="section-eyebrow">01 — Servicios</div>
+      <h2 class="section-title">Todo lo que tu mascota necesita,<br/><em>bajo un mismo techo.</em></h2>
+      <p class="section-lead">Seis servicios pensados para acompañaros en cada etapa. Cada uno con el mismo cuidado, el mismo respeto y el mismo cariño.</p>
+    </header>
+
+    <div class="services-grid">
+
+      <article class="service-card" data-service="guarderia" style="--accent:#a8c5e0">
+        <div class="service-num">01</div>
+        <div class="service-icon">
+          <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="24" cy="20" r="4"/><circle cx="40" cy="20" r="4"/>
+            <circle cx="16" cy="32" r="3.5"/><circle cx="48" cy="32" r="3.5"/>
+            <path d="M22 38c0-6 4-10 10-10s10 4 10 10c0 5-3 8-10 8s-10-3-10-8z"/>
+          </svg>
+        </div>
+        <h3>Guardería de día</h3>
+        <p>Un espacio seguro donde tu perro juega, socializa y descansa mientras tú trabajas. Grupos pequeños por carácter y tamaño.</p>
+        <div class="service-tags">
+          <span>Socialización</span><span>Juego guiado</span><span>Descanso</span>
+        </div>
+        <button class="service-more" data-open="guarderia">
+          Saber más
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </button>
+      </article>
+
+      <article class="service-card" data-service="hotel" style="--accent:#93b8d6">
+        <div class="service-num">02</div>
+        <div class="service-icon">
+          <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M10 50V24l22-14 22 14v26"/>
+            <path d="M10 50h44M22 50V36h20v14"/>
+            <path d="M28 36h8"/>
+          </svg>
+        </div>
+        <h3>Hotel canino, felino y roedores</h3>
+        <p>Alojamiento con estancia personalizada para perros, gatos y pequeños roedores. Rutinas, cariño y atención 24 h como si estuvieran en casa.</p>
+        <div class="service-tags">
+          <span>Perros</span><span>Gatos</span><span>Roedores</span>
+        </div>
+        <button class="service-more" data-open="hotel">
+          Saber más
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </button>
+      </article>
+
+      <article class="service-card" data-service="peluqueria" style="--accent:#7da8cc">
+        <div class="service-num">03</div>
+        <div class="service-icon">
+          <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="18" cy="22" r="8"/><circle cx="18" cy="42" r="8"/>
+            <path d="M24 28l28 16M24 36l28-16M44 26l10-6M44 38l10 6"/>
+          </svg>
+        </div>
+        <h3>Peluquería</h3>
+        <p>Baños, corte y estética adaptados al pelaje y carácter de cada mascota. Productos suaves y manos pacientes.</p>
+        <div class="service-tags">
+          <span>Baño</span><span>Corte</span><span>Estética</span>
+        </div>
+        <button class="service-more" data-open="peluqueria">
+          Saber más
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </button>
+      </article>
+
+      <article class="service-card" data-service="ozonoterapia" style="--accent:#6897bf">
+        <div class="service-num">04</div>
+        <div class="service-icon">
+          <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="32" cy="32" r="20"/>
+            <path d="M12 32c10 0 10 -8 20 -8s10 8 20 8"/>
+            <path d="M12 32c10 0 10 8 20 8s10 -8 20 -8"/>
+          </svg>
+        </div>
+        <h3>Ozonoterapia</h3>
+        <p>Tratamiento natural con ozono para piel, pelaje y problemas dermatológicos. Indicado para mayores y pieles sensibles.</p>
+        <div class="service-tags">
+          <span>Piel</span><span>Natural</span><span>Indoloro</span>
+        </div>
+        <button class="service-more" data-open="ozonoterapia">
+          Saber más
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </button>
+      </article>
+
+      <article class="service-card" data-service="fisioterapia" style="--accent:#5788b2">
+        <div class="service-num">05</div>
+        <div class="service-icon">
+          <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 44l8-8 6 6 10-12 12 10"/>
+            <circle cx="14" cy="44" r="2"/><circle cx="52" cy="40" r="2"/>
+            <path d="M10 54h44"/>
+          </svg>
+        </div>
+        <h3>Fisioterapia</h3>
+        <p>Rehabilitación y movilidad para mascotas operadas, seniors o con lesiones. Ejercicios suaves adaptados a cada caso.</p>
+        <div class="service-tags">
+          <span>Rehabilitación</span><span>Movilidad</span><span>Senior</span>
+        </div>
+        <button class="service-more" data-open="fisioterapia">
+          Saber más
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </button>
+      </article>
+
+      <article class="service-card" data-service="adios" style="--accent:#4a7aa5">
+        <div class="service-num">06</div>
+        <div class="service-icon">
+          <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M8 44c4-4 8-4 12 0s8 4 12 0 8-4 12 0 8 4 12 0"/>
+            <path d="M20 32c4-6 12-10 20-4M32 18c2-4 6-6 10-4"/>
+            <circle cx="44" cy="20" r="1.5" fill="currentColor"/>
+          </svg>
+        </div>
+        <h3>Último adiós</h3>
+        <p>Acompañamiento respetuoso en el momento de la despedida. Cremación individualizada y cuidado en cada paso.</p>
+        <div class="service-tags">
+          <span>Respeto</span><span>Cercanía</span><span>Acompañamiento</span>
+        </div>
+        <button class="service-more" data-open="adios">
+          Saber más
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </button>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============ INSTALACIONES ============ -->
+<section class="facilities" id="instalaciones">
+  <div class="container">
+    <header class="section-head section-head--split">
+      <div>
+        <div class="section-eyebrow">02 — Instalaciones</div>
+        <h2 class="section-title">Un centro pensado <em>al detalle</em>.</h2>
+      </div>
+      <p class="section-lead">
+        Más de 600 m² divididos en zonas específicas: patio con césped, piscina, área de juego cubierta, zona felina y sala de descanso. Todo diseñado para que cada mascota se sienta como en casa.
+      </p>
+    </header>
+
+    <div class="facilities-grid">
+      <div class="facility-tile facility-tile--lg" data-lightbox="assets/play-interior.jpeg">
+        <img src="assets/play-interior.jpeg" alt="Zona de juego interior"/>
+        <div class="facility-caption">
+          <span class="facility-caption-num">01</span>
+          <span class="facility-caption-text">Zona de juego cubierta</span>
+        </div>
+      </div>
+      <div class="facility-tile" data-lightbox="assets/pool-dogs.jpeg">
+        <img src="assets/pool-dogs.jpeg" alt="Piscina canina"/>
+        <div class="facility-caption"><span class="facility-caption-num">02</span><span class="facility-caption-text">Piscina canina</span></div>
+      </div>
+      <div class="facility-tile" data-lightbox="assets/agility.jpeg">
+        <img src="assets/agility.jpeg" alt="Zona de agility"/>
+        <div class="facility-caption"><span class="facility-caption-num">03</span><span class="facility-caption-text">Circuito de agility</span></div>
+      </div>
+      <div class="facility-tile" data-lightbox="assets/facade.jpeg">
+        <img src="assets/facade.jpeg" alt="Patio exterior"/>
+        <div class="facility-caption"><span class="facility-caption-num">04</span><span class="facility-caption-text">Patio exterior</span></div>
+      </div>
+      <div class="facility-tile facility-tile--lg" data-lightbox="assets/cats-fountain.jpeg">
+        <img src="assets/cats-fountain.jpeg" alt="Zona felina"/>
+        <div class="facility-caption"><span class="facility-caption-num">05</span><span class="facility-caption-text">Zona felina independiente</span></div>
+      </div>
+    </div>
+
+    <div class="facilities-feat">
+      <div class="feat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z"/></svg>
+        <div><strong>Grupos reducidos</strong><span>Separados por tamaño y carácter</span></div>
+      </div>
+      <div class="feat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        <div><strong>Horario ampliado</strong><span>Lunes a sábado, 08:00 — 20:00</span></div>
+      </div>
+      <div class="feat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>
+        <div><strong>Atención 24 h en hotel</strong><span>Supervisión permanente</span></div>
+      </div>
+      <div class="feat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 7L9 18l-5-5"/></svg>
+        <div><strong>Protocolos veterinarios</strong><span>Coordinación con tu veterinario</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SOBRE NOSOTROS ============ -->
+<section class="about" id="sobre">
+  <div class="container about-grid">
+    <div class="about-visual">
+      <img src="assets/facade.jpeg" alt="Fachada de Cielo Animal" class="about-img-1"/>
+      <img src="assets/shepherd.jpeg" alt="" class="about-img-2"/>
+      <div class="about-quote-float">
+        <span class="about-quote-mark">“</span>
+        Cada mascota forma parte de una familia. Y nosotros formamos parte del cuidado.
+      </div>
+    </div>
+    <div class="about-copy">
+      <div class="section-eyebrow">03 — Quiénes somos</div>
+      <h2 class="section-title">Un proyecto nacido del <em>amor por los animales</em>.</h2>
+      <p>Cielo Animal nace en Palencia con una idea clara: crear un lugar en el que los animales reciban el mismo cuidado que damos a los nuestros en casa. Sin jaulas frías, sin prisas, sin atajos.</p>
+      <p>Somos un equipo pequeño y especializado. Conocemos a cada mascota por su nombre, aprendemos sus manías y respetamos sus tiempos. Trabajamos con veterinarios, etólogos y fisioterapeutas para ofrecer un cuidado realmente integral.</p>
+
+      <ul class="about-list">
+        <li><span>✓</span>Equipo formado en bienestar animal</li>
+        <li><span>✓</span>Instalaciones propias y diseñadas para ellos</li>
+        <li><span>✓</span>Trato cercano con cada familia</li>
+        <li><span>✓</span>Coordinación con tu veterinario de confianza</li>
+      </ul>
+
+      <a href="#contacto" class="btn btn-outline">Conócenos en persona</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ÚLTIMO ADIÓS (dedicated band, mismo peso visual) ============ -->
+<section class="farewell" id="ultimo-adios">
+  <div class="container">
+    <div class="farewell-card">
+      <div class="farewell-copy">
+        <div class="section-eyebrow farewell-eyebrow">04 — Último adiós</div>
+        <h2 class="farewell-title">También estamos en los <em>momentos más difíciles</em>.</h2>
+        <p class="farewell-lead">Sabemos que despedirse de un compañero de vida no es fácil. Por eso te acompañamos en todo el proceso, con respeto, cercanía y cuidado.</p>
+
+        <div class="farewell-pillars">
+          <div>
+            <h4>Qué ofrecemos</h4>
+            <ul>
+              <li>Servicio de cremación de mascotas</li>
+              <li>Atención cercana y personalizada</li>
+              <li>Gestión completa del proceso</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Cómo lo hacemos</h4>
+            <ul>
+              <li>Recogida cuando es necesaria</li>
+              <li>Cuidado y respeto en todo momento</li>
+              <li>Entrega posterior con cercanía</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Nuestro enfoque</h4>
+            <p class="farewell-pillar-text">“No es solo un servicio. Es acompañarte en uno de los momentos más importantes con tu mascota.”</p>
+          </div>
+        </div>
+
+        <div class="farewell-ctas">
+          <a href="#contacto" class="btn btn-primary btn-quiet">Consultar información</a>
+          <a href="tel:+34655933233" class="btn btn-ghost">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            Llamar ahora
+          </a>
+        </div>
+      </div>
+      <div class="farewell-visual">
+        <img src="assets/crematorio.jpeg" alt="Fachada del crematorio Cielo Animal"/>
+        <div class="farewell-visual-note">Instalación propia · Palencia</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PROCESO ============ -->
+<section class="process">
+  <div class="container">
+    <header class="section-head">
+      <div class="section-eyebrow">05 — Cómo trabajamos</div>
+      <h2 class="section-title">Un proceso pensado para <em>vosotros dos</em>.</h2>
+    </header>
+
+    <ol class="process-steps">
+      <li>
+        <span class="process-num">01</span>
+        <h4>Hablamos</h4>
+        <p>Nos cuentas sobre tu mascota: carácter, rutinas, necesidades y miedos. Escuchamos de verdad.</p>
+      </li>
+      <li>
+        <span class="process-num">02</span>
+        <h4>Visita conjunta</h4>
+        <p>Venís al centro sin compromiso. Conocemos a tu mascota y ella nos conoce a nosotros.</p>
+      </li>
+      <li>
+        <span class="process-num">03</span>
+        <h4>Plan a medida</h4>
+        <p>Diseñamos la estancia o tratamiento adecuado: guardería, hotel, peluquería, terapia o acompañamiento.</p>
+      </li>
+      <li>
+        <span class="process-num">04</span>
+        <h4>Te mantenemos cerca</h4>
+        <p>Fotos, mensajes y actualizaciones. Estéis donde estéis, tu mascota y tú estáis conectados.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============ RESEÑAS ============ -->
+<section class="reviews" id="resenas">
+  <div class="container">
+    <header class="section-head section-head--center">
+      <div class="section-eyebrow">06 — Reseñas</div>
+      <h2 class="section-title">Lo que dicen las <em>familias</em> que confían en nosotros.</h2>
+      <div class="reviews-score">
+        <div class="reviews-stars">★★★★★</div>
+        <div>
+          <strong>4,9 / 5</strong>
+          <span>basado en 127 reseñas verificadas</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="reviews-grid" id="reviewsGrid">
+      <!-- JS fills -->
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="faq">
+  <div class="container faq-grid">
+    <div>
+      <div class="section-eyebrow">07 — Preguntas</div>
+      <h2 class="section-title">Resolvemos <em>tus dudas</em>.</h2>
+      <p class="section-lead">Si no encuentras tu respuesta, escríbenos o llámanos. Estaremos encantados.</p>
+      <a href="#contacto" class="btn btn-outline">Enviar consulta</a>
+    </div>
+    <div class="faq-list" id="faqList">
+      <!-- JS fills -->
+    </div>
+  </div>
+</section>
+
+<!-- ============ CONTACTO ============ -->
+<section class="contact" id="contacto">
+  <div class="container contact-grid">
+    <div class="contact-copy">
+      <div class="section-eyebrow">08 — Contacto</div>
+      <h2 class="section-title">Ven a <em>conocernos</em>.</h2>
+      <p class="section-lead">Reserva una visita gratuita o cuéntanos lo que necesitas. Te respondemos en el día.</p>
+
+      <div class="contact-block">
+        <div class="contact-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          <div>
+            <strong>Dirección</strong>
+            <span>Polígono Industrial · Palencia, 34004</span>
+          </div>
+        </div>
+        <div class="contact-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          <div>
+            <strong>Teléfono</strong>
+            <a href="tel:+34655933233">655 93 32 33</a>
+          </div>
+        </div>
+        <div class="contact-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6l-10 7L2 6"/></svg>
+          <div>
+            <strong>Email</strong>
+            <a href="mailto:hola@cieloanimal.es">hola@cieloanimal.es</a>
+          </div>
+        </div>
+        <div class="contact-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          <div>
+            <strong>Horario</strong>
+            <span>Lun — Sáb · 08:00 — 20:00</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <form class="contact-form" id="contactForm" novalidate>
+      <h3>Cuéntanos sobre tu mascota</h3>
+      <div class="form-row">
+        <label>
+          <span>Tu nombre</span>
+          <input type="text" name="name" required placeholder="Ej. Laura Martínez"/>
+        </label>
+        <label>
+          <span>Teléfono</span>
+          <input type="tel" name="phone" required placeholder="600 000 000"/>
+        </label>
+      </div>
+      <label>
+        <span>Email</span>
+        <input type="email" name="email" required placeholder="tu@email.com"/>
+      </label>
+      <label>
+        <span>Servicio de interés</span>
+        <select name="service">
+          <option>Guardería de día</option>
+          <option>Hotel canino, felino y roedores</option>
+          <option>Peluquería</option>
+          <option>Ozonoterapia</option>
+          <option>Fisioterapia</option>
+          <option>Último adiós</option>
+          <option>No lo sé, aconsejadme</option>
+        </select>
+      </label>
+      <label>
+        <span>Cuéntanos</span>
+        <textarea name="message" rows="4" placeholder="Edad, raza, si es la primera vez que viene a una guardería, rutinas especiales…"></textarea>
+      </label>
+      <label class="form-check">
+        <input type="checkbox" required/>
+        <span>He leído y acepto la política de privacidad.</span>
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        <span class="form-submit-text">Enviar por WhatsApp</span>
+      </button>
+      <p class="form-hint">Se abrirá WhatsApp con tu mensaje listo para enviar. Te respondemos en menos de 24 h laborables.</p>
+    </form>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer">
+  <div class="container footer-grid">
+    <div class="footer-brand">
+      <img src="assets/logo.jpeg" alt="" class="footer-logo"/>
+      <h4>Cielo Animal</h4>
+      <p>Cuidado integral para tu mascota. Desde el juego y el descanso, hasta el último adiós.</p>
+    </div>
+    <div>
+      <h5>Servicios</h5>
+      <a href="#servicios">Guardería de día</a>
+      <a href="#servicios">Hotel canino, felino y roedores</a>
+      <a href="#servicios">Peluquería</a>
+      <a href="#servicios">Ozonoterapia</a>
+      <a href="#servicios">Fisioterapia</a>
+      <a href="#ultimo-adios">Último adiós</a>
+    </div>
+    <div>
+      <h5>Sobre</h5>
+      <a href="#sobre">Quiénes somos</a>
+      <a href="#instalaciones">Instalaciones</a>
+      <a href="#resenas">Reseñas</a>
+      <a href="#contacto">Contacto</a>
+    </div>
+    <div>
+      <h5>Contacto</h5>
+      <a href="tel:+34655933233">655 93 32 33</a>
+      <a href="mailto:hola@cieloanimal.es">hola@cieloanimal.es</a>
+      <p>Polígono Industrial · Palencia</p>
+      <div class="footer-social">
+        <a aria-label="Instagram" href="https://www.instagram.com/cieloanimal?igsh=ZG1uN2lrN3g1eXZv" target="_blank" rel="noopener"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="0.8" fill="currentColor"/></svg></a>
+        <a aria-label="Facebook" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg></a>
+        <a aria-label="WhatsApp" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom container">
+    <span>© 2026 Cielo Animal · Palencia. Todos los derechos reservados.</span>
+    <span class="footer-bottom-links">
+      <a href="#">Aviso legal</a>
+      <a href="#">Privacidad</a>
+      <a href="#">Cookies</a>
+    </span>
+  </div>
+</footer>
+
+<!-- ============ MODAL ============ -->
+<div class="modal" id="modal" aria-hidden="true">
+  <div class="modal-overlay" data-close></div>
+  <div class="modal-panel" role="dialog" aria-modal="true">
+    <button class="modal-close" aria-label="Cerrar" data-close>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+    <div class="modal-content" id="modalContent"></div>
+  </div>
+</div>
+
+<!-- ============ LIGHTBOX ============ -->
+<div class="lightbox" id="lightbox" aria-hidden="true">
+  <button class="lightbox-close" data-close-lb aria-label="Cerrar">×</button>
+  <img id="lightboxImg" alt=""/>
+</div>
+
+<!-- ============ TOAST ============ -->
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, startTransition } from 'react'
 import { Sidebar, Topbar, SearchModal, BellPanel, ProfileModal, BottomNav } from './components/Shell'
 import { QuickLeadDrawer } from './components/Drawer'
 import Dashboard from './components/Dashboard'
@@ -223,13 +223,13 @@ export default function App() {
       return { ...c, vencida: d < today }
     }
 
-    const ins  = (set) => ({ new: r }) => set(p => p.some(x => x.id === r.id) ? p : [r, ...p])
-    const upd  = (set, norm = x => x) => ({ new: r }) => set(p => p.map(x => x.id === r.id ? norm(r) : x))
-    const del  = (set) => ({ old: r }) => set(p => p.filter(x => x.id !== r.id))
+    const ins  = (set) => ({ new: r }) => startTransition(() => set(p => p.some(x => x.id === r.id) ? p : [r, ...p]))
+    const upd  = (set, norm = x => x) => ({ new: r }) => startTransition(() => set(p => p.map(x => x.id === r.id ? norm(r) : x)))
+    const del  = (set) => ({ old: r }) => startTransition(() => set(p => p.filter(x => x.id !== r.id)))
 
     const ch = supabase.channel('crm-sync')
-      .on('postgres_changes', { event:'INSERT', schema:'public', table:'leads'     }, ({ new: r }) => setLeads(p => p.some(x => x.id === r.id) ? p : [normLead(r), ...p]))
-      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'leads'     }, ({ new: r }) => setLeads(p => p.map(x => x.id === r.id ? normLead(r) : x)))
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'leads'     }, ({ new: r }) => startTransition(() => setLeads(p => p.some(x => x.id === r.id) ? p : [normLead(r), ...p])))
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'leads'     }, ({ new: r }) => startTransition(() => setLeads(p => p.map(x => x.id === r.id ? normLead(r) : x))))
       .on('postgres_changes', { event:'DELETE', schema:'public', table:'leads'     }, del(setLeads))
       .on('postgres_changes', { event:'INSERT', schema:'public', table:'clientes'  }, ins(setClientes))
       .on('postgres_changes', { event:'UPDATE', schema:'public', table:'clientes'  }, upd(setClientes))
@@ -248,8 +248,8 @@ export default function App() {
 
     if (isAdmin) {
       ch
-        .on('postgres_changes', { event:'INSERT', schema:'public', table:'cobros' }, ({ new: r }) => setCobros(p => p.some(x => x.id === r.id) ? p : [normCobro(r), ...p]))
-        .on('postgres_changes', { event:'UPDATE', schema:'public', table:'cobros' }, ({ new: r }) => setCobros(p => p.map(x => x.id === r.id ? normCobro(r) : x)))
+        .on('postgres_changes', { event:'INSERT', schema:'public', table:'cobros' }, ({ new: r }) => startTransition(() => setCobros(p => p.some(x => x.id === r.id) ? p : [normCobro(r), ...p])))
+        .on('postgres_changes', { event:'UPDATE', schema:'public', table:'cobros' }, ({ new: r }) => startTransition(() => setCobros(p => p.map(x => x.id === r.id ? normCobro(r) : x))))
         .on('postgres_changes', { event:'DELETE', schema:'public', table:'cobros' }, del(setCobros))
         .on('postgres_changes', { event:'INSERT', schema:'public', table:'gastos' }, ins(setGastos))
         .on('postgres_changes', { event:'UPDATE', schema:'public', table:'gastos' }, upd(setGastos))
@@ -381,7 +381,7 @@ export default function App() {
       const restoMonto = monto - señalCobrada
       if (restoMonto > 0 && !esRecurrente) {
         addCobro({ cliente: lead.empresa, concepto: `Resto · ${servicio}`, monto: restoMonto, vence: lead.vence_resto || null, pagado: true, vencida: false, recurrente: false })
-        setWowEffect(prev => prev ? prev : { type: 'full', cliente: lead.empresa })
+        setTimeout(() => setWowEffect(prev => prev ? prev : { type: 'full', cliente: lead.empresa, ts: Date.now() }), 500)
       }
     } else if (dividido && monto > 0) {
       const señalMonto = Math.round(monto * señalPct / 100)
@@ -469,7 +469,7 @@ export default function App() {
 
     // Señal pagada → efecto parcial
     if (nuevoEstado === STAGE.SEÑAL && lead?.estado !== STAGE.SEÑAL) {
-      setWowEffect(prev => prev ? prev : { type: 'partial', cliente: lead?.empresa })
+      setTimeout(() => setWowEffect(prev => prev ? prev : { type: 'partial', cliente: lead?.empresa, ts: Date.now() }), 500)
     }
 
     if (seraCobrado && !eraCobrado) {
@@ -483,7 +483,7 @@ export default function App() {
       const esDividido = pagoDividido || lead?.pagoDividido
       const tieneSeñal = (parseFloat(lead?.señal_cobrada) || 0) > 0
       if (!tieneSeñal && !esRecurrente && monto > 0) {
-        setWowEffect(prev => prev ? prev : { type: esDividido ? 'partial' : 'full', cliente: lead?.empresa })
+        setTimeout(() => setWowEffect(prev => prev ? prev : { type: esDividido ? 'partial' : 'full', cliente: lead?.empresa, ts: Date.now() }), 500)
       }
     } else if (eraCobrado && nuevoEstado && !seraCobrado) {
       // Deja de ser Cobrado → eliminar cobros auto-creados y cliente auto-creado
@@ -762,7 +762,7 @@ export default function App() {
         const proyecto = proyectosRef.current.find(p => p.cliente === cobro.cliente && p.estado !== 'Cerrado')
         if (proyecto) updateProyecto(proyecto.id, { progreso: 100, pago: 'Pagado' })
       }
-      setWowEffect(prev => prev ? prev : { type: todoPagado ? 'full' : 'partial', cliente: cobro.cliente })
+      setTimeout(() => setWowEffect(prev => prev ? prev : { type: todoPagado ? 'full' : 'partial', cliente: cobro.cliente, ts: Date.now() }), 500)
     }
 
     // Si es un cobro recurrente que acaba de pagarse, generar el siguiente período
@@ -866,7 +866,7 @@ export default function App() {
         onSelect={r => { setPage(r.page); setOpenItem(r); setSearchOpen(false) }} />
       <BellPanel open={bellOpen} onClose={() => setBellOpen(false)} tasks={tasks} cobros={role === 'admin' ? cobros : []} notificaciones={notificaciones} onMarkRead={markNotifsRead} />
 
-      {wowEffect && <WowEffect type={wowEffect.type} cliente={wowEffect.cliente} onDone={() => setWowEffect(null)} />}
+      {wowEffect && <WowEffect key={wowEffect.ts} type={wowEffect.type} cliente={wowEffect.cliente} onDone={() => setWowEffect(null)} />}
 
       {/* Toast notifications */}
       <div className="toast-container" style={{position:'fixed', display:'flex', flexDirection:'column', gap:8, zIndex:9999, pointerEvents:'none'}}>
