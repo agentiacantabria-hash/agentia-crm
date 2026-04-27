@@ -44,7 +44,7 @@ function Drop({ emoji, size, x, delay, dur, rot }) {
 export function WowEffect({ type, cliente, onDone }) {
   const isFull = type === 'full'
   const EMOJIS = isFull ? EMOJIS_FULL : EMOJIS_PARTIAL
-  const n      = isFull ? 8 : 6
+  const n      = isFull ? 22 : 16
 
   const drops = useMemo(() => Array.from({ length: n }, (_, i) => ({
     id:    i,
