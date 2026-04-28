@@ -14,6 +14,8 @@ export interface ScheduleSlot {
   is_active: boolean
   class_type_id: ClassTypeId
   class_types: ClassType
+  min_regulars: number
+  max_capacity: number
 }
 
 export interface Plan {
@@ -36,6 +38,17 @@ export interface Profile {
   created_at: string
 }
 
+export interface Announcement {
+  id: string
+  emoji: string
+  title: string
+  body: string
+  is_active: boolean
+  pinned: boolean
+  expires_at: string | null
+  created_at: string
+}
+
 export interface InviteCode {
   id: string
   code: string
@@ -50,6 +63,7 @@ export interface RegularSlot {
   id: string
   user_id: string
   slot_id: string
+  week_parity: 'all' | 'even' | 'odd'
   created_at: string
 }
 

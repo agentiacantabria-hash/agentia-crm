@@ -1,148 +1,242 @@
 'use client'
 import { useState } from 'react'
-import { format } from 'date-fns'
+import { format, getISOWeek } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { useRouter } from 'next/navigation'
-import { MAX_CAPACITY } from '@/lib/types'
 import type { SlotInfo } from '@/app/horario/page'
 
 interface Props { info: SlotInfo; onClose: () => void; onSuccess: () => void }
 
 export default function SlotModal({ info, onClose, onSuccess }: Props) {
-  const { slot, date, capacity, isUserRegular, isUserAbsent, isUserRecovery, isUserWaitlist, isCancelled, waitlistCount } = info
-  const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState('')
-  const router = useRouter()
+  const { slot, date, capacity, regularCount, isUserRegular, userRegularParity, isUserAbsent, isUserRecovery, isUserWaitlist, isCancelled, waitlistCount } = info
+  const [loading, setLoading]           = useState(false)
+  const [error, setError]               = useState('')
+  const [showParityPicker, setShowParity] = useState(false)
 
-  const dateStr    = format(date, 'yyyy-MM-dd')
-  const dayLabel   = format(date, "EEEE d 'de' MMMM", { locale: es })
-  const timeLabel  = slot.start_time.slice(0, 5)
-  const spotsLeft  = Math.max(0, MAX_CAPACITY - capacity)
-  const isPast     = date < new Date(new Date().setHours(0,0,0,0))
+  const dateStr       = format(date, 'yyyy-MM-dd')
+  const dayLabel      = format(date, "EEEE d 'de' MMMM", { locale: es })
+  const timeLabel     = slot.start_time.slice(0, 5)
+  const slotMax       = slot.max_capacity ?? 7
+  const spotsLeft     = Math.max(0, slotMax - capacity)
+  const isPast        = date < new Date(new Date().setHours(0,0,0,0))
+  const isEnFormacion = slot.min_regulars > 0 && regularCount < slot.min_regulars
 
-  async function call(url: string, method: string) {
+  // Paridad de la semana de esta fecha
+  const weekIsEven     = getISOWeek(date) % 2 === 0
+  const thisWeekParity = weekIsEven ? 'even' : 'odd'
+  const otherParity    = weekIsEven ? 'odd' : 'even'
+
+  // ¿Tiene esta clase como fija pero para las semanas alternas (no esta)?
+  const hasSlotOtherWeek = userRegularParity !== null && !isUserRegular
+
+  async function call(url: string, method: string, extra?: Record<string, unknown>) {
     setLoading(true); setError('')
     try {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slot_id: slot.id, class_date: dateStr }),
+        body: JSON.stringify({ slot_id: slot.id, class_date: dateStr, ...extra }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Error')
       onSuccess()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error inesperado')
+      setShowParity(false)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-ink/20 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg mx-auto bg-white rounded-t-3xl p-6 pb-10 shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="w-10 h-1 bg-ink/10 rounded-full mx-auto mb-5"/>
+    <div className="fixed inset-0 z-50 flex items-end bg-ink/30 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-lg mx-auto rounded-t-3xl overflow-hidden"
+        style={{ boxShadow: '0 -8px 40px rgba(11,31,77,0.25)' }}
+        onClick={e => e.stopPropagation()}>
 
-        {/* Chip disciplina */}
-        <div className="flex items-center gap-2 mb-3">
-          <span className="inline-block px-3 py-1 rounded-full text-xs font-bold text-ink"
-            style={{ backgroundColor: slot.class_types.color }}>
-            {slot.class_types.name}
-          </span>
-          {isCancelled && <span className="text-xs font-mono text-red-500 uppercase tracking-wider">Cancelada</span>}
-          {isUserRegular && !isUserAbsent && !isCancelled && (
-            <span className="text-xs font-mono text-navy uppercase tracking-wider">· Tu clase</span>
-          )}
-          {isUserRecovery && (
-            <span className="text-xs font-mono text-blue uppercase tracking-wider">· Recuperación</span>
-          )}
+        {/* Colored header */}
+        <div className="relative px-6 pt-5 pb-5 overflow-hidden"
+          style={{ backgroundColor: slot.class_types.color }}>
+          <div className="absolute inset-0 pointer-events-none"
+            style={{ background: 'radial-gradient(circle at 90% 10%, rgba(255,255,255,0.5) 0%, transparent 55%)' }}/>
+
+          <div className="w-10 h-1 rounded-full mx-auto mb-4"
+            style={{ backgroundColor: 'rgba(11,31,77,0.18)' }}/>
+
+          <div className="relative z-10">
+            <div className="flex items-center flex-wrap gap-1.5 mb-2">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-ink/50 font-semibold">
+                {slot.class_types.name}
+              </span>
+              {isCancelled && (
+                <span className="text-[9px] font-mono font-bold text-red-800 bg-red-100/70 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  Cancelada
+                </span>
+              )}
+              {isUserRegular && !isUserAbsent && !isCancelled && (
+                <span className="text-[9px] font-mono font-bold text-ink/60 bg-white/40 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  Tu clase
+                </span>
+              )}
+              {hasSlotOtherWeek && (
+                <span className="text-[9px] font-mono font-bold text-ink/60 bg-white/40 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  Alterna
+                </span>
+              )}
+              {isUserRecovery && (
+                <span className="text-[9px] font-mono font-bold text-blue bg-white/50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  Recuperación
+                </span>
+              )}
+              {isEnFormacion && (
+                <span className="text-[9px] font-mono font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  En formación · {regularCount}/{slot.min_regulars}
+                </span>
+              )}
+            </div>
+            <h2 className="font-display font-extrabold text-xl text-ink capitalize leading-tight">{dayLabel}</h2>
+            <p className="font-mono text-xs text-ink/50 mt-0.5">{timeLabel}h · {slot.duration_minutes} min</p>
+          </div>
         </div>
 
-        <h2 className="font-display font-bold text-2xl text-navy capitalize">{dayLabel}</h2>
-        <p className="font-mono text-sm text-ink/40 mt-0.5">{timeLabel}h · {slot.duration_minutes} min</p>
-
-        {/* Indicador de plazas */}
-        {!isCancelled && (
-          <div className="mt-4 flex items-center gap-2">
-            <div className="flex gap-0.5">
-              {Array.from({ length: MAX_CAPACITY }).map((_, i) => (
-                <div key={i} className={`w-3 h-3 rounded-full transition-colors ${i < capacity ? 'bg-navy' : 'bg-ink/10'}`}/>
-              ))}
-            </div>
-            <span className="font-mono text-xs text-ink/40">
-              {spotsLeft > 0 ? `${spotsLeft} libre${spotsLeft !== 1 ? 's' : ''}` : 'Completa'}
-            </span>
-            {waitlistCount > 0 && (
-              <span className="font-mono text-xs text-ink/30">· {waitlistCount} en espera</span>
-            )}
-          </div>
-        )}
-
-        {error && <p className="mt-4 text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">{error}</p>}
-
-        {/* Acciones */}
-        <div className="mt-5 flex flex-col gap-2">
-          {isCancelled ? (
-            <div className="text-center text-ink/40 font-mono text-sm py-3">Esta clase ha sido cancelada</div>
-
-          ) : isPast ? (
-            <div className="text-center text-ink/30 font-mono text-sm py-3">Esta clase ya ha pasado</div>
-
-          ) : isUserRegular ? (
-            <>
-              {isUserAbsent ? (
-                <button onClick={() => call('/api/absence', 'DELETE')} disabled={loading}
-                  className="w-full bg-ink/8 text-ink font-display font-bold py-4 rounded-2xl disabled:opacity-50">
-                  {loading ? '…' : '↩ Quitar falta'}
-                </button>
-              ) : (
-                <button onClick={() => call('/api/absence', 'POST')} disabled={loading}
-                  className="w-full bg-red-50 text-red-700 font-display font-bold py-4 rounded-2xl disabled:opacity-50">
-                  {loading ? '…' : 'Marcar falta'}
-                </button>
+        {/* White body */}
+        <div className="bg-white px-6 pt-5 pb-10">
+          {/* Capacity */}
+          {!isCancelled && (
+            <div className="flex items-center gap-2.5 mb-5 pb-5 border-b border-ink/5">
+              <div className="flex gap-1">
+                {Array.from({ length: slotMax }).map((_, i) => (
+                  <div key={i} className="w-3 h-3 rounded-full transition-colors"
+                    style={{ backgroundColor: i < Math.max(0, capacity)
+                      ? slot.class_types.color
+                      : `${slot.class_types.color}35` }}/>
+                ))}
+              </div>
+              <span className="font-mono text-xs text-ink/50">
+                {spotsLeft > 0 ? `${spotsLeft} libre${spotsLeft !== 1 ? 's' : ''}` : 'Completa'}
+              </span>
+              {waitlistCount > 0 && (
+                <span className="font-mono text-xs text-ink/30">· {waitlistCount} en espera</span>
               )}
-              <button onClick={() => call('/api/regular-slot', 'DELETE')} disabled={loading}
-                className="w-full bg-paper-2 text-ink/50 font-mono text-xs py-3 rounded-2xl disabled:opacity-50 uppercase tracking-wider">
-                Quitar de mis clases fijas
-              </button>
-            </>
+            </div>
+          )}
 
-          ) : isUserRecovery ? (
-            <button onClick={() => call('/api/recovery', 'DELETE')} disabled={loading}
-              className="w-full bg-ink/8 text-ink font-display font-bold py-4 rounded-2xl disabled:opacity-50">
-              {loading ? '…' : 'Cancelar recuperación'}
-            </button>
+          {error && (
+            <p className="mb-4 text-sm text-red-600 bg-red-50 rounded-2xl px-4 py-3">{error}</p>
+          )}
 
-          ) : spotsLeft > 0 ? (
-            <>
-              <button onClick={() => call('/api/recovery', 'POST')} disabled={loading}
-                className="w-full bg-blue text-white font-display font-bold py-4 rounded-2xl disabled:opacity-50">
-                {loading ? '…' : 'Usar recuperación aquí'}
-              </button>
-              <button onClick={() => call('/api/regular-slot', 'POST')} disabled={loading}
-                className="w-full bg-navy text-paper font-display font-bold py-4 rounded-2xl disabled:opacity-50">
-                {loading ? '…' : 'Añadir a mis clases fijas'}
-              </button>
-            </>
+          {/* Actions */}
+          <div className="flex flex-col gap-2.5">
+            {isCancelled ? (
+              <div className="text-center text-ink/40 font-mono text-sm py-4 bg-paper rounded-2xl">
+                Esta clase ha sido cancelada
+              </div>
 
-          ) : (
-            <>
-              {isUserWaitlist ? (
-                <button onClick={() => call('/api/waitlist', 'DELETE')} disabled={loading}
-                  className="w-full bg-ink/8 text-ink/60 font-display font-bold py-4 rounded-2xl disabled:opacity-50">
+            ) : isPast ? (
+              <div className="text-center text-ink/30 font-mono text-sm py-4 bg-paper rounded-2xl">
+                Esta clase ya ha pasado
+              </div>
+
+            ) : isUserRegular ? (
+              <>
+                {isUserAbsent ? (
+                  <button onClick={() => call('/api/absence', 'DELETE')} disabled={loading} className="btn-secondary">
+                    {loading ? '…' : '↩ Quitar falta'}
+                  </button>
+                ) : (
+                  <button onClick={() => call('/api/absence', 'POST')} disabled={loading}
+                    className="w-full bg-red-50 text-red-700 font-display font-bold py-4 rounded-2xl text-base transition-all active:scale-[0.98] disabled:opacity-40">
+                    {loading ? '…' : 'Marcar falta'}
+                  </button>
+                )}
+                <button onClick={() => call('/api/regular-slot', 'DELETE')} disabled={loading}
+                  className="w-full bg-paper-2 text-ink/40 font-mono text-[11px] py-3 rounded-2xl disabled:opacity-40 uppercase tracking-wider">
+                  Quitar de mis clases fijas
+                </button>
+              </>
+
+            ) : isUserRecovery ? (
+              <button onClick={() => call('/api/recovery', 'DELETE')} disabled={loading} className="btn-secondary">
+                {loading ? '…' : 'Cancelar recuperación'}
+              </button>
+
+            ) : hasSlotOtherWeek ? (
+              // Tiene la clase como fija pero es semana alterna → no activa esta semana
+              <>
+                <div className="text-center text-sm text-ink/50 font-mono py-3 bg-paper rounded-2xl leading-relaxed">
+                  Tienes esta clase las semanas alternas
+                </div>
+                {spotsLeft > 0 && (
+                  <button onClick={() => call('/api/recovery', 'POST')} disabled={loading}
+                    className="w-full bg-blue text-white font-display font-bold py-4 rounded-2xl text-base transition-all active:scale-[0.98] disabled:opacity-40"
+                    style={{ boxShadow: '0 4px 16px rgba(46,91,255,0.3)' }}>
+                    {loading ? '…' : 'Usar recuperación aquí'}
+                  </button>
+                )}
+                <button onClick={() => call('/api/regular-slot', 'DELETE')} disabled={loading}
+                  className="w-full bg-paper-2 text-ink/40 font-mono text-[11px] py-3 rounded-2xl disabled:opacity-40 uppercase tracking-wider">
+                  Quitar de mis clases fijas
+                </button>
+              </>
+
+            ) : spotsLeft > 0 ? (
+              <>
+                <button onClick={() => call('/api/recovery', 'POST')} disabled={loading}
+                  className="w-full bg-blue text-white font-display font-bold py-4 rounded-2xl text-base transition-all active:scale-[0.98] disabled:opacity-40"
+                  style={{ boxShadow: '0 4px 16px rgba(46,91,255,0.3)' }}>
+                  {loading ? '…' : 'Usar recuperación aquí'}
+                </button>
+
+                {showParityPicker ? (
+                  <div className="flex flex-col gap-2">
+                    <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40 text-center py-1">
+                      ¿Cada cuánto vas a esta clase?
+                    </p>
+                    {isEnFormacion && (
+                      <p className="text-center text-[10px] font-mono text-amber-600 bg-amber-50 rounded-xl px-3 py-2">
+                        Al apuntarte ayudas a activar esta clase ({regularCount + 1}/{slot.min_regulars})
+                      </p>
+                    )}
+                    <button onClick={() => call('/api/regular-slot', 'POST', { week_parity: 'all' })} disabled={loading}
+                      className="btn-primary">
+                      {loading ? '…' : 'Todas las semanas'}
+                    </button>
+                    <button onClick={() => call('/api/regular-slot', 'POST', { week_parity: thisWeekParity })} disabled={loading}
+                      className="btn-secondary">
+                      {loading ? '…' : 'Semanas alternas — esta semana sí'}
+                    </button>
+                    <button onClick={() => call('/api/regular-slot', 'POST', { week_parity: otherParity })} disabled={loading}
+                      className="btn-secondary">
+                      {loading ? '…' : 'Semanas alternas — esta semana no'}
+                    </button>
+                    <button onClick={() => setShowParity(false)}
+                      className="text-center text-xs text-ink/30 py-1 font-mono">
+                      ← Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => setShowParity(true)}
+                    className="btn-primary">
+                    Añadir a mis clases fijas
+                  </button>
+                )}
+              </>
+
+            ) : (
+              isUserWaitlist ? (
+                <button onClick={() => call('/api/waitlist', 'DELETE')} disabled={loading} className="btn-secondary">
                   {loading ? '…' : '✓ En lista de espera — Salir'}
                 </button>
               ) : (
-                <button onClick={() => call('/api/waitlist', 'POST')} disabled={loading}
-                  className="w-full bg-paper-2 text-navy font-display font-bold py-4 rounded-2xl disabled:opacity-50">
+                <button onClick={() => call('/api/waitlist', 'POST')} disabled={loading} className="btn-secondary">
                   {loading ? '…' : 'Unirse a lista de espera'}
                 </button>
-              )}
-            </>
-          )}
+              )
+            )}
 
-          <button onClick={() => { router.push('/login') }} className="hidden"/>
-          <button onClick={onClose} className="text-center text-xs text-ink/30 py-2">Cerrar</button>
+            <button onClick={onClose} className="text-center text-xs text-ink/30 py-2 font-mono">
+              Cerrar
+            </button>
+          </div>
         </div>
       </div>
     </div>
