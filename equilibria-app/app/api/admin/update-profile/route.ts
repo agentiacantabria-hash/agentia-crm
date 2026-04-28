@@ -2,6 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+function sanitizePassword(s: string): string {
+  return Array.from(s.trim()).filter(c => {
+    const code = c.codePointAt(0) ?? 0
+    return (code >= 32 && code <= 126) || (code >= 160 && code <= 255)
+  }).join('')
+}
+
+function sanitizeText(s: string): string {
+  return Array.from(s.trim()).filter(c => {
+    const code = c.codePointAt(0) ?? 0
+    if (code === 0xFEFF || code === 0x00AD) return false
+    if (code >= 0x200B && code <= 0x200F) return false
+    return code >= 32
+  }).join('')
+}
+
 export async function PATCH(req: NextRequest) {
   const sb = await createClient()
   const { data: { user } } = await sb.auth.getUser()
@@ -13,21 +29,17 @@ export async function PATCH(req: NextRequest) {
   const raw = await req.json()
   if (!raw.user_id) return NextResponse.json({ error: 'Falta user_id' }, { status: 400 })
 
-  const stripInvisible = (s: string) =>
-    s.replace(/[﻿­​‌‍⁠ﾠ]/g, '').trim()
-
   const user_id   = raw.user_id
-  const full_name = raw.full_name !== undefined ? stripInvisible(raw.full_name) : undefined
-  const username  = raw.username  !== undefined ? stripInvisible(raw.username)  : undefined
-  const phone     = raw.phone     !== undefined ? stripInvisible(raw.phone)      : undefined
-  const password  = raw.password  !== undefined ? stripInvisible(raw.password)  : undefined
+  const full_name = raw.full_name !== undefined ? sanitizeText(String(raw.full_name))    : undefined
+  const username  = raw.username  !== undefined ? sanitizeText(String(raw.username))     : undefined
+  const phone     = raw.phone     !== undefined ? sanitizeText(String(raw.phone))        : undefined
+  const password  = raw.password  !== undefined ? sanitizePassword(String(raw.password)) : undefined
 
   const admin = createAdminClient()
 
-  // Actualizar auth: contraseña y/o email (derivado del nuevo username)
   const authUpdates: Record<string, string> = {}
   if (password) authUpdates.password = password
-  if (username) authUpdates.email    = `${username.toLowerCase().replace(/\s+/g, '')}@equilibria.app`
+  if (username) authUpdates.email = `${username.toLowerCase().replace(/\s+/g, '')}@equilibria.app`
 
   if (Object.keys(authUpdates).length > 0) {
     const { error } = await admin.auth.admin.updateUserById(user_id, authUpdates)
@@ -36,7 +48,7 @@ export async function PATCH(req: NextRequest) {
 
   const profileUpdates: Record<string, unknown> = {}
   if (full_name !== undefined) profileUpdates.full_name = full_name
-  if (username  !== undefined) profileUpdates.username  = username.trim().toLowerCase().replace(/\s+/g, '') || null
+  if (username  !== undefined) profileUpdates.username  = username.toLowerCase().replace(/\s+/g, '') || null
   if (phone     !== undefined) profileUpdates.phone     = phone || null
 
   if (Object.keys(profileUpdates).length > 0) {

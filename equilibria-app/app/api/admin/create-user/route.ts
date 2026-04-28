@@ -2,6 +2,28 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+/**
+ * Supabase Auth exige que la password sea un ByteString (char codes 0-255).
+ * iOS/macOS inyecta U+FEFF (65279) al final de campos de texto, lo que rompe createUser.
+ * Filtramos a caracteres ASCII imprimibles (32-126) + Latin-1 (160-255).
+ */
+function sanitizePassword(s: string): string {
+  return Array.from(s.trim()).filter(c => {
+    const code = c.codePointAt(0) ?? 0
+    return (code >= 32 && code <= 126) || (code >= 160 && code <= 255)
+  }).join('')
+}
+
+function sanitizeText(s: string): string {
+  return Array.from(s.trim()).filter(c => {
+    const code = c.codePointAt(0) ?? 0
+    // Excluir BOM (65279=0xFEFF), soft-hyphen (173=0x00AD) y zero-width chars (8203-8207)
+    if (code === 0xFEFF || code === 0x00AD) return false
+    if (code >= 0x200B && code <= 0x200F) return false
+    return code >= 32
+  }).join('')
+}
+
 export async function POST(req: NextRequest) {
   const sb = await createClient()
   const { data: { user } } = await sb.auth.getUser()
@@ -11,15 +33,12 @@ export async function POST(req: NextRequest) {
   if (!profile?.is_admin) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
   const raw = await req.json()
-  // Elimina BOM y caracteres invisibles que iOS/macOS inyecta en campos de texto
-  const stripInvisible = (s: string) =>
-    s.replace(/[﻿­​‌‍⁠ﾠ]/g, '').trim()
 
-  const username  = stripInvisible(raw.username  ?? '')
-  const password  = stripInvisible(raw.password  ?? '')
-  const full_name = stripInvisible(raw.full_name ?? '')
-  const phone     = raw.phone ? stripInvisible(raw.phone) : null
-  const plan_id   = raw.plan_id ?? ''
+  const username  = sanitizeText(String(raw.username  ?? ''))
+  const password  = sanitizePassword(String(raw.password  ?? ''))
+  const full_name = sanitizeText(String(raw.full_name ?? ''))
+  const phone     = raw.phone ? sanitizeText(String(raw.phone)) : null
+  const plan_id   = String(raw.plan_id ?? '')
 
   if (!username || !password || !full_name || !plan_id) {
     return NextResponse.json({ error: 'Faltan campos obligatorios (username, password, full_name, plan_id)' }, { status: 400 })
