@@ -10,15 +10,24 @@ export async function PATCH(req: NextRequest) {
   const { data: profile } = await sb.from('profiles').select('is_admin').eq('id', user.id).single()
   if (!profile?.is_admin) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
-  const { user_id, full_name, username, phone, password } = await req.json()
-  if (!user_id) return NextResponse.json({ error: 'Falta user_id' }, { status: 400 })
+  const raw = await req.json()
+  if (!raw.user_id) return NextResponse.json({ error: 'Falta user_id' }, { status: 400 })
+
+  const stripInvisible = (s: string) =>
+    s.replace(/[﻿­​‌‍⁠ﾠ]/g, '').trim()
+
+  const user_id   = raw.user_id
+  const full_name = raw.full_name !== undefined ? stripInvisible(raw.full_name) : undefined
+  const username  = raw.username  !== undefined ? stripInvisible(raw.username)  : undefined
+  const phone     = raw.phone     !== undefined ? stripInvisible(raw.phone)      : undefined
+  const password  = raw.password  !== undefined ? stripInvisible(raw.password)  : undefined
 
   const admin = createAdminClient()
 
   // Actualizar auth: contraseña y/o email (derivado del nuevo username)
   const authUpdates: Record<string, string> = {}
   if (password) authUpdates.password = password
-  if (username) authUpdates.email    = `${username.trim().toLowerCase().replace(/\s+/g, '')}@equilibria.app`
+  if (username) authUpdates.email    = `${username.toLowerCase().replace(/\s+/g, '')}@equilibria.app`
 
   if (Object.keys(authUpdates).length > 0) {
     const { error } = await admin.auth.admin.updateUserById(user_id, authUpdates)

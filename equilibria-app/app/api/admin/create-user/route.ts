@@ -10,12 +10,22 @@ export async function POST(req: NextRequest) {
   const { data: profile } = await sb.from('profiles').select('is_admin').eq('id', user.id).single()
   if (!profile?.is_admin) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
-  const { username, password, full_name, phone, plan_id } = await req.json()
+  const raw = await req.json()
+  // Elimina BOM y caracteres invisibles que iOS/macOS inyecta en campos de texto
+  const stripInvisible = (s: string) =>
+    s.replace(/[﻿­​‌‍⁠ﾠ]/g, '').trim()
+
+  const username  = stripInvisible(raw.username  ?? '')
+  const password  = stripInvisible(raw.password  ?? '')
+  const full_name = stripInvisible(raw.full_name ?? '')
+  const phone     = raw.phone ? stripInvisible(raw.phone) : null
+  const plan_id   = raw.plan_id ?? ''
+
   if (!username || !password || !full_name || !plan_id) {
     return NextResponse.json({ error: 'Faltan campos obligatorios (username, password, full_name, plan_id)' }, { status: 400 })
   }
 
-  const cleanUsername = username.trim().toLowerCase().replace(/\s+/g, '')
+  const cleanUsername = username.toLowerCase().replace(/\s+/g, '')
   const email         = `${cleanUsername}@equilibria.app`
 
   const admin = createAdminClient()
