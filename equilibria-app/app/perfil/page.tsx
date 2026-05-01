@@ -68,7 +68,7 @@ export default function PerfilPage() {
         date: r.class_date,
         type: 'recovery',
         className: r.schedule_slots?.class_types?.name ?? '—',
-        color: r.schedule_slots?.class_types?.color ?? '#0B1F4D',
+        color: r.schedule_slots?.class_types?.color ?? '#1E4DB7',
         time: r.schedule_slots?.start_time?.slice(0, 5) ?? '',
       }))
       const absItems: HistoryItem[] = ((absences ?? []) as unknown as RawHistRow[]).map(a => ({
@@ -76,7 +76,7 @@ export default function PerfilPage() {
         date: a.class_date,
         type: 'absence',
         className: a.schedule_slots?.class_types?.name ?? '—',
-        color: a.schedule_slots?.class_types?.color ?? '#0B1F4D',
+        color: a.schedule_slots?.class_types?.color ?? '#1E4DB7',
         time: a.schedule_slots?.start_time?.slice(0, 5) ?? '',
       }))
       setHistory([...recItems, ...absItems]
@@ -96,7 +96,7 @@ export default function PerfilPage() {
 
   if (loading) return (
     <div className="flex justify-center items-center min-h-screen">
-      <div className="w-8 h-8 rounded-full border-2 border-navy border-t-transparent animate-spin" />
+      <div className="w-8 h-8 rounded-full border-2 border-brand/30 border-t-brand animate-spin" />
     </div>
   )
 
@@ -109,89 +109,96 @@ export default function PerfilPage() {
     : '?'
 
   return (
-    <div className="max-w-lg mx-auto px-4 pt-10">
+    <div className="max-w-lg mx-auto px-4 pt-8">
       <p className="page-eyebrow">Perfil</p>
 
       {/* Avatar + nombre */}
-      <div className="flex items-center gap-4 mt-2 mb-7">
-        <div className="w-16 h-16 rounded-2xl bg-navy flex items-center justify-center flex-shrink-0"
-          style={{ boxShadow: '0 4px 20px rgba(11,31,77,0.28)' }}>
-          <span className="font-display font-extrabold text-xl text-paper">{initials}</span>
+      <div className="flex items-center gap-4 mt-1 mb-7 animate-fade-in">
+        <div className="relative w-20 h-20 rounded-3xl flex items-center justify-center flex-shrink-0"
+          style={{
+            background: 'linear-gradient(135deg, #2657C9 0%, #1E4DB7 50%, #143A8C 100%)',
+            boxShadow: '0 12px 32px rgba(30,77,183,0.32), inset 0 1px 0 rgba(255,255,255,0.18)',
+          }}>
+          <div className="absolute -top-2 -right-2 w-10 h-10 rounded-full pointer-events-none"
+            style={{ background: 'radial-gradient(circle, rgba(232,200,147,0.4) 0%, transparent 70%)' }}/>
+          <span className="font-display font-semibold text-3xl text-paper relative">{initials}</span>
         </div>
-        <div>
-          <h1 className="font-display font-extrabold text-2xl text-navy leading-tight">
+        <div className="min-w-0">
+          <h1 className="font-display font-semibold text-3xl text-navy leading-tight tracking-tight truncate">
             {profile?.full_name || 'Tu perfil'}
           </h1>
-          <p className="font-mono text-[10px] text-ink/40 uppercase tracking-widest mt-0.5">
-            Código · {profile?.username ?? '—'}
+          <p className="font-mono text-[10px] text-ink/45 uppercase tracking-widest mt-1">
+            {profile?.username ? <>Código · <span className="text-brand-deep font-semibold">{profile.username}</span></> : '—'}
           </p>
         </div>
       </div>
 
+      {/* Card de cupo */}
+      <div className="card-tint mb-3 px-5 py-5" style={{ ['--tint' as string]: '#1E4DB7' }}>
+        <p className="font-mono text-[10px] uppercase tracking-widest text-brand-deep/70 font-semibold">
+          {isRotating ? 'Reservas este mes' : 'Recuperaciones este mes'}
+        </p>
+        <div className="flex items-center gap-3 mt-2">
+          <p className="font-display text-4xl font-semibold text-brand-deep tabular-nums leading-none">
+            {creditsLeft}
+            <span className="text-brand-deep/30 text-3xl">/{creditsMax}</span>
+          </p>
+          <div className="flex flex-wrap gap-1 flex-1">
+            {Array.from({ length: creditsMax || 4 }).map((_, i) => (
+              <span key={i} className="w-2.5 h-2.5 rounded-full transition-all flex-shrink-0"
+                style={{ backgroundColor: i < creditsLeft ? '#1E4DB7' : 'rgba(30,77,183,0.15)' }}/>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Datos */}
-      <div className="card divide-y divide-ink/5 mb-4">
-        <div className="px-4 py-4">
-          <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40 mb-1">Plan</p>
-          <p className="font-display font-bold text-navy">{plan?.name ?? '—'}</p>
+      <div className="card mb-4 divide-y divide-ink/5">
+        <div className="px-5 py-4">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-ink/40 mb-1">Plan</p>
+          <p className="font-display text-xl text-navy tracking-tight">{plan?.name ?? '—'}</p>
           {plan && (
-            <p className="font-mono text-[10px] text-ink/40 mt-0.5">
+            <p className="font-mono text-[11px] text-ink/45 mt-1 tracking-wide">
               {plan.classes_per_week}× por semana
             </p>
           )}
         </div>
 
-        <div className="px-4 py-4">
-          <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40 mb-2">
-            {isRotating ? 'Reservas este mes' : 'Recuperaciones este mes'}
-          </p>
-          <div className="flex items-center gap-3">
-            <div className="flex gap-1 flex-wrap">
-              {Array.from({ length: creditsMax || 4 }).map((_, i) => (
-                <div key={i} className="w-3 h-3 rounded-full transition-colors flex-shrink-0"
-                  style={{ backgroundColor: i < creditsLeft ? '#2E5BFF' : 'rgba(11,31,77,0.08)' }}/>
-              ))}
-            </div>
-            <span className="font-mono text-xs text-ink/50">
-              {creditsLeft}/{creditsMax} disponibles
-            </span>
-          </div>
-        </div>
-
         {profile?.phone && (
-          <div className="px-4 py-4">
-            <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40 mb-1">Teléfono</p>
-            <p className="text-ink text-sm">{profile.phone}</p>
+          <div className="px-5 py-4">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-ink/40 mb-1">Teléfono</p>
+            <p className="font-mono text-sm text-ink">{profile.phone}</p>
           </div>
         )}
 
-        <div className="px-4 py-4">
-          <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40 mb-1">Miembro desde</p>
-          <p className="text-ink text-sm">
-            {profile?.created_at ? new Date(profile.created_at).toLocaleDateString('es-ES') : '—'}
+        <div className="px-5 py-4">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-ink/40 mb-1">Miembro desde</p>
+          <p className="font-mono text-sm text-ink capitalize">
+            {profile?.created_at ? format(new Date(profile.created_at), "MMMM yyyy", { locale: es }) : '—'}
           </p>
         </div>
       </div>
 
       {/* Histórico */}
       {history.length > 0 && (
-        <div className="card mb-4">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-ink/40 px-4 pt-4 pb-2">
-            Últimas clases
-          </p>
+        <div className="card mb-6">
+          <div className="px-5 pt-4 pb-3 flex items-center gap-2">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-ink/45 font-semibold">Últimas clases</p>
+            <span className="flex-1 h-px bg-gradient-to-r from-ink/10 to-transparent"/>
+          </div>
           <div className="divide-y divide-ink/5">
             {history.map(item => (
-              <div key={item.id} className="px-4 py-3 flex items-center gap-3">
-                <div className="w-1 h-8 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+              <div key={item.id} className="px-5 py-3 flex items-center gap-3">
+                <div className="w-1 h-9 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
                 <div className="flex-1 min-w-0">
-                  <p className={`font-display font-semibold text-sm truncate ${item.type === 'absence' ? 'text-ink/40 line-through' : 'text-ink'}`}>
+                  <p className={`font-display font-medium text-base truncate ${item.type === 'absence' ? 'text-ink/40 line-through' : 'text-ink'}`}>
                     {item.className}
                   </p>
-                  <p className="font-mono text-[10px] text-ink/40 mt-0.5 capitalize">
+                  <p className="font-mono text-[10px] text-ink/40 mt-0.5 tracking-wide capitalize">
                     {format(new Date(item.date + 'T12:00:00'), "d MMM yyyy", { locale: es })} · {item.time}h
                   </p>
                 </div>
-                <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0
-                  ${item.type === 'recovery' ? 'bg-blue/10 text-blue' : 'bg-red-50 text-red-500'}`}>
+                <span className={`badge ${item.type === 'recovery' ? 'badge-brand' : 'badge-danger'}`}>
                   {item.type === 'recovery' ? 'Recup.' : 'Falta'}
                 </span>
               </div>
@@ -200,8 +207,7 @@ export default function PerfilPage() {
         </div>
       )}
 
-      <button onClick={handleSignOut}
-        className="btn-secondary mt-2">
+      <button onClick={handleSignOut} className="btn-secondary mt-2">
         Cerrar sesión
       </button>
     </div>

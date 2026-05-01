@@ -16,10 +16,10 @@ type Notif = {
   created_at: string
 }
 
-const TYPE_EMOJI: Record<string, string> = {
-  waitlist_freed:  '🎉',
-  class_cancelled: '⚠️',
-  announcement:    '📢',
+const TYPE_META: Record<string, { emoji: string; tint: string; label: string }> = {
+  waitlist_freed:  { emoji: '🎉', tint: '#9BC4BC', label: 'Plaza libre' },
+  class_cancelled: { emoji: '⚠️', tint: '#E8C893', label: 'Cancelación' },
+  announcement:    { emoji: '📢', tint: '#1E4DB7', label: 'Aviso' },
 }
 
 export default function AvisosPage() {
@@ -42,7 +42,6 @@ export default function AvisosPage() {
     setItems((data ?? []) as Notif[])
     setLoading(false)
 
-    // Marcar todas como leídas tras mostrarlas
     if ((data ?? []).some((n: Notif) => !n.is_read)) {
       await fetch('/api/notifications/mark-read', {
         method: 'POST',
@@ -54,7 +53,6 @@ export default function AvisosPage() {
 
   useEffect(() => { load() }, [load])
 
-  // Realtime: aparecer al instante si llega nueva
   useEffect(() => {
     const sb = createClient()
     let channel: ReturnType<typeof sb.channel> | null = null
@@ -72,49 +70,69 @@ export default function AvisosPage() {
 
   if (loading) return (
     <div className="flex justify-center items-center min-h-screen">
-      <div className="w-7 h-7 rounded-full border-2 border-navy border-t-transparent animate-spin"/>
+      <div className="w-8 h-8 rounded-full border-2 border-brand/30 border-t-brand animate-spin"/>
     </div>
   )
 
-  return (
-    <div className="max-w-lg mx-auto px-4 pt-10">
-      <p className="font-mono text-[10px] uppercase tracking-widest text-ink/40 mb-1">Avisos</p>
-      <h1 className="font-display font-bold text-3xl text-navy mb-6">Notificaciones</h1>
+  const unreadCount = items.filter(n => !n.is_read).length
 
-      {items.length === 0 ? (
-        <div className="text-center py-20">
-          <p className="text-4xl mb-3">🔕</p>
-          <p className="font-display font-bold text-xl text-navy mb-2">Todo al día</p>
-          <p className="text-ink/40 text-sm">Cuando haya novedades te avisaremos aquí</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {items.map(n => {
-            const emoji = TYPE_EMOJI[n.type] ?? '🔔'
-            const ago = formatDistanceToNow(new Date(n.created_at), { locale: es, addSuffix: true })
-            const content = (
-              <div className={`card flex gap-3 px-4 py-3 transition-opacity ${n.is_read ? 'opacity-60' : ''}`}>
-                <span className="text-2xl flex-shrink-0 leading-none mt-0.5">{emoji}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="font-display font-bold text-navy text-sm leading-tight">{n.title}</p>
-                  {n.body && <p className="text-ink/70 text-sm mt-1 leading-snug">{n.body}</p>}
-                  <p className="font-mono text-[9px] text-ink/30 uppercase tracking-wider mt-2">{ago}</p>
-                </div>
-                {!n.is_read && (
-                  <span className="w-2 h-2 rounded-full bg-blue flex-shrink-0 mt-2" aria-label="sin leer"/>
-                )}
-              </div>
-            )
-            return n.link ? (
-              <Link key={n.id} href={n.link} className="block active:scale-[0.99] transition-transform">
-                {content}
-              </Link>
-            ) : (
-              <div key={n.id}>{content}</div>
-            )
-          })}
-        </div>
+  return (
+    <div className="max-w-lg mx-auto px-4 pt-8">
+      <p className="page-eyebrow">Avisos</p>
+      <h1 className="page-title">
+        {unreadCount > 0 ? <>Tienes <em>novedades</em></> : <em>Notificaciones</em>}
+      </h1>
+      {unreadCount > 0 && (
+        <p className="font-mono text-xs text-brand-deep/60 mt-2 tracking-wide">
+          {unreadCount} sin leer
+        </p>
       )}
+
+      <div className="mt-6">
+        {items.length === 0 ? (
+          <div className="text-center py-20 animate-fade-in">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center"
+              style={{ background: 'radial-gradient(circle, rgba(155,196,188,0.2) 0%, transparent 70%)' }}>
+              <span className="text-4xl">🔕</span>
+            </div>
+            <p className="font-display text-xl text-navy mb-1">Todo al día</p>
+            <p className="text-ink/45 text-sm max-w-xs mx-auto">Cuando haya novedades te avisaremos aquí en tiempo real</p>
+          </div>
+        ) : (
+          <div className="space-y-2.5 animate-slide-up">
+            {items.map(n => {
+              const meta = TYPE_META[n.type] ?? { emoji: '🔔', tint: '#1E4DB7', label: 'Aviso' }
+              const ago = formatDistanceToNow(new Date(n.created_at), { locale: es, addSuffix: true })
+              const content = (
+                <div className={`card-tint relative overflow-hidden flex gap-3 px-5 py-4 transition-all ${n.is_read ? 'opacity-65' : ''}`}
+                  style={{ ['--tint' as string]: meta.tint }}>
+                  {!n.is_read && (
+                    <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-brand animate-pulse-soft" aria-label="sin leer"/>
+                  )}
+                  <span className="text-2xl flex-shrink-0 leading-none mt-0.5">{meta.emoji}</span>
+                  <div className="flex-1 min-w-0 pr-4">
+                    <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40 font-semibold mb-1">
+                      {meta.label}
+                    </p>
+                    <p className="font-display font-semibold text-navy text-base leading-snug tracking-tight">
+                      {n.title}
+                    </p>
+                    {n.body && <p className="text-ink/65 text-sm mt-1 leading-relaxed">{n.body}</p>}
+                    <p className="font-mono text-[10px] text-ink/35 uppercase tracking-wider mt-2.5">{ago}</p>
+                  </div>
+                </div>
+              )
+              return n.link ? (
+                <Link key={n.id} href={n.link} className="block active:scale-[0.99] transition-transform">
+                  {content}
+                </Link>
+              ) : (
+                <div key={n.id}>{content}</div>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

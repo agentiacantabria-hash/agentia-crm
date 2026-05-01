@@ -74,7 +74,6 @@ export default function MisClasesPage() {
     const dayDate = weekDayDate(slot.day_of_week)
     const dateStr = format(dayDate, 'yyyy-MM-dd')
 
-    // Verificar plazo
     const classDateTime = new Date(`${dateStr}T${slot.start_time}`)
     const hoursUntil    = (classDateTime.getTime() - Date.now()) / 3_600_000
     if (!slot.isAbsent && hoursUntil < CANCEL_DEADLINE_HOURS) {
@@ -97,83 +96,109 @@ export default function MisClasesPage() {
 
   if (loading) return (
     <div className="flex justify-center items-center min-h-screen">
-      <div className="w-7 h-7 rounded-full border-2 border-navy border-t-transparent animate-spin"/>
+      <div className="w-8 h-8 rounded-full border-2 border-brand/30 border-t-brand animate-spin"/>
     </div>
   )
 
   const creditsMax = maxRecoveriesPerMonth(scheduleType, plan)
   const creditsLeft = Math.max(0, creditsMax - usedCredits)
   const isRotating = scheduleType === 'rotativo'
+  const cupLabel   = isRotating ? 'reservas' : 'recuperaciones'
 
   return (
-    <div className="max-w-lg mx-auto px-4 pt-10">
-      <p className="font-mono text-[10px] uppercase tracking-widest text-ink/40 mb-1">Esta semana</p>
-      <h1 className="font-display font-bold text-3xl text-navy mb-1">Mis clases</h1>
+    <div className="max-w-lg mx-auto px-4 pt-8">
+      <p className="page-eyebrow">Esta semana</p>
+      <h1 className="page-title">Mis <em>clases</em></h1>
 
-      {/* Badge de recuperaciones */}
-      <div className="flex items-center gap-2 mb-6">
-        <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono font-bold
-          ${creditsLeft > 0 ? 'bg-blue/10 text-blue' : 'bg-ink/8 text-ink/40'}`}>
-          <span>{creditsLeft}/{creditsMax}</span>
-          <span className="font-normal">{isRotating ? 'reservas este mes' : 'recuperaciones este mes'}</span>
+      {/* Card de cupo */}
+      <div className="card-tint mt-5 mb-6 px-5 py-4" style={{ ['--tint' as string]: '#1E4DB7' }}>
+        <div className="flex items-baseline justify-between">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-brand-deep/70 font-semibold">
+            {cupLabel} este mes
+          </p>
+          {creditsLeft > 0 && (
+            <button onClick={() => router.push('/recuperar')}
+              className="font-mono text-[10px] uppercase tracking-widest text-brand font-bold underline-offset-2 hover:underline">
+              Usar →
+            </button>
+          )}
         </div>
-        {creditsLeft > 0 && (
-          <button onClick={() => router.push('/recuperar')}
-            className="text-xs font-mono text-blue underline underline-offset-2">
-            Usar →
-          </button>
-        )}
+        <div className="flex items-center gap-3 mt-2">
+          <p className="font-display text-3xl font-semibold text-brand-deep tabular-nums leading-none">
+            {creditsLeft}
+            <span className="text-brand-deep/30 text-2xl">/{creditsMax}</span>
+          </p>
+          <div className="flex flex-wrap gap-1 flex-1 max-w-[60%]">
+            {Array.from({ length: creditsMax || 4 }).map((_, i) => (
+              <span key={i} className="w-2.5 h-2.5 rounded-full transition-all flex-shrink-0"
+                style={{ backgroundColor: i < creditsLeft ? '#1E4DB7' : 'rgba(30,77,183,0.15)' }}/>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {error && <p className="mb-4 text-sm text-red-600 bg-red-50 rounded-2xl px-4 py-3">{error}</p>}
+      {error && (
+        <div className="mb-4 px-4 py-3 rounded-2xl bg-red-50 border border-red-100 animate-fade-in">
+          <p className="font-mono text-sm text-red-700">{error}</p>
+        </div>
+      )}
 
       {slots.length === 0 ? (
-        <div className="text-center py-20">
-          <p className="text-4xl mb-3">📅</p>
-          <p className="font-display font-bold text-xl text-navy mb-2">Sin clases fijas</p>
-          <p className="text-ink/40 text-sm mb-6">Ve al horario y añade tus clases de la semana</p>
+        <div className="text-center py-20 animate-fade-in">
+          <div className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center"
+            style={{ background: 'radial-gradient(circle, rgba(30,77,183,0.12) 0%, transparent 70%)' }}>
+            <span className="text-4xl">🌿</span>
+          </div>
+          <p className="font-display text-xl text-navy mb-1">Aún no tienes clases fijas</p>
+          <p className="text-ink/50 text-sm mb-6 max-w-xs mx-auto">Apúntate a las que quieras desde el horario y aparecerán aquí</p>
           <button onClick={() => router.push('/horario')}
-            className="bg-navy text-paper font-display font-bold px-6 py-3 rounded-2xl">
-            Ver horario
+            className="btn-primary max-w-xs mx-auto">
+            Ver horario →
           </button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2.5 animate-slide-up">
           {[...slots].sort((a,b) => a.day_of_week - b.day_of_week || a.start_time.localeCompare(b.start_time))
             .map(slot => {
               const dayDate   = weekDayDate(slot.day_of_week)
-              const dateStr   = format(dayDate, 'yyyy-MM-dd')
               const dayLabel  = format(dayDate, "EEEE d", { locale: es })
               const isPast    = isBefore(dayDate, new Date(new Date().setHours(0,0,0,0)))
+              const color     = slot.class_types.color
 
               return (
-                <div key={slot.id} className={`card overflow-hidden flex ${slot.isAbsent ? 'opacity-50' : ''}`}>
-                  <div className="w-1.5 flex-shrink-0" style={{ backgroundColor: slot.class_types.color }}/>
-                  <div className="flex-1 px-4 py-4 flex items-center justify-between">
-                    <div>
-                      <p className="font-display font-bold text-navy">{slot.class_types.name}</p>
-                      <p className="font-mono text-[10px] text-ink/40 uppercase tracking-wider mt-0.5 capitalize">
+                <div key={slot.id}
+                  className={`card-tint overflow-hidden flex transition-all ${slot.isAbsent ? 'opacity-55' : ''}`}
+                  style={{ ['--tint' as string]: color }}>
+                  <div className="w-1.5 flex-shrink-0" style={{ backgroundColor: color }}/>
+                  <div className="flex-1 px-4 py-4 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-display font-semibold text-navy text-lg tracking-tight leading-tight">
+                        {slot.class_types.name}
+                      </p>
+                      <p className="font-mono text-[11px] text-ink/55 uppercase tracking-widest mt-1 capitalize">
                         {dayLabel} · {slot.start_time.slice(0,5)}h
                       </p>
-                      {slot.week_parity !== 'all' && (
-                        <span className="inline-block mt-0.5 text-[9px] font-mono text-ink/30 uppercase tracking-wider">semanas alternas</span>
-                      )}
-                      {slot.isAbsent && (
-                        <span className="inline-block mt-1 text-[10px] font-mono text-red-500 uppercase tracking-wider">Falta marcada</span>
-                      )}
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        {slot.week_parity !== 'all' && (
+                          <span className="badge badge-neutral !text-[9px]">Alternas</span>
+                        )}
+                        {slot.isAbsent && (
+                          <span className="badge badge-danger !text-[9px]">Falta marcada</span>
+                        )}
+                      </div>
                     </div>
                     {!isPast && (
                       <button
                         onClick={() => toggleAbsence(slot)}
                         disabled={actionLoading === slot.id}
-                        className={`text-xs font-mono px-3 py-1.5 rounded-xl transition-colors
+                        className={`flex-shrink-0 font-mono text-[11px] font-bold uppercase tracking-wider px-3.5 py-2 rounded-xl transition-all active:scale-95
                           ${slot.isAbsent
-                            ? 'bg-green-50 text-green-700'
-                            : 'bg-red-50 text-red-600'
+                            ? 'bg-teal/30 text-emerald-800 hover:bg-teal/40'
+                            : 'bg-red-50 text-red-600 hover:bg-red-100'
                           } disabled:opacity-40`}
                       >
                         {actionLoading === slot.id ? '…'
-                          : slot.isAbsent ? 'Quitar falta'
+                          : slot.isAbsent ? '↻ Recuperar'
                           : 'Marcar falta'}
                       </button>
                     )}
@@ -184,8 +209,8 @@ export default function MisClasesPage() {
         </div>
       )}
 
-      <p className="text-center text-xs text-ink/30 font-mono mt-8 uppercase tracking-wider">
-        Plan actual: {plan?.name ?? '—'}
+      <p className="text-center font-mono text-[10px] text-ink/35 mt-10 uppercase tracking-widest">
+        Plan actual · {plan?.name ?? '—'}
       </p>
     </div>
   )
