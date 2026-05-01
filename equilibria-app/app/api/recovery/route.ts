@@ -25,14 +25,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Has agotado tus ${maxRecoveries} recuperación${maxRecoveries > 1 ? 'es' : ''} de este mes` }, { status: 409 })
   }
 
-  // Verificar capacidad de la clase
-  const [{ count: regularCount }, { count: absentCount }, { count: recoveryCount }] = await Promise.all([
+  // Verificar capacidad de la clase usando el max_capacity propio del slot
+  const [{ data: slotInfo }, { count: regularCount }, { count: absentCount }, { count: recoveryCount }] = await Promise.all([
+    sb.from('schedule_slots').select('max_capacity').eq('id', slot_id).single(),
     sb.from('regular_slots').select('*', { count: 'exact', head: true }).eq('slot_id', slot_id),
     sb.from('absences').select('*', { count: 'exact', head: true }).eq('slot_id', slot_id).eq('class_date', class_date),
     sb.from('recovery_bookings').select('*', { count: 'exact', head: true }).eq('slot_id', slot_id).eq('class_date', class_date).eq('status', 'confirmed'),
   ])
+  const slotMax = slotInfo?.max_capacity ?? MAX_CAPACITY
   const capacity = (regularCount ?? 0) - (absentCount ?? 0) + (recoveryCount ?? 0)
-  if (capacity >= MAX_CAPACITY) return NextResponse.json({ error: 'La clase está completa' }, { status: 409 })
+  if (capacity >= slotMax) return NextResponse.json({ error: 'La clase está completa' }, { status: 409 })
 
   // Clientes fijos no pueden reservar su propia clase fija como recuperación
   const isRotating = (profile as unknown as { schedule_type?: string })?.schedule_type === 'rotativo'
@@ -42,7 +44,20 @@ export async function POST(req: NextRequest) {
     if (ownSlot) return NextResponse.json({ error: 'No puedes recuperar tu propia clase fija' }, { status: 400 })
   }
 
-  const { error } = await sb.from('recovery_bookings').insert({ user_id: user.id, slot_id, class_date, status: 'confirmed' })
+  // Si existe una reserva cancelada anterior, reactivarla en lugar de chocar con el UNIQUE
+  const { data: existing } = await sb.from('recovery_bookings')
+    .select('id, status')
+    .eq('user_id', user.id).eq('slot_id', slot_id).eq('class_date', class_date)
+    .maybeSingle()
+
+  if (existing?.status === 'confirmed') {
+    return NextResponse.json({ error: 'Ya tienes una recuperación en esta clase' }, { status: 409 })
+  }
+
+  const { error } = existing
+    ? await sb.from('recovery_bookings').update({ status: 'confirmed' }).eq('id', existing.id)
+    : await sb.from('recovery_bookings').insert({ user_id: user.id, slot_id, class_date, status: 'confirmed' })
+
   if (error) {
     if (error.code === '23505') return NextResponse.json({ error: 'Ya tienes una recuperación en esta clase' }, { status: 409 })
     return NextResponse.json({ error: error.message }, { status: 500 })
