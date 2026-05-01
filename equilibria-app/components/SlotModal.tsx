@@ -3,6 +3,20 @@ import { useState, useEffect } from 'react'
 import { format, getISOWeek } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { SlotInfo } from '@/app/horario/page'
+import { toast } from '@/lib/toast'
+import Spinner from '@/components/Spinner'
+
+const SUCCESS_MESSAGES: Record<string, string> = {
+  'POST /api/regular-slot':    'Te has apuntado a esta clase fija',
+  'PATCH /api/regular-slot':   'Frecuencia actualizada',
+  'DELETE /api/regular-slot':  'Has quitado la clase fija',
+  'POST /api/recovery':        'Reserva confirmada',
+  'DELETE /api/recovery':      'Reserva cancelada',
+  'POST /api/absence':         'Falta registrada',
+  'DELETE /api/absence':       'Has quitado la falta',
+  'POST /api/waitlist':        'Apuntada a lista de espera',
+  'DELETE /api/waitlist':      'Has salido de la lista de espera',
+}
 
 type Attendee = { user_id: string; full_name: string; type: 'regular' | 'recovery' | 'absent' | 'waitlist' }
 
@@ -54,6 +68,8 @@ export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) 
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Error')
+      const msg = SUCCESS_MESSAGES[`${method} ${url}`]
+      if (msg) toast.success(msg)
       onSuccess()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error inesperado')

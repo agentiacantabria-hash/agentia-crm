@@ -8,6 +8,7 @@ import type { ScheduleSlot, Plan } from '@/lib/types'
 import { CANCEL_DEADLINE_HOURS } from '@/lib/types'
 import { parityActive } from '@/lib/parity'
 import { maxRecoveriesPerMonth } from '@/lib/plan'
+import { toast } from '@/lib/toast'
 
 type SlotFull = ScheduleSlot & { isAbsent: boolean; week_parity: string }
 
@@ -90,6 +91,7 @@ export default function MisClasesPage() {
     })
     const json = await res.json()
     if (!res.ok) { setError(json.error); setAL(null); return }
+    toast.success(slot.isAbsent ? 'Has quitado la falta' : 'Falta registrada')
     setAL(null)
     load()
   }

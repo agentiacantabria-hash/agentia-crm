@@ -32,6 +32,7 @@ export default function HorarioPage() {
   const [loading, setLoading]         = useState(true)
   const [isAdmin, setIsAdmin]         = useState(false)
   const [isRotating, setIsRotating]   = useState(false)
+  const [firstName, setFirstName]     = useState<string | null>(null)
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [dismissed, setDismissed]     = useState<Set<string>>(new Set())
 
@@ -56,10 +57,12 @@ export default function HorarioPage() {
     const { data: { user } } = await sb.auth.getUser()
 
     if (user) {
-      sb.from('profiles').select('is_admin, schedule_type').eq('id', user.id).single()
+      sb.from('profiles').select('is_admin, schedule_type, full_name').eq('id', user.id).single()
         .then(({ data }) => {
-          setIsAdmin(data?.is_admin ?? false)
-          setIsRotating(data?.schedule_type === 'rotativo')
+          const d = data as { is_admin?: boolean; schedule_type?: string; full_name?: string } | null
+          setIsAdmin(d?.is_admin ?? false)
+          setIsRotating(d?.schedule_type === 'rotativo')
+          setFirstName(d?.full_name?.split(' ')[0] ?? null)
         })
     }
 
@@ -192,6 +195,23 @@ export default function HorarioPage() {
 
   const isCurrentWeek = format(weekStart, 'yyyy-MM-dd') === format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
 
+  function greeting(): string {
+    const h = new Date().getHours()
+    if (h < 6)  return 'Buenas noches'
+    if (h < 13) return 'Buenos días'
+    if (h < 21) return 'Buenas tardes'
+    return 'Buenas noches'
+  }
+
+  function isHappeningNow(slot: ScheduleSlot, date: Date): boolean {
+    const now = new Date()
+    if (format(date, 'yyyy-MM-dd') !== format(now, 'yyyy-MM-dd')) return false
+    const [h, m] = slot.start_time.split(':').map(Number)
+    const start = new Date(date); start.setHours(h, m, 0, 0)
+    const end = new Date(start.getTime() + (slot.duration_minutes ?? 50) * 60_000)
+    return now >= start && now < end
+  }
+
   return (
     <div className="max-w-lg mx-auto px-4 pt-6">
 
@@ -230,8 +250,12 @@ export default function HorarioPage() {
       )}
 
       {/* ── Cabecera ──────────────────────────────────── */}
-      <div className="mb-5">
-        <p className="page-eyebrow">Horario</p>
+      <div className="mb-5 animate-fade-in">
+        {firstName && isCurrentWeek ? (
+          <p className="page-eyebrow">{greeting()}, <span className="text-brand-deep font-bold normal-case tracking-normal">{firstName}</span></p>
+        ) : (
+          <p className="page-eyebrow">Horario</p>
+        )}
         <h1 className="page-title">
           {isCurrentWeek ? <>Esta <em>semana</em></> : <em>{format(weekStart, "MMMM", { locale: es })}</em>}
         </h1>
@@ -286,8 +310,24 @@ export default function HorarioPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-20">
-          <div className="w-8 h-8 rounded-full border-2 border-brand/30 border-t-brand animate-spin"/>
+        <div className="space-y-5 pb-8">
+          {[0,1,2].map(i => (
+            <div key={i}>
+              <div className="flex items-center gap-2 mb-2 px-0.5">
+                <div className="h-3 w-12 rounded bg-ink/8 relative overflow-hidden">
+                  <div className="absolute inset-0 -translate-x-full animate-shimmer" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)' }}/>
+                </div>
+                <span className="flex-1 h-px bg-ink/5"/>
+              </div>
+              <div className="grid grid-cols-5 gap-1.5">
+                {[1,2,3,4,5].map(d => (
+                  <div key={d} className="rounded-2xl bg-ink/5 relative overflow-hidden" style={{ minHeight: '78px' }}>
+                    <div className="absolute inset-0 -translate-x-full animate-shimmer" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)' }}/>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="space-y-5 pb-8">
@@ -322,6 +362,7 @@ export default function HorarioPage() {
                           const activeRegs   = (regularParities[slot.id] ?? []).filter(p => parityActive(p, date)).length
                           const isEnFormacion= slot.min_regulars > 0 && activeRegs < slot.min_regulars
                           const color        = slot.class_types.color
+                          const isNow        = !cancelled && isHappeningNow(slot, date)
 
                           // Estado del puntito superior derecha
                           let statusColor = '#9BC4BC' // verde teal — libre
@@ -356,11 +397,23 @@ export default function HorarioPage() {
                               <div className="h-1 w-full" style={{ backgroundColor: color }}/>
 
                               {/* Status dot */}
-                              {!cancelled && !isAbsent && (
+                              {!cancelled && !isAbsent && !isNow && (
                                 <span
                                   className={`absolute top-2 right-2 w-2 h-2 rounded-full ${spotsLeft > 0 && spotsLeft <= 2 ? 'animate-pulse-soft' : ''}`}
                                   style={{ backgroundColor: statusColor }}
                                 />
+                              )}
+
+                              {/* Indicador "ocurriendo ahora" */}
+                              {isNow && (
+                                <span className="absolute top-1.5 right-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-full"
+                                  style={{ backgroundColor: '#DC2626', boxShadow: '0 2px 8px rgba(220,38,38,0.4)' }}>
+                                  <span className="relative flex w-1.5 h-1.5">
+                                    <span className="absolute inline-flex h-full w-full rounded-full bg-white animate-pulse-ring"/>
+                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"/>
+                                  </span>
+                                  <span className="font-mono text-[8px] font-bold text-white tracking-widest uppercase">Ahora</span>
+                                </span>
                               )}
 
                               <div className="px-2 pt-2 pb-2.5">

@@ -3,6 +3,7 @@ import { Fraunces, Inter, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import NavBar from '@/components/NavBar'
 import PwaRegister from '@/components/PwaRegister'
+import ToastContainer from '@/components/ToastContainer'
 
 // Fraunces: serif editorial cálida con curvas suaves. Aporta personalidad
 // "boutique" sin perder legibilidad en móvil.
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
         </main>
         <NavBar />
+        <ToastContainer />
         <PwaRegister />
       </body>
     </html>

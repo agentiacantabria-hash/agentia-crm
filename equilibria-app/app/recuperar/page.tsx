@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { ScheduleSlot, Plan } from '@/lib/types'
 import { parityActive } from '@/lib/parity'
 import { maxRecoveriesPerMonth } from '@/lib/plan'
+import { toast } from '@/lib/toast'
 
 export default function RecuperarPage() {
   const router = useRouter()
@@ -111,6 +112,7 @@ export default function RecuperarPage() {
     })
     const json = await res.json()
     if (!res.ok) { setError(json.error); setAL(null); return }
+    toast.success(`Reservado · ${slot.class_types.name}`)
     setBookedKey(key)
     setAL(null)
     load()
