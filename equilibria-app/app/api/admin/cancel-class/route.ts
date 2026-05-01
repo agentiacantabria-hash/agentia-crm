@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { assertAdmin } from '@/lib/auth/admin-guard'
-import { logServerError } from '@/lib/log'
+import { createNotifications } from '@/lib/notifications'
+import { parityActive } from '@/lib/parity'
 
 export async function POST(req: NextRequest) {
   const guard = await assertAdmin()
@@ -40,41 +42,42 @@ export async function DELETE(req: NextRequest) {
 }
 
 async function notifyAffected(
-  sb: Awaited<ReturnType<typeof createClient>>,
+  _sb: Awaited<ReturnType<typeof createClient>>,
   slotId: string,
   classDate: string,
   reason: string | null
 ) {
-  const apiKey = process.env.RESEND_API_KEY
-  const adminEmail = process.env.ADMIN_EMAIL
-  if (!apiKey || apiKey.startsWith('re_XXX') || !adminEmail) return
+  // Las afectadas son: regulares activas esa semana (paridad) + recuperaciones
+  // confirmadas para esa fecha. Usamos admin client para esquivar RLS.
+  let admin: ReturnType<typeof createAdminClient>
+  try { admin = createAdminClient() } catch { return }
 
-  const { data: slot } = await sb
-    .from('schedule_slots')
-    .select('start_time, class_types(name)')
-    .eq('id', slotId)
-    .single()
+  const targetDate = new Date(classDate + 'T12:00:00')
 
-  const className = (slot?.class_types as unknown as { name: string } | null)?.name ?? ''
+  const [{ data: slot }, { data: regulars }, { data: recoveries }] = await Promise.all([
+    admin.from('schedule_slots').select('start_time, class_types(name)').eq('id', slotId).single(),
+    admin.from('regular_slots').select('user_id, week_parity').eq('slot_id', slotId),
+    admin.from('recovery_bookings').select('user_id').eq('slot_id', slotId).eq('class_date', classDate).eq('status', 'cancelled'),
+  ])
+
+  const className = (slot?.class_types as unknown as { name: string } | null)?.name ?? 'tu clase'
   const time = slot?.start_time?.slice(0, 5) ?? ''
-  const reasonText = reason ? ` Motivo: ${reason}.` : ''
+  const dateLabel = new Date(classDate + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: 'Equilibria <onboarding@resend.dev>',
-        to: [adminEmail],
-        subject: `[Admin] Clase cancelada — ${className} ${classDate}`,
-        html: `<p>La clase de <b>${className}</b> del ${classDate} a las ${time}h ha sido cancelada.${reasonText}</p>`,
-      }),
-    })
-    if (!res.ok) {
-      const body = await res.text().catch(() => '')
-      logServerError('cancelClass:resend', new Error(`HTTP ${res.status}`), { body, slotId, classDate })
-    }
-  } catch (e) {
-    logServerError('cancelClass:fetch', e, { slotId, classDate })
-  }
+  type RegRow = { user_id: string; week_parity: string }
+  const activeRegulars = ((regulars ?? []) as RegRow[])
+    .filter(r => parityActive(r.week_parity, targetDate))
+    .map(r => r.user_id)
+  const recoveryUsers = ((recoveries ?? []) as { user_id: string }[]).map(r => r.user_id)
+
+  // Dedup por user_id (alguien podría tener regular + recovery — improbable pero curarse en salud)
+  const userIds = Array.from(new Set([...activeRegulars, ...recoveryUsers]))
+
+  const reasonText = reason ? ` Motivo: ${reason}.` : ''
+  await createNotifications(userIds, {
+    type: 'class_cancelled',
+    title: `${className} de ${dateLabel} cancelada`,
+    body: `La clase de ${dateLabel} a las ${time}h ha sido cancelada.${reasonText} Si tenías recuperación, se te ha devuelto el crédito.`,
+    link: '/horario',
+  })
 }
