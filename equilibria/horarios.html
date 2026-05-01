@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Horarios — Equilibria</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <link rel="stylesheet" href="assets/horario.css">
+  <style>
+    .page-hero{
+      background: var(--navy-deep); color: var(--paper);
+      padding: 160px 32px 80px; position: relative; overflow: hidden;
+    }
+    .page-hero::before{
+      content:""; position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(244,239,230,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(244,239,230,.04) 1px, transparent 1px);
+      background-size: 80px 80px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, #000 30%, transparent 80%);
+      pointer-events: none;
+    }
+    .page-hero-inner{ max-width: 1500px; margin: 0 auto; position: relative; z-index: 2; }
+    .page-hero h1{
+      font-family: var(--display); font-size: clamp(48px, 9.8vw, 143px);
+      line-height: 1.0; letter-spacing: -0.022em; margin-top: 32px; font-weight: 800;
+    }
+    .page-hero h1 .accent{ color: var(--blue); }
+    .page-hero p{ max-width: 540px; margin-top: 32px; font-size: 17px; line-height: 1.6; color: rgba(244,239,230,.78); }
+
+    /* ── RESERVA INFO ── */
+    .reserva-info{
+      display: grid; grid-template-columns: 1fr 1fr; gap: 60px;
+      padding-top: 56px; margin-top: 56px;
+      border-top: 1px solid var(--line);
+    }
+    .reserva-info h3{
+      font-family: var(--display); font-size: clamp(28px, 4vw, 56px);
+      font-weight: 800; line-height: 0.95; margin-bottom: 16px;
+    }
+    .reserva-info p{ font-size: 16px; line-height: 1.6; color: var(--muted); max-width: 460px; }
+    .reserva-btns{ display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; padding-top: 8px; }
+
+    @media (max-width: 900px){
+      .page-hero{ padding: 120px 20px 56px; }
+      .page-hero p{ font-size: 15px; margin-top: 24px; }
+      .reserva-info{ grid-template-columns: 1fr; gap: 28px; padding-top: 40px; margin-top: 40px; }
+      .reserva-info h3{ font-size: clamp(28px, 7vw, 44px); }
+    }
+    @media (max-width: 600px){
+      .page-hero{ padding: 110px 18px 48px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="nav-mount"></div>
+
+  <header class="page-hero">
+    <div class="page-hero-inner">
+      <div class="eyebrow on-dark">002 — Horarios</div>
+      <h1>TU SEMANA<br>organizada<br>al <span class="accent">DETALLE.</span></h1>
+      <p>De lunes a viernes, mañana y tarde. Reserva tu plaza con un toque. Si una clase está completa, te avisamos cuando se libere un sitio.</p>
+    </div>
+  </header>
+
+  <section class="horario-section">
+    <div class="horario-inner">
+
+      <div class="horario-controls">
+        <div class="h-tabs" id="h-tabs">
+          <button class="h-tab active" data-track="manana">Mañana</button>
+          <button class="h-tab" data-track="tarde">Tarde</button>
+        </div>
+        <span class="h-filter-label">Filtrar:</span>
+        <div class="h-filter-pills" id="h-pills"></div>
+      </div>
+
+      <div class="horario-grid dark" id="horario-grid"></div>
+      <div class="horario-legend" id="legend"></div>
+
+      <!-- Mobile day view -->
+      <div id="horario-mobile">
+        <div class="h-day-tabs" id="h-day-tabs">
+          <button class="h-day-tab active" data-day="0">Lun</button>
+          <button class="h-day-tab" data-day="1">Mar</button>
+          <button class="h-day-tab" data-day="2">Mié</button>
+          <button class="h-day-tab" data-day="3">Jue</button>
+          <button class="h-day-tab" data-day="4">Vie</button>
+        </div>
+        <div class="h-mobile-list" id="h-mobile-list"></div>
+      </div>
+
+      <div class="reserva-info">
+        <div>
+          <div class="eyebrow" style="margin-bottom: 16px;">Cómo reservar</div>
+          <h3>Toca, llama<br>o WhatsApp.</h3>
+          <p>Las plazas son limitadas. Lo más rápido es reservar por WhatsApp al <strong>684 80 30 11</strong> o tocando directamente la clase que te interese arriba.</p>
+        </div>
+        <div class="reserva-btns">
+          <a href="https://wa.me/34684803011" class="btn btn-primary">WhatsApp <span class="btn-arrow">→</span></a>
+          <a href="tel:+34684803011" class="btn btn-outline">Llamar</a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <div id="footer-mount"></div>
+
+  <script src="assets/data.js"></script>
+  <script>
+    Promise.all([
+      fetch('assets/_nav.html').then(r => r.text()),
+      fetch('assets/_footer.html').then(r => r.text())
+    ]).then(([nav, footer]) => {
+      document.getElementById('nav-mount').innerHTML = nav;
+      document.getElementById('footer-mount').innerHTML = footer;
+    });
+
+    const DAYS = ['LUN','MAR','MIÉ','JUE','VIE'];
+    const DAYS_FULL = ['Lunes','Martes','Miércoles','Jueves','Viernes'];
+    let currentTrack = 'manana';
+    let activeFilter = null;
+
+    document.getElementById('legend').innerHTML = window.EQ.disciplinas.map(d => `
+      <span><span class="swatch" style="background: ${d.color};"></span> ${d.name}</span>
+    `).join('');
+
+    document.getElementById('h-pills').innerHTML =
+      `<button class="h-pill active" data-id="all">Todas</button>` +
+      window.EQ.disciplinas.map(d =>
+        `<button class="h-pill" data-id="${d.id}"><span class="swatch" style="background: ${d.color};"></span>${d.name}</button>`
+      ).join('');
+
+    function renderGrid(){
+      const data = currentTrack === 'manana' ? window.EQ.horarioManana : window.EQ.horarioTarde;
+      const grid = document.getElementById('horario-grid');
+      let html = `<div class="h-cell head"></div>` + DAYS.map(d => `<div class="h-cell head">${d}</div>`).join('');
+
+      data.forEach((row, idx) => {
+        const rawTime = row[0];
+        const isB = rawTime.endsWith('b');
+        const time = rawTime.replace('b','');
+        const nextRow = data[idx + 1];
+        const hasB = nextRow && nextRow[0] === time + 'b';
+
+        if (!isB) {
+          const spanStyle = hasB ? ' style="grid-row: span 2; align-self: center;"' : '';
+          html += `<div class="h-cell time"${spanStyle}>${time}</div>`;
+        }
+
+        for (let i = 1; i <= 5; i++) {
+          const dId = row[i];
+          if (!dId) {
+            html += `<div class="h-cell empty"></div>`;
+          } else {
+            const d = window.EQ.findDisc(dId);
+            if (!d) { html += `<div class="h-cell empty"></div>`; continue; }
+            const dim = activeFilter && activeFilter !== dId ? 'dim' : '';
+            html += `
+              <div class="h-cell class ${dim}" style="background: ${d.color};"
+                   data-disc="${dId}" data-day="${i-1}" data-time="${time}">
+                ${d.name.toUpperCase()}
+                <span class="time-mini">${time}</span>
+              </div>`;
+          }
+        }
+      });
+      grid.innerHTML = html;
+      grid.querySelectorAll('.h-cell.class').forEach(cell => {
+        cell.addEventListener('click', () => reservarWA(cell.dataset));
+      });
+    }
+    renderGrid();
+
+    document.getElementById('h-tabs').addEventListener('click', (e) => {
+      const btn = e.target.closest('.h-tab');
+      if (!btn) return;
+      document.querySelectorAll('#h-tabs .h-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentTrack = btn.dataset.track;
+      renderGrid();
+      renderMobileDay();
+    });
+
+    document.getElementById('h-pills').addEventListener('click', (e) => {
+      const btn = e.target.closest('.h-pill');
+      if (!btn) return;
+      document.querySelectorAll('#h-pills .h-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeFilter = btn.dataset.id === 'all' ? null : btn.dataset.id;
+      renderGrid();
+    });
+
+    function reservarWA(d){
+      const disc = window.EQ.findDisc(d.disc);
+      const dia = DAYS_FULL[parseInt(d.day)];
+      const msg = encodeURIComponent(`Hola, quiero reservar plaza en la clase de ${disc.name} el ${dia} a las ${d.time}. ¿Hay sitio?`);
+      window.open(`https://wa.me/34684803011?text=${msg}`, '_blank');
+    }
+    // ── Mobile day view ──
+    let currentDay = 0;
+
+    function renderMobileDay(){
+      const data = currentTrack === 'manana' ? window.EQ.horarioManana : window.EQ.horarioTarde;
+      const col = currentDay + 1;
+      const items = [];
+      data.forEach(row => {
+        const dId = row[col];
+        if (!dId) return;
+        const d = window.EQ.findDisc(dId);
+        if (!d) return;
+        const time = row[0].replace('b','');
+        items.push({ d, time });
+      });
+      const list = document.getElementById('h-mobile-list');
+      if (!items.length) {
+        list.innerHTML = `<div class="h-mobile-empty">Sin clases este día</div>`;
+        return;
+      }
+      list.innerHTML = items.map(({ d, time }) => `
+        <div class="h-mobile-card" style="--disc-bg: ${d.color};"
+             data-disc="${d.id}" data-day="${currentDay}" data-time="${time}">
+          <div class="m-time">${time}</div>
+          <div class="m-name">${d.name}</div>
+          <div class="m-dur">${d.tag.split('·')[1]?.trim() || '50 min'}</div>
+          <div class="m-arrow">→</div>
+        </div>
+      `).join('');
+      list.querySelectorAll('.h-mobile-card').forEach(card => {
+        card.addEventListener('click', () => reservarWA(card.dataset));
+      });
+    }
+    renderMobileDay();
+
+    document.getElementById('h-day-tabs').addEventListener('click', (e) => {
+      const btn = e.target.closest('.h-day-tab');
+      if (!btn) return;
+      document.querySelectorAll('#h-day-tabs .h-day-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentDay = parseInt(btn.dataset.day);
+      renderMobileDay();
+    });
+
+  </script>
+  <script src="assets/scatter.js"></script>
+</body>
+</html>

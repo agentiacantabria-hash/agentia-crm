@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contacto — Equilibria</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <style>
+    .page-hero{
+      background: var(--navy-deep); color: var(--paper);
+      padding: 160px 32px 80px; position: relative; overflow: hidden;
+    }
+    .page-hero::before{
+      content:""; position: absolute; inset: 0;
+      background-image: linear-gradient(rgba(244,239,230,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(244,239,230,.04) 1px, transparent 1px);
+      background-size: 80px 80px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, #000 30%, transparent 80%);
+      pointer-events: none;
+    }
+    .page-hero-inner{ max-width: 1500px; margin: 0 auto; position: relative; z-index: 2; }
+    .page-hero h1{
+      font-family: var(--display); font-size: clamp(40px, 9.8vw, 143px);
+      line-height: 1.0; letter-spacing: -0.022em; margin-top: 32px; font-weight: 800;
+    }
+    .page-hero h1 .accent{ color: var(--blue); }
+
+    /* ── CONTACT SECTION ── */
+    .contact-section{ padding: 100px 32px; }
+    .contact-grid{
+      max-width: 1500px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 80px; align-items: start;
+    }
+    .contact-info .item{
+      padding: 32px 0; border-bottom: 1px solid var(--line);
+      display: grid; grid-template-columns: 48px 1fr; gap: 20px;
+    }
+    .contact-info .item:first-child{ border-top: 1px solid var(--line); }
+    .contact-info .item .num{ font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); padding-top: 4px; }
+    .contact-info .item .l{ font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 8px; }
+    .contact-info .item .v{
+      font-family: var(--display); font-size: clamp(24px, 3.5vw, 36px); line-height: 1.1; margin-top: 4px; font-weight: 800;
+    }
+    .contact-info .item .v a{ transition: color .3s ease; }
+    .contact-info .item .v a:hover{ color: var(--blue); }
+    .contact-info .item .sub{ font-size: 13px; color: var(--muted); margin-top: 8px; font-family: var(--mono); letter-spacing: 0.04em; }
+
+    /* ── FORM ── */
+    .contact-form{
+      background: var(--navy); color: var(--paper); padding: 56px 48px;
+    }
+    .contact-form h2{
+      font-family: var(--display); font-size: clamp(32px, 4.5vw, 56px);
+      line-height: 1.05; margin-bottom: 12px; font-weight: 800;
+    }
+    .contact-form h2 .accent{ color: var(--blue); }
+    .contact-form p{ font-size: 14px; color: rgba(244,239,230,.7); margin-bottom: 32px; }
+    .contact-form .field{ margin-bottom: 16px; }
+    .contact-form label{
+      display: block; font-family: var(--mono); font-size: 10px;
+      text-transform: uppercase; letter-spacing: 0.12em;
+      color: rgba(244,239,230,.6); margin-bottom: 8px;
+    }
+    .contact-form input, .contact-form select, .contact-form textarea{
+      width: 100%; padding: 14px 16px;
+      background: rgba(244,239,230,.06);
+      border: 1.5px solid rgba(244,239,230,.18);
+      color: var(--paper);
+      font-family: var(--sans); font-size: 16px; /* evita zoom en iOS */
+      transition: border-color .3s ease, background .3s ease;
+      -webkit-appearance: none;
+    }
+    .contact-form input:focus, .contact-form select:focus, .contact-form textarea:focus{
+      outline: none; border-color: var(--blue); background: rgba(46,91,255,.08);
+    }
+    .contact-form select{
+      background-image:
+        linear-gradient(45deg, transparent 50%, var(--paper) 50%),
+        linear-gradient(135deg, var(--paper) 50%, transparent 50%);
+      background-position: calc(100% - 18px) calc(50% - 2px), calc(100% - 13px) calc(50% - 2px);
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+      background-color: rgba(244,239,230,.06);
+      padding-right: 40px; cursor: pointer;
+    }
+    .contact-form select option{ background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 14px; }
+    .contact-form textarea{ resize: vertical; min-height: 100px; }
+    .contact-form .row{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .contact-form button{
+      width: 100%; padding: 18px;
+      background: var(--blue); color: var(--paper);
+      font-family: var(--sans); font-weight: 700; font-size: 14px;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      cursor: pointer; border: none; margin-top: 12px;
+      min-height: 52px;
+      transition: background .3s ease;
+    }
+    .contact-form button:hover{ background: var(--paper); color: var(--navy); }
+    .contact-form .success{ text-align: center; padding: 40px 20px; }
+    .contact-form .success .check{
+      width: 64px; height: 64px; border-radius: 50%;
+      background: var(--blue); color: white; display: flex;
+      align-items: center; justify-content: center; font-size: 36px;
+      margin: 0 auto 24px;
+    }
+    .contact-form .success h3{ font-family: var(--display); font-size: 40px; font-weight: 800; }
+    .contact-form .success p{ margin-top: 12px; color: rgba(244,239,230,.7); }
+
+    /* ── MAP SECTION ── */
+    .map-section{ background: var(--paper-2); }
+    .map-grid{
+      max-width: 1500px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    }
+    .map-text{ padding: 100px 60px; }
+    .map-text h2{ font-family: var(--display); font-size: clamp(32px, 4.2vw, 57px); line-height: 1.05; margin-bottom: 24px; font-weight: 800; }
+    .map-text p{ font-size: 16px; line-height: 1.6; color: var(--muted); margin-bottom: 16px; max-width: 420px; }
+    .map-visual{
+      background: var(--navy); min-height: 500px;
+      position: relative; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .map-visual img{ width: 100%; height: 100%; object-fit: cover; opacity: 0.7; }
+    .map-pin{
+      position: absolute; top: 50%; left: 50%;
+      width: 64px; height: 64px;
+      background: var(--blue);
+      border-radius: 50% 50% 50% 0;
+      transform: translate(-50%, -50%) rotate(-45deg);
+      display: flex; align-items: center; justify-content: center;
+      animation: pin-pulse 2s ease-in-out infinite;
+    }
+    .map-pin::before{ content:""; width: 20px; height: 20px; background: var(--paper); border-radius: 50%; }
+    @keyframes pin-pulse{
+      0%,100%{ box-shadow: 0 0 0 0 rgba(46,91,255,.7); }
+      50%{ box-shadow: 0 0 0 24px rgba(46,91,255,0); }
+    }
+
+    /* ── HOURS ── */
+    .hours{ padding: 100px 32px; background: var(--paper); }
+    .hours-inner{ max-width: 1500px; margin: 0 auto; }
+    .hours-grid{
+      display: grid; grid-template-columns: repeat(7, 1fr);
+      gap: 4px; margin-top: 48px;
+    }
+    .day-card{ background: var(--paper-2); padding: 24px 16px; }
+    .day-card.closed{ opacity: 0.4; }
+    .day-card .day{ font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 8px; }
+    .day-card .hrs{ font-family: var(--display); font-size: 20px; line-height: 1.1; font-weight: 800; }
+
+    /* ── MOBILE ── */
+    @media (max-width: 900px){
+      .page-hero{ padding: 120px 20px 64px; }
+      .contact-section{ padding: 64px 20px; }
+      .contact-grid{ grid-template-columns: 1fr; gap: 40px; }
+      .contact-info .item{ grid-template-columns: 36px 1fr; gap: 14px; padding: 22px 0; }
+      .contact-info .item .v{ font-size: 24px; }
+      .contact-form{ padding: 36px 24px; }
+      .contact-form h2{ font-size: 32px; }
+      .contact-form .row{ grid-template-columns: 1fr; gap: 0; }
+      .map-grid{ grid-template-columns: 1fr; }
+      .map-text{ padding: 56px 20px; }
+      .map-text h2{ margin-bottom: 16px; }
+      .map-visual{ min-height: 260px; order: -1; }
+      .hours{ padding: 64px 20px; }
+      .hours-grid{ grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 32px; }
+      .day-card{ padding: 16px 12px; }
+      .day-card .hrs{ font-size: 16px; }
+    }
+    @media (max-width: 600px){
+      .page-hero{ padding: 110px 18px 48px; }
+      .contact-section{ padding: 48px 18px; }
+      .contact-form{ padding: 28px 18px; }
+      .contact-form h2{ font-size: 28px; }
+      .hours{ padding: 48px 18px; }
+      .hours-grid{ grid-template-columns: repeat(2, 1fr); }
+      .map-text{ padding: 44px 18px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="nav-mount"></div>
+
+  <header class="page-hero">
+    <div class="page-hero-inner">
+      <div class="eyebrow on-dark">004 — Contacto</div>
+      <h1>HABLEMOS<br>de tu<br><span class="accent">PRIMERA</span> clase.</h1>
+    </div>
+  </header>
+
+  <section class="contact-section">
+    <div class="contact-grid">
+      <div class="contact-info">
+        <div class="item">
+          <span class="num">01</span>
+          <div>
+            <div class="l">Teléfono · WhatsApp</div>
+            <div class="v"><a href="tel:+34684803011">684 80 30 11</a></div>
+            <div class="sub">Llámanos o escríbenos. Respondemos en menos de una hora.</div>
+          </div>
+        </div>
+        <div class="item">
+          <span class="num">02</span>
+          <div>
+            <div class="l">Dirección</div>
+            <div class="v">Calle Sierra<br>Don Esteve, 4</div>
+            <div class="sub">39610 — El Astillero, Cantabria</div>
+          </div>
+        </div>
+        <div class="item">
+          <span class="num">03</span>
+          <div>
+            <div class="l">Instagram</div>
+            <div class="v"><a href="https://instagram.com/equilibria_astillero" target="_blank">@equilibria<br>_astillero</a></div>
+            <div class="sub">Horarios, novedades y vida del centro.</div>
+          </div>
+        </div>
+        <div class="item">
+          <span class="num">04</span>
+          <div>
+            <div class="l">Cómo llegar</div>
+            <div class="v">A pie<br>10 min</div>
+            <div class="sub">Desde la estación de El Astillero. Aparcamiento en la calle.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="contact-form">
+        <div id="form-content">
+          <h2>Escríbenos<br>y te <span class="accent">llamamos.</span></h2>
+          <p>Cuéntanos qué te interesa y te ayudamos a elegir la clase que encaja contigo.</p>
+          <form id="contact-form">
+            <div class="row">
+              <div class="field"><label>Nombre</label><input type="text" required autocomplete="name"></div>
+              <div class="field"><label>Teléfono</label><input type="tel" required autocomplete="tel"></div>
+            </div>
+            <div class="field"><label>Email</label><input type="email" autocomplete="email"></div>
+            <div class="field">
+              <label>Disciplina que te interesa</label>
+              <select id="disc-select">
+                <option value="">Aún no lo tengo claro</option>
+              </select>
+            </div>
+            <div class="field"><label>Mensaje</label><textarea placeholder="¿Algo que tengamos que saber? Lesiones, objetivos, dudas..."></textarea></div>
+            <button type="submit">Enviar mensaje</button>
+          </form>
+        </div>
+        <div class="success" id="form-success" style="display: none;">
+          <div class="check">✓</div>
+          <h3>¡Recibido!</h3>
+          <p>Te contactamos en breve por WhatsApp.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="map-section">
+    <div class="map-grid">
+      <div class="map-text">
+        <div class="eyebrow" style="margin-bottom: 24px;">005 — Visítanos</div>
+        <h2>Pásate<br>cuando<br><span class="accent">quieras.</span></h2>
+        <p>Estamos a 10 minutos andando de la estación de El Astillero. La puerta es la que pone EQUILIBRIA — no tiene pérdida.</p>
+        <p>Si vienes en coche, hay aparcamiento gratis en la calle. La primera clase es siempre gratis: solo trae ropa cómoda y agua.</p>
+        <a href="https://maps.google.com/?q=Calle+Sierra+Don+Esteve+4+El+Astillero" target="_blank" class="btn btn-primary" style="margin-top: 24px;">Ver en Google Maps <span class="btn-arrow">→</span></a>
+      </div>
+      <div class="map-visual">
+        <img src="assets/equipo-fundadores.jpg" alt="Entrada Equilibria">
+        <div class="map-pin"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="hours">
+    <div class="hours-inner">
+      <div class="eyebrow">006 — Horario centro</div>
+      <h2 class="display-l" style="margin-top: 16px;">Cuándo<br>estamos <span class="accent">abiertos.</span></h2>
+      <div class="hours-grid">
+        <div class="day-card"><div class="day">Lun</div><div class="hrs">09–13<br>16–22</div></div>
+        <div class="day-card"><div class="day">Mar</div><div class="hrs">09–13<br>16–22</div></div>
+        <div class="day-card"><div class="day">Mié</div><div class="hrs">09–13<br>16–22</div></div>
+        <div class="day-card"><div class="day">Jue</div><div class="hrs">09–13<br>16–22</div></div>
+        <div class="day-card"><div class="day">Vie</div><div class="hrs">09–13<br>16–22</div></div>
+        <div class="day-card closed"><div class="day">Sáb</div><div class="hrs">Cerrado</div></div>
+        <div class="day-card closed"><div class="day">Dom</div><div class="hrs">Cerrado</div></div>
+      </div>
+    </div>
+  </section>
+
+  <div id="footer-mount"></div>
+
+  <script src="assets/data.js"></script>
+  <script>
+    Promise.all([
+      fetch('assets/_nav.html').then(r => r.text()),
+      fetch('assets/_footer.html').then(r => r.text())
+    ]).then(([nav, footer]) => {
+      document.getElementById('nav-mount').innerHTML = nav;
+      document.getElementById('footer-mount').innerHTML = footer;
+    });
+
+    const sel = document.getElementById('disc-select');
+    window.EQ.disciplinas.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.id; opt.textContent = d.name;
+      sel.appendChild(opt);
+    });
+
+    document.getElementById('contact-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      document.getElementById('form-content').style.display = 'none';
+      document.getElementById('form-success').style.display = 'block';
+    });
+  </script>
+  <script src="assets/scatter.js"></script>
+</body>
+</html>

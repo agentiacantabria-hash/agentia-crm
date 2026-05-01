@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Disciplinas — Equilibria</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <style>
+    .page-hero{
+      background: var(--navy-deep);
+      color: var(--paper);
+      padding: 160px 32px 100px;
+      position: relative;
+      overflow: hidden;
+    }
+    .page-hero::before{
+      content:""; position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(244,239,230,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(244,239,230,.04) 1px, transparent 1px);
+      background-size: 80px 80px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, #000 30%, transparent 80%);
+      pointer-events: none;
+    }
+    .page-hero-inner{ max-width: 1500px; margin: 0 auto; position: relative; z-index: 2; }
+    .page-hero h1{
+      font-family: var(--display);
+      font-size: clamp(48px, 9.8vw, 143px);
+      line-height: 1.0;
+      letter-spacing: -0.022em;
+      margin-top: 32px;
+    }
+    .page-hero h1 .accent{ color: var(--blue); }
+    .page-hero p{
+      max-width: 540px; margin-top: 32px;
+      font-size: 17px; line-height: 1.6;
+      color: rgba(244,239,230,.78);
+    }
+
+    /* ── DISC ROWS ── */
+    .disc-section{ padding: 100px 32px; }
+    .disc-row{
+      max-width: 1500px; margin: 0 auto;
+      display: grid;
+      grid-template-columns: 56px 1.2fr 1fr 0.8fr 56px;
+      align-items: center;
+      gap: 28px;
+      padding: 48px 0;
+      border-bottom: 1px solid var(--line);
+      position: relative;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      transition: padding .5s ease;
+    }
+    .disc-row:hover{ padding-left: 20px; padding-right: 20px; }
+    .disc-row::before{
+      content:""; position: absolute; left: 0; top: 0; bottom: 0;
+      width: 0; background: var(--disc-color, var(--blue));
+      transition: width .5s cubic-bezier(.7,0,.2,1);
+      z-index: -1;
+    }
+    .disc-row:hover::before{ width: 100%; }
+    .disc-row .num{ font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--muted); }
+    .disc-row .name{
+      font-family: var(--display);
+      font-size: clamp(28px, 4.9vw, 72px);
+      line-height: 1.05;
+      letter-spacing: -0.022em;
+      font-weight: 800;
+    }
+    .disc-row .desc{ font-size: 15px; line-height: 1.6; color: var(--muted); max-width: 360px; }
+    .disc-row .meta{
+      font-family: var(--mono); font-size: 11px;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--muted);
+    }
+    .disc-row .arrow{
+      justify-self: end;
+      width: 52px; height: 52px; border-radius: 50%;
+      border: 1.5px solid var(--ink);
+      display: flex; align-items: center; justify-content: center;
+      transition: all .4s ease;
+      flex-shrink: 0;
+    }
+    .disc-row:hover .arrow{
+      background: var(--ink); color: var(--paper); border-color: var(--ink);
+      transform: rotate(-45deg);
+    }
+    .disc-row:hover .name{ color: var(--ink); }
+    .disc-row .swatch{
+      width: 52px; height: 52px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    /* ── DETAIL CARDS ── */
+    .disc-detail-section{ background: var(--paper-2); padding: 100px 32px; }
+    .disc-detail{
+      max-width: 1500px; margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      padding: 60px 0;
+      border-bottom: 1px solid var(--line);
+      align-items: center;
+    }
+    .disc-detail.alt{ direction: rtl; }
+    .disc-detail.alt > *{ direction: ltr; }
+    .disc-detail .photo{
+      aspect-ratio: 5/4;
+      overflow: hidden;
+      position: relative;
+    }
+    .disc-detail .photo img{ width: 100%; height: 100%; object-fit: cover; }
+    .disc-detail .photo .tag{
+      position: absolute; top: 16px; left: 16px;
+      padding: 8px 14px;
+      font-family: var(--mono); font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      background: var(--ink); color: var(--paper);
+    }
+    .disc-detail .body{ padding: 0 24px; }
+    .disc-detail .body .num{ font-family: var(--mono); font-size: 11px; color: var(--muted); }
+    .disc-detail .body h2{
+      font-family: var(--display);
+      font-size: clamp(32px, 4.9vw, 72px);
+      line-height: 1.05;
+      margin: 16px 0 24px;
+      font-weight: 800;
+    }
+    .disc-detail .body p{ font-size: 16px; line-height: 1.65; color: var(--muted); margin-bottom: 16px; }
+    .disc-detail .body .meta-row{
+      display: flex; gap: 24px; flex-wrap: wrap;
+      margin-top: 32px; padding-top: 32px;
+      border-top: 1px solid var(--line);
+    }
+    .disc-detail .body .meta-item .l{ font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+    .disc-detail .body .meta-item .v{ font-family: var(--display); font-size: 28px; line-height: 1; margin-top: 4px; font-weight: 800; }
+
+    /* ── END CTA ── */
+    .end-cta{
+      background: var(--blue); color: var(--paper);
+      padding: 140px 32px; text-align: center;
+    }
+    .end-cta h2{
+      font-family: var(--display); font-size: clamp(40px, 7.0vw, 104px);
+      line-height: 1.05; margin-bottom: 32px; font-weight: 800;
+    }
+
+    /* ── MOBILE ── */
+    @media (max-width: 900px){
+      .page-hero{ padding: 120px 20px 70px; }
+      .page-hero p{ font-size: 15px; margin-top: 24px; }
+
+      .disc-section{ padding: 48px 20px; }
+      .disc-row{
+        grid-template-columns: 36px 1fr 44px;
+        gap: 14px;
+        padding: 28px 0;
+      }
+      .disc-row:hover{ padding-left: 0; padding-right: 0; }
+      .disc-row .desc, .disc-row .meta{ display: none; }
+      .disc-row .swatch{ width: 36px; height: 36px; border-radius: 3px; }
+      .disc-row .arrow{ width: 44px; height: 44px; }
+
+      .disc-detail-section{ padding: 60px 20px; }
+      .disc-detail{ grid-template-columns: 1fr; gap: 24px; padding: 40px 0; }
+      .disc-detail.alt{ direction: ltr; }
+      .disc-detail .body{ padding: 0; }
+      .disc-detail .body p{ text-align: justify; }
+      .disc-detail .body h2{ margin: 12px 0 16px; }
+      .disc-detail .body p{ font-size: 15px; }
+      .disc-detail .body .meta-row{ gap: 16px 20px; margin-top: 24px; padding-top: 24px; }
+      .disc-detail .body .meta-item .v{ font-size: 22px; }
+
+      .end-cta{ padding: 80px 20px; }
+    }
+    @media (max-width: 600px){
+      .page-hero{ padding: 110px 18px 56px; }
+      .disc-section{ padding: 32px 18px; }
+      .disc-row{ padding: 22px 0; gap: 12px; }
+      .end-cta{ padding: 64px 18px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="nav-mount"></div>
+
+  <header class="page-hero">
+    <div class="page-hero-inner">
+      <div class="eyebrow on-dark">001 — Disciplinas</div>
+      <h1>SIETE<br>caminos,<br>una <span class="accent">SALA.</span></h1>
+      <p>Cada disciplina tiene un objetivo claro y un código de color propio. Combina las que necesites — la mayoría de la gente entrena dos o tres a lo largo de la semana.</p>
+    </div>
+  </header>
+
+  <section class="disc-section">
+    <div id="disc-rows"></div>
+  </section>
+
+  <section class="disc-detail-section">
+    <div style="max-width: 1500px; margin: 0 auto 60px;">
+      <div class="eyebrow">002 — Detalle</div>
+      <h2 class="display-l" style="margin-top: 16px;">Conoce<br>cada <span class="accent">clase.</span></h2>
+    </div>
+    <div id="disc-details"></div>
+  </section>
+
+  <section class="end-cta">
+    <h2>Empieza<br>por UNA.</h2>
+    <p style="max-width: 480px; margin: 0 auto 40px; opacity: .9; font-size: 17px;">Tu primera clase es gratis. Elige la que más te llame y reserva por WhatsApp.</p>
+    <a href="https://wa.me/34684803011" class="btn btn-light">Reservar clase de prueba <span class="btn-arrow" style="background: var(--blue); color: var(--paper);">→</span></a>
+  </section>
+
+  <div id="footer-mount"></div>
+
+  <script src="assets/data.js"></script>
+  <script>
+    Promise.all([
+      fetch('assets/_nav.html').then(r => r.text()),
+      fetch('assets/_footer.html').then(r => r.text())
+    ]).then(([nav, footer]) => {
+      document.getElementById('nav-mount').innerHTML = nav;
+      document.getElementById('footer-mount').innerHTML = footer;
+    });
+
+    const PHOTOS = {
+      pilates:    'assets/clase-abdominal.jpg',
+      bodypower:  'assets/clase-press.jpg',
+      hiit:       'assets/clase-saltos.jpg',
+      gap:        'assets/clase-plancha.jpg',
+      trx:        'assets/trx.jpg',
+      funcional:  'assets/clase-jumping-jack.jpg',
+      espalda:    'assets/coach-mancuernas.jpg',
+    };
+    const LONG = {
+      pilates:    ['Core, postura y control corporal en cada movimiento. Pilates trabaja desde el centro hacia fuera — respiración, alineación y conciencia corporal a la vez.', 'Para ti si quieres mejorar movilidad y estabilidad, o simplemente sentirte mejor en el día a día. Te llevas una espalda más ligera, un abdomen más fuerte y mejor postura.'],
+      bodypower:  ['Fuerza y tonificación con progresión y buen ritmo. Trabajamos con pesas, discos y barras, además de ejercicios funcionales que complementan cada sesión.', 'Para ti si quieres ganar forma, verte más estética/o y entrenar con motivación real. Te llevas más fuerza, más energía y un entrenamiento de verdad.'],
+      hiit:       ['Intervalos cortos e intensos: una clase dura, rápida y muy efectiva. Pulsaciones altas con descansos controlados, diseñada para quemar calorías y mejorar la condición física.', 'Para ti si quieres caña, sudar y salir con la sensación de "me lo he ganado". Te llevas más resistencia, mejor cardio y una quema de calorías que sigue después de acabar.'],
+      gap:        ['Glúteos, abdominales y piernas: trabajo localizado y bien guiado para fortalecer el tren inferior y el core. Ejercicios técnicos con progresión real.', 'Para ti si quieres tonificar, fortalecer y notar resultados concretos. Te llevas tren inferior más fuerte y core firme.'],
+      trx:        ['Entrenamiento en suspensión con tu propio peso: estabilidad y control en cada repetición. Cada ejercicio activa el core y los estabilizadores a la vez.', 'Para ti si quieres un core más fuerte y un cuerpo más estable. Te llevas mejor postura, fuerza funcional y una técnica que se nota en todo lo demás.'],
+      funcional:  ['Entrenamiento completo y dinámico: fuerza + cardio + coordinación. Movimientos reales — empujar, tirar, levantar, llevar — que preparan el cuerpo para la vida fuera del gimnasio.', 'Para ti si quieres ponerte en forma para la vida real y no aburrirte repitiendo siempre lo mismo. Te llevas resistencia, agilidad y una condición general que se nota.'],
+      espalda:    ['Fuerza y movilidad para cuidar la espalda, mejorar la postura y prevenir molestias. Descarga lumbar y trabajo postural para quienes acumulan tensión o pasan muchas horas sentados.', 'Para ti si notas la espalda cargada o tienes molestias crónicas en cuello y hombros. Te llevas menos tensión, más estabilidad y más calidad de vida.'],
+    };
+
+    document.getElementById('disc-rows').innerHTML = window.EQ.disciplinas.map((d, i) => `
+      <a href="#${d.id}" class="disc-row" style="--disc-color: ${d.color};">
+        <span class="swatch" style="background: ${d.color};"></span>
+        <h3 class="name" style="color: ${d.color};">${d.name}</h3>
+        <p class="desc">${d.desc}</p>
+        <span class="meta">${d.tag}</span>
+        <span class="arrow">→</span>
+      </a>
+    `).join('');
+
+    document.getElementById('disc-details').innerHTML = window.EQ.disciplinas.map((d, i) => {
+      const long = LONG[d.id] || [d.desc];
+      return `
+        <div class="disc-detail ${i % 2 === 1 ? 'alt' : ''}" id="${d.id}">
+          <div class="photo">
+            <img src="${PHOTOS[d.id]}" alt="${d.name}">
+            <span class="tag" style="background: ${d.color}; color: var(--ink);">0${i+1} · ${d.name.toUpperCase()}</span>
+          </div>
+          <div class="body">
+            <div class="num">0${i+1} / 07</div>
+            <h2 class="display-l" style="color: ${d.color};">${d.name}</h2>
+            ${long.map(p => `<p>${p}</p>`).join('')}
+            <div class="meta-row">
+              <div class="meta-item"><div class="l">Duración</div><div class="v">${d.tag.split('·')[1]?.trim() || '50 min'}</div></div>
+              <div class="meta-item"><div class="l">Plazas</div><div class="v">≤${d.spots}</div></div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  </script>
+  <script src="assets/scatter.js"></script>
+</body>
+</html>
