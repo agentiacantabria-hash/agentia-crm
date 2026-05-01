@@ -1,18 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-
-async function requireAdmin() {
-  const sb = await createClient()
-  const { data: { user } } = await sb.auth.getUser()
-  if (!user) return { sb, user: null, error: NextResponse.json({ error: 'No autenticado' }, { status: 401 }) }
-  const { data } = await sb.from('profiles').select('is_admin').eq('id', user.id).single()
-  if (!data?.is_admin) return { sb, user: null, error: NextResponse.json({ error: 'Sin permisos' }, { status: 403 }) }
-  return { sb, user, error: null }
-}
+import { assertAdmin } from '@/lib/auth/admin-guard'
 
 export async function POST(req: NextRequest) {
-  const { sb, error } = await requireAdmin()
-  if (error) return error
+  const guard = await assertAdmin()
+  if (!guard.ok) return guard.response
+  const { sb } = guard
 
   const { emoji, title, body, pinned, expires_at } = await req.json()
   if (!title || !body) return NextResponse.json({ error: 'Título y mensaje son obligatorios' }, { status: 400 })
@@ -30,8 +22,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const { sb, error } = await requireAdmin()
-  if (error) return error
+  const guard = await assertAdmin()
+  if (!guard.ok) return guard.response
+  const { sb } = guard
 
   const { id, ...updates } = await req.json()
   if (!id) return NextResponse.json({ error: 'Falta id' }, { status: 400 })
@@ -45,8 +38,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const { sb, error } = await requireAdmin()
-  if (error) return error
+  const guard = await assertAdmin()
+  if (!guard.ok) return guard.response
+  const { sb } = guard
 
   const { id } = await req.json()
   if (!id) return NextResponse.json({ error: 'Falta id' }, { status: 400 })

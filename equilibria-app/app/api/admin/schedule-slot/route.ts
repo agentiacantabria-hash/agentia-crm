@@ -1,16 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-
-async function adminCheck(sb: Awaited<ReturnType<typeof createClient>>) {
-  const { data: { user } } = await sb.auth.getUser()
-  if (!user) return null
-  const { data } = await sb.from('profiles').select('is_admin').eq('id', user.id).single()
-  return data?.is_admin ? user : null
-}
+import { assertAdmin } from '@/lib/auth/admin-guard'
 
 export async function POST(req: NextRequest) {
-  const sb = await createClient()
-  if (!await adminCheck(sb)) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+  const guard = await assertAdmin()
+  if (!guard.ok) return guard.response
+  const { sb } = guard
 
   const { day_of_week, start_time, duration_minutes, class_type_id, min_regulars, max_capacity } = await req.json()
   if (!day_of_week || !start_time || !class_type_id) {
@@ -28,8 +22,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const sb = await createClient()
-  if (!await adminCheck(sb)) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+  const guard = await assertAdmin()
+  if (!guard.ok) return guard.response
+  const { sb } = guard
 
   const { slot_id, day_of_week, start_time, duration_minutes, class_type_id, is_active, min_regulars, max_capacity } = await req.json()
   if (!slot_id) return NextResponse.json({ error: 'Falta slot_id' }, { status: 400 })
@@ -49,8 +44,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const sb = await createClient()
-  if (!await adminCheck(sb)) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+  const guard = await assertAdmin()
+  if (!guard.ok) return guard.response
+  const { sb } = guard
 
   const { slot_id } = await req.json()
   if (!slot_id) return NextResponse.json({ error: 'Falta slot_id' }, { status: 400 })

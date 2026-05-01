@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { assertAdmin } from '@/lib/auth/admin-guard'
 
 function sanitizePassword(s: string): string {
   return Array.from(s.trim()).filter(c => {
@@ -19,12 +19,8 @@ function sanitizeText(s: string): string {
 }
 
 export async function PATCH(req: NextRequest) {
-  const sb = await createClient()
-  const { data: { user } } = await sb.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-
-  const { data: profile } = await sb.from('profiles').select('is_admin').eq('id', user.id).single()
-  if (!profile?.is_admin) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+  const guard = await assertAdmin()
+  if (!guard.ok) return guard.response
 
   const raw = await req.json()
   if (!raw.user_id) return NextResponse.json({ error: 'Falta user_id' }, { status: 400 })
@@ -60,12 +56,8 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const sb = await createClient()
-  const { data: { user } } = await sb.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-
-  const { data: profile } = await sb.from('profiles').select('is_admin').eq('id', user.id).single()
-  if (!profile?.is_admin) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+  const guard = await assertAdmin()
+  if (!guard.ok) return guard.response
 
   const { user_id } = await req.json()
   if (!user_id) return NextResponse.json({ error: 'Falta user_id' }, { status: 400 })

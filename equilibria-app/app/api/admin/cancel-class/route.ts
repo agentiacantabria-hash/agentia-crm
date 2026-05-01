@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { assertAdmin } from '@/lib/auth/admin-guard'
+import { logServerError } from '@/lib/log'
 
 export async function POST(req: NextRequest) {
-  const sb = await createClient()
-  const { data: { user } } = await sb.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-
-  const { data: profile } = await sb.from('profiles').select('is_admin').eq('id', user.id).single()
-  if (!profile?.is_admin) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+  const guard = await assertAdmin()
+  if (!guard.ok) return guard.response
+  const { sb, user } = guard
 
   const { slot_id, class_date, reason } = await req.json()
 
@@ -31,12 +30,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const sb = await createClient()
-  const { data: { user } } = await sb.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-
-  const { data: profile } = await sb.from('profiles').select('is_admin').eq('id', user.id).single()
-  if (!profile?.is_admin) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+  const guard = await assertAdmin()
+  if (!guard.ok) return guard.response
+  const { sb } = guard
 
   const { slot_id, class_date } = await req.json()
   await sb.from('cancelled_classes').delete().eq('slot_id', slot_id).eq('class_date', class_date)
@@ -63,14 +59,22 @@ async function notifyAffected(
   const time = slot?.start_time?.slice(0, 5) ?? ''
   const reasonText = reason ? ` Motivo: ${reason}.` : ''
 
-  await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: 'Equilibria <onboarding@resend.dev>',
-      to: [adminEmail],
-      subject: `[Admin] Clase cancelada — ${className} ${classDate}`,
-      html: `<p>La clase de <b>${className}</b> del ${classDate} a las ${time}h ha sido cancelada.${reasonText}</p>`,
-    }),
-  })
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: 'Equilibria <onboarding@resend.dev>',
+        to: [adminEmail],
+        subject: `[Admin] Clase cancelada — ${className} ${classDate}`,
+        html: `<p>La clase de <b>${className}</b> del ${classDate} a las ${time}h ha sido cancelada.${reasonText}</p>`,
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      logServerError('cancelClass:resend', new Error(`HTTP ${res.status}`), { body, slotId, classDate })
+    }
+  } catch (e) {
+    logServerError('cancelClass:fetch', e, { slotId, classDate })
+  }
 }

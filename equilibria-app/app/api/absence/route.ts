@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { CANCEL_DEADLINE_HOURS } from '@/lib/types'
+import { logServerError } from '@/lib/log'
 
 export async function POST(req: NextRequest) {
   const sb = await createClient()
@@ -104,18 +105,26 @@ async function notifyWaitlist(
   // El sender 'onboarding@resend.dev' es el dominio sandbox de Resend y solo
   // entrega a la cuenta verificada del titular. Para enviar a alumnas reales,
   // verificar dominio propio en https://resend.com/domains y cambiar el `from`.
-  await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: 'Equilibria <onboarding@resend.dev>',
-      to: [email],
-      bcc: process.env.ADMIN_EMAIL ? [process.env.ADMIN_EMAIL] : undefined,
-      subject: `Hay una plaza libre — ${className} ${classDate}`,
-      html: `<p>Hola ${firstName},</p>
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: 'Equilibria <onboarding@resend.dev>',
+        to: [email],
+        bcc: process.env.ADMIN_EMAIL ? [process.env.ADMIN_EMAIL] : undefined,
+        subject: `Hay una plaza libre — ${className} ${classDate}`,
+        html: `<p>Hola ${firstName},</p>
 <p>Se ha liberado una plaza en <b>${className}</b> el ${classDate} a las ${time}h.</p>
 <p>Estabas en la lista de espera. Entra en la app para reservar tu recuperación.</p>
 <p style="color:#999;font-size:12px;">— Equilibria</p>`,
-    }),
-  })
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      logServerError('notifyWaitlist:resend', new Error(`HTTP ${res.status}`), { body, slotId, classDate })
+    }
+  } catch (e) {
+    logServerError('notifyWaitlist:fetch', e, { slotId, classDate })
+  }
 }

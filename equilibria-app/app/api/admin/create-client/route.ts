@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { assertAdmin } from '@/lib/auth/admin-guard'
 
 export async function POST(req: NextRequest) {
-  const sb = await createClient()
-  const { data: { user } } = await sb.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-
-  const { data: profile } = await sb.from('profiles').select('is_admin').eq('id', user.id).single()
-  if (!profile?.is_admin) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+  const guard = await assertAdmin()
+  if (!guard.ok) return guard.response
+  const { sb } = guard
 
   const { code, full_name, phone, plan_id } = await req.json()
   if (!code || !full_name || !plan_id) return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
