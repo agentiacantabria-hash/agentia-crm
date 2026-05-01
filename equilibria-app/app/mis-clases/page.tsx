@@ -1,11 +1,12 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { format, addDays, startOfWeek, isBefore, getISOWeek } from 'date-fns'
+import { format, addDays, startOfWeek, isBefore } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import type { ScheduleSlot, Plan } from '@/lib/types'
-import { DAY_NAMES, CANCEL_DEADLINE_HOURS } from '@/lib/types'
+import { CANCEL_DEADLINE_HOURS } from '@/lib/types'
+import { parityActive } from '@/lib/parity'
 
 type SlotFull = ScheduleSlot & { isAbsent: boolean; week_parity: string }
 
@@ -48,9 +49,8 @@ export default function MisClasesPage() {
     const absentSet = new Set((absencesWeek ?? []).map((a: { slot_id: string; class_date: string }) => `${a.slot_id}|${a.class_date}`))
 
     type UserRegRow = { slot_id: string; week_parity: string; schedule_slots: ScheduleSlot }
-    const weekIsEven = getISOWeek(weekStart) % 2 === 0
     const enriched = ((userRegular ?? []) as unknown as UserRegRow[])
-      .filter(r => r.week_parity === 'all' || (r.week_parity === 'even') === weekIsEven)
+      .filter(r => parityActive(r.week_parity, weekStart))
       .map(r => {
         const s = r.schedule_slots
         const dayDate = weekDayDate(s.day_of_week)

@@ -35,6 +35,7 @@ export interface Profile {
   payment_status: 'al_dia' | 'pendiente' | 'atrasado'
   last_payment_date: string | null
   notes: string | null
+  schedule_type: 'fijo' | 'rotativo'
   created_at: string
 }
 

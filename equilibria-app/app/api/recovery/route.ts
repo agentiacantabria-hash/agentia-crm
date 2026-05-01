@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   if (capacity >= slotMax) return NextResponse.json({ error: 'La clase está completa' }, { status: 409 })
 
   // Clientes fijos no pueden reservar su propia clase fija como recuperación
-  const isRotating = (profile as unknown as { schedule_type?: string })?.schedule_type === 'rotativo'
+  const isRotating = profile?.schedule_type === 'rotativo'
   if (!isRotating) {
     const { data: ownSlot } = await sb.from('regular_slots')
       .select('id').eq('user_id', user.id).eq('slot_id', slot_id).single()

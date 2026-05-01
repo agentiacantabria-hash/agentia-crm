@@ -1,10 +1,11 @@
 'use client'
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { format, addDays, startOfWeek, isBefore, startOfDay, getISOWeek } from 'date-fns'
+import { format, addDays, startOfWeek, isBefore, startOfDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import type { ScheduleSlot, Announcement } from '@/lib/types'
 import { DAY_SHORT } from '@/lib/types'
+import { parityActive } from '@/lib/parity'
 import SlotModal from '@/components/SlotModal'
 
 export type SlotInfo = {
@@ -20,12 +21,6 @@ export type SlotInfo = {
   isCancelled: boolean
   waitlistCount: number
   isRotating: boolean
-}
-
-function parityActive(parity: string, date: Date): boolean {
-  if (parity === 'all') return true
-  const weekIsEven = getISOWeek(date) % 2 === 0
-  return (parity === 'even') === weekIsEven
 }
 
 export default function HorarioPage() {
@@ -66,7 +61,7 @@ export default function HorarioPage() {
       sb.from('profiles').select('is_admin, schedule_type').eq('id', user.id).single()
         .then(({ data }) => {
           setIsAdmin(data?.is_admin ?? false)
-          setIsRotating((data as unknown as { schedule_type?: string })?.schedule_type === 'rotativo')
+          setIsRotating(data?.schedule_type === 'rotativo')
         })
     }
 

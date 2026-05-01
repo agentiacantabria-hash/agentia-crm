@@ -9,28 +9,33 @@ App web para **Equilibria**, estudio de pilates. Gestiona reservas de clases rec
 ## Comandos
 
 ```bash
-bun dev          # Dev server (package manager: Bun)
-npx tsc --noEmit # Verificar tipos sin build
+bun dev            # Dev server
+bun run typecheck  # Verificar tipos sin build (alias de tsc --noEmit)
+bun run build      # Build local — funciona desde Next 16 + Turbopack
+bun run test       # Tests unitarios con bun:test
 ```
 
-**No hay build local funcional.** `next build` falla en local. Para verificar tipos usar `tsc --noEmit`; para probar el resultado real, hacer deploy a Vercel.
+El build local **funciona** desde la subida a Next 16 (en versiones anteriores fallaba). Para verificación rápida durante iteración usar `bun run typecheck`. Para el resultado en condiciones reales, deploy a Vercel.
 
 ## Stack
 
 - **Next.js 16 + React 19 + TypeScript** (strict mode)
-- **Supabase** — auth + base de datos (no real-time)
+- **Supabase** — auth + base de datos. Sí hay realtime (suscripción a `postgres_changes` en `/horario`)
 - **Tailwind CSS 3** con componentes CSS propios en `globals.css`
 - **date-fns 4** para manipulación de fechas
+- **bun:test** para tests unitarios (helpers de lógica de negocio)
 - **Deploy:** Vercel (integración git NO auto-despliega — deploy manual)
 
 ## Arquitectura de autenticación
 
 `proxy.ts` en la raíz actúa como middleware de Next.js (fue renombrado desde `middleware.ts`). Gestiona cookies de Supabase en cada request con `createServerClient`.
 
-Dos clientes Supabase:
+Tres clientes Supabase:
 - `lib/supabase/client.ts` — browser (componentes client-side)
-- `lib/supabase/server.ts` — server components y API routes
-- El cliente admin (con `SUPABASE_SERVICE_ROLE_KEY`) se crea inline en cada API route que lo necesite.
+- `lib/supabase/server.ts` — server components y API routes con sesión del usuario
+- `lib/supabase/admin.ts` — service role, server-side. Se usa cuando RLS impide ver datos globales (counts agregados de aforo, lectura de waitlist completa, etc.). **Nunca** importar desde código que se ejecute en el cliente.
+
+Tipos generados de la BBDD en `lib/database.types.ts` (vía `mcp__supabase__generate_typescript_types`). Hoy NO se pasan como genérico a `createClient` porque rompe queries con joins embebidos; cuando se haga el refactor completo se podrá tipar sb estrictamente.
 
 ## Modelo de datos (`lib/types.ts`)
 
@@ -72,7 +77,7 @@ Colores definidos en `tailwind.config.ts` como `bg-pilates`, `bg-bodypower`, etc
 - `POST /api/absence` — avisar de ausencia
 - `POST /api/recovery` — reservar recuperación
 - `POST /api/waitlist` — entrar en lista de espera
-- `POST /api/book` — reserva puntual
+- `POST /api/horario-counts` — agregados de aforo por (slot, fecha) usando admin client. Necesario porque RLS limita los counts globales desde la sesión del usuario
 
 ## Componentes
 
