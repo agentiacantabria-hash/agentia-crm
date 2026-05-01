@@ -70,57 +70,35 @@ export default function HorarioPage() {
         })
     }
 
+    // Conteos GLOBALES → endpoint server-side con admin client (saltarse RLS).
+    // Datos PROPIOS del usuario → queries directas con RLS (filtran a su id).
+    const countsPromise = fetch('/api/horario-counts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date_from: dateFrom, date_to: dateTo }),
+    }).then(r => r.ok ? r.json() : null).catch(() => null)
+
     const [
       { data: rawSlots },
-      { data: regularAll },
-      { data: absencesAll },
-      { data: recoveriesAll },
-      { data: waitlistAll },
-      { data: cancelledAll },
+      counts,
       { data: userRegular },
       { data: userAbsences },
       { data: userRecoveries },
       { data: userWaitlist },
     ] = await Promise.all([
       sb.from('schedule_slots').select('*, class_types(*)').eq('is_active', true),
-      sb.from('regular_slots').select('slot_id, week_parity'),
-      sb.from('absences').select('slot_id, class_date').gte('class_date', dateFrom).lte('class_date', dateTo),
-      sb.from('recovery_bookings').select('slot_id, class_date').eq('status','confirmed').gte('class_date', dateFrom).lte('class_date', dateTo),
-      sb.from('waitlist').select('slot_id, class_date').gte('class_date', dateFrom).lte('class_date', dateTo),
-      sb.from('cancelled_classes').select('slot_id, class_date').gte('class_date', dateFrom).lte('class_date', dateTo),
+      countsPromise,
       user ? sb.from('regular_slots').select('slot_id, week_parity').eq('user_id', user.id) : Promise.resolve({ data: [] }),
       user ? sb.from('absences').select('slot_id, class_date').eq('user_id', user.id).gte('class_date', dateFrom).lte('class_date', dateTo) : Promise.resolve({ data: [] }),
       user ? sb.from('recovery_bookings').select('slot_id, class_date').eq('user_id', user.id).eq('status','confirmed').gte('class_date', dateFrom).lte('class_date', dateTo) : Promise.resolve({ data: [] }),
       user ? sb.from('waitlist').select('slot_id, class_date').eq('user_id', user.id).gte('class_date', dateFrom).lte('class_date', dateTo) : Promise.resolve({ data: [] }),
     ])
 
-    // Contadores globales agrupados por paridad
-    const rp: Record<string, string[]> = {}
-    ;(regularAll ?? []).forEach((r: { slot_id: string; week_parity: string }) => {
-      rp[r.slot_id] ??= []
-      rp[r.slot_id].push(r.week_parity)
-    })
-    setRegularParities(rp)
-
-    const ac: Record<string, Record<string, number>> = {}
-    ;(absencesAll ?? []).forEach((a: { slot_id: string; class_date: string }) => {
-      ac[a.slot_id] ??= {}; ac[a.slot_id][a.class_date] = (ac[a.slot_id][a.class_date] ?? 0) + 1
-    })
-    setAbsentCounts(ac)
-
-    const rvc: Record<string, Record<string, number>> = {}
-    ;(recoveriesAll ?? []).forEach((r: { slot_id: string; class_date: string }) => {
-      rvc[r.slot_id] ??= {}; rvc[r.slot_id][r.class_date] = (rvc[r.slot_id][r.class_date] ?? 0) + 1
-    })
-    setRecoveryCounts(rvc)
-
-    const wlc: Record<string, Record<string, number>> = {}
-    ;(waitlistAll ?? []).forEach((w: { slot_id: string; class_date: string }) => {
-      wlc[w.slot_id] ??= {}; wlc[w.slot_id][w.class_date] = (wlc[w.slot_id][w.class_date] ?? 0) + 1
-    })
-    setWaitlistCounts(wlc)
-
-    setCancelledSet(new Set((cancelledAll ?? []).map((c: { slot_id: string; class_date: string }) => `${c.slot_id}|${c.class_date}`)))
+    setRegularParities(counts?.regularParities ?? {})
+    setAbsentCounts(counts?.absentCounts ?? {})
+    setRecoveryCounts(counts?.recoveryCounts ?? {})
+    setWaitlistCounts(counts?.waitlistCounts ?? {})
+    setCancelledSet(new Set<string>(counts?.cancelledKeys ?? []))
 
     // Mapa usuario: slot_id → week_parity
     const urm = new Map<string, string>()

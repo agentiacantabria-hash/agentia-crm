@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { MAX_CAPACITY } from '@/lib/types'
 
 export async function POST(req: NextRequest) {
@@ -25,12 +26,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Has agotado tus ${maxRecoveries} recuperación${maxRecoveries > 1 ? 'es' : ''} de este mes` }, { status: 409 })
   }
 
-  // Verificar capacidad de la clase usando el max_capacity propio del slot
+  // Capacidad: usar admin client para que el count NO esté sesgado por las
+  // policies RLS (que limitan a regulares/recoveries propias del usuario)
+  const admin = createAdminClient()
   const [{ data: slotInfo }, { count: regularCount }, { count: absentCount }, { count: recoveryCount }] = await Promise.all([
-    sb.from('schedule_slots').select('max_capacity').eq('id', slot_id).single(),
-    sb.from('regular_slots').select('*', { count: 'exact', head: true }).eq('slot_id', slot_id),
-    sb.from('absences').select('*', { count: 'exact', head: true }).eq('slot_id', slot_id).eq('class_date', class_date),
-    sb.from('recovery_bookings').select('*', { count: 'exact', head: true }).eq('slot_id', slot_id).eq('class_date', class_date).eq('status', 'confirmed'),
+    admin.from('schedule_slots').select('max_capacity').eq('id', slot_id).single(),
+    admin.from('regular_slots').select('*', { count: 'exact', head: true }).eq('slot_id', slot_id),
+    admin.from('absences').select('*', { count: 'exact', head: true }).eq('slot_id', slot_id).eq('class_date', class_date),
+    admin.from('recovery_bookings').select('*', { count: 'exact', head: true }).eq('slot_id', slot_id).eq('class_date', class_date).eq('status', 'confirmed'),
   ])
   const slotMax = slotInfo?.max_capacity ?? MAX_CAPACITY
   const capacity = (regularCount ?? 0) - (absentCount ?? 0) + (recoveryCount ?? 0)
@@ -61,6 +64,20 @@ export async function POST(req: NextRequest) {
   if (error) {
     if (error.code === '23505') return NextResponse.json({ error: 'Ya tienes una recuperación en esta clase' }, { status: 409 })
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // Post-check: re-contar tras el insert. Si nos hemos pasado del aforo por una
+  // race condition (dos reservas concurrentes), revertir esta y devolver 409.
+  // No es 100% atómico pero reduce la ventana a milisegundos.
+  const { count: postRecoveryCount } = await admin
+    .from('recovery_bookings').select('*', { count: 'exact', head: true })
+    .eq('slot_id', slot_id).eq('class_date', class_date).eq('status', 'confirmed')
+  const postCapacity = (regularCount ?? 0) - (absentCount ?? 0) + (postRecoveryCount ?? 0)
+  if (postCapacity > slotMax) {
+    await sb.from('recovery_bookings')
+      .update({ status: 'cancelled' })
+      .eq('user_id', user.id).eq('slot_id', slot_id).eq('class_date', class_date)
+    return NextResponse.json({ error: 'La clase acaba de llenarse' }, { status: 409 })
   }
 
   // Quitar de la lista de espera si estaba

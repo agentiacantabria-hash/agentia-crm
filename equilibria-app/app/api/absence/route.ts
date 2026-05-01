@@ -63,14 +63,19 @@ export async function DELETE(req: NextRequest) {
 }
 
 async function notifyWaitlist(
-  sb: Awaited<ReturnType<typeof createClient>>,
+  _sb: Awaited<ReturnType<typeof createClient>>,
   slotId: string,
   classDate: string
 ) {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey || apiKey.startsWith('re_XXX')) return
 
-  const { data: waitlist } = await sb
+  // RLS de waitlist y profiles limita a la sesión propia, así que aquí no
+  // sirve el server client. Necesitamos admin para ver toda la cola.
+  let admin: ReturnType<typeof createAdminClient>
+  try { admin = createAdminClient() } catch { return }
+
+  const { data: waitlist } = await admin
     .from('waitlist')
     .select('user_id, profiles(full_name)')
     .eq('slot_id', slotId)
@@ -81,18 +86,12 @@ async function notifyWaitlist(
   if (!waitlist?.length) return
   const first = waitlist[0] as unknown as { user_id: string; profiles: { full_name: string } | null }
 
-  // El email vive en auth.users, no en profiles → service role para obtenerlo
-  let email: string | undefined
-  try {
-    const admin = createAdminClient()
-    const { data: userData } = await admin.auth.admin.getUserById(first.user_id)
-    email = userData?.user?.email ?? undefined
-  } catch {
-    return
-  }
+  // El email vive en auth.users, no en profiles
+  const { data: userData } = await admin.auth.admin.getUserById(first.user_id)
+  const email = userData?.user?.email
   if (!email) return
 
-  const { data: slot } = await sb
+  const { data: slot } = await admin
     .from('schedule_slots')
     .select('start_time, class_types(name)')
     .eq('id', slotId)
