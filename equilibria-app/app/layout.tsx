@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Manrope, Inter, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import NavBar from '@/components/NavBar'
+import PwaRegister from '@/components/PwaRegister'
 
 const manrope = Manrope({
   subsets: ['latin'],
@@ -52,6 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
         </main>
         <NavBar />
+        <PwaRegister />
       </body>
     </html>
   )
