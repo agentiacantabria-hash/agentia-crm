@@ -2,7 +2,19 @@
   "permissions": {
     "allow": [
       "Read(//c/Users/unaio/.claude/channels/telegram/inbox/**)",
-      "Read(//c/Users/unaio/.claude/channels/telegram/approved/**)"
+      "Read(//c/Users/unaio/.claude/channels/telegram/approved/**)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__get_cost",
+      "Bash(mkdir -p \"/c/Users/unaio/.claude/projects/c--Users-unaio-OneDrive-Escritorio-CLAUDE-CODE-WEBS-equilibria-app/memory\")",
+      "Bash(mkdir -p \"/c/Users/unaio/.claude/projects/c--Users-unaio-OneDrive-Escritorio-CLAUDE-CODE-WEBS-agentia-crm/memory\")",
+      "Bash(mkdir -p \"C:/Users/unaio/.claude/plugins/cache/claude-plugins-official/frontend-design\")",
+      "Bash(cp -r \"C:/Users/unaio/.claude/plugins/marketplaces/claude-plugins-official/plugins/frontend-design\" \"C:/Users/unaio/.claude/plugins/cache/claude-plugins-official/frontend-design/unknown\")",
+      "Read(//c/Users/unaio/.claude/plugins/cache/claude-plugins-official/frontend-design/**)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\unaio\\.claude\\projects\\c--Users-unaio-OneDrive-Escritorio-CLAUDE-CODE-WEBS-equilibria-app\\memory",
+      "C:\\Users\\unaio\\.claude\\projects\\c--Users-unaio-OneDrive-Escritorio-CLAUDE-CODE-WEBS-agentia-crm\\memory",
+      "C:\\Users\\unaio\\.claude\\plugins"
     ]
   }
 }
