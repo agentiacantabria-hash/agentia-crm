@@ -1,14 +1,124 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  html { -webkit-tap-highlight-color: transparent; }
-  body { @apply bg-paper text-ink font-sans antialiased; }
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 }
 
 @layer utilities {
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
-  .pb-nav { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+  .pb-nav      { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+}
+
+@layer components {
+  /* ── Cards ─────────────────────────────────── */
+  .card {
+    background-color: white;
+    border-radius: 1rem;
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    box-shadow: 0 2px 20px rgba(11, 31, 77, 0.07);
+  }
+  .card-lg {
+    background-color: white;
+    border-radius: 1.5rem;
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    box-shadow: 0 4px 32px rgba(11, 31, 77, 0.09);
+  }
+
+  /* ── Inputs ─────────────────────────────────── */
+  .input-field {
+    width: 100%;
+    background-color: #ECE5D6;
+    border-radius: 1rem;
+    padding: 1rem;
+    color: #0A1430;
+    outline: none;
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
+  }
+  .input-field:focus {
+    border-color: rgba(11, 31, 77, 0.2);
+    box-shadow: 0 0 0 3px rgba(11, 31, 77, 0.08);
+  }
+
+  /* ── Buttons ─────────────────────────────────── */
+  .btn-primary {
+    display: block;
+    width: 100%;
+    background-color: #0B1F4D;
+    color: #F4EFE6;
+    font-family: var(--font-display), system-ui, sans-serif;
+    font-weight: 700;
+    padding: 1rem;
+    border-radius: 1rem;
+    font-size: 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.1s ease, opacity 0.15s ease;
+    box-shadow: 0 4px 20px rgba(11, 31, 77, 0.28);
+  }
+  .btn-primary:active  { transform: scale(0.98); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-secondary {
+    display: block;
+    width: 100%;
+    background-color: rgba(10, 20, 48, 0.06);
+    color: rgba(10, 20, 48, 0.7);
+    font-family: var(--font-display), system-ui, sans-serif;
+    font-weight: 700;
+    padding: 1rem;
+    border-radius: 1rem;
+    font-size: 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.1s ease, opacity 0.15s ease;
+  }
+  .btn-secondary:active  { transform: scale(0.98); }
+  .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-danger {
+    display: block;
+    width: 100%;
+    background-color: #dc2626;
+    color: white;
+    font-family: var(--font-display), system-ui, sans-serif;
+    font-weight: 700;
+    padding: 1rem;
+    border-radius: 1rem;
+    font-size: 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.1s ease, opacity 0.15s ease;
+    box-shadow: 0 4px 16px rgba(220, 38, 38, 0.3);
+  }
+  .btn-danger:active  { transform: scale(0.98); }
+  .btn-danger:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Page header ─────────────────────────────── */
+  .page-eyebrow {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(10, 20, 48, 0.35);
+    margin-bottom: 0.25rem;
+  }
+  .page-title {
+    font-family: var(--font-display), system-ui, sans-serif;
+    font-weight: 800;
+    font-size: 2rem;
+    color: #0B1F4D;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+  }
 }

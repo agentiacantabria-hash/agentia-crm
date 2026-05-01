@@ -34,11 +34,12 @@ export async function POST(req: NextRequest) {
 
   const raw = await req.json()
 
-  const username  = sanitizeText(String(raw.username  ?? ''))
-  const password  = sanitizePassword(String(raw.password  ?? ''))
-  const full_name = sanitizeText(String(raw.full_name ?? ''))
-  const phone     = raw.phone ? sanitizeText(String(raw.phone)) : null
-  const plan_id   = String(raw.plan_id ?? '')
+  const username      = sanitizeText(String(raw.username  ?? ''))
+  const password      = sanitizePassword(String(raw.password  ?? ''))
+  const full_name     = sanitizeText(String(raw.full_name ?? ''))
+  const phone         = raw.phone ? sanitizeText(String(raw.phone)) : null
+  const plan_id       = String(raw.plan_id ?? '')
+  const schedule_type = ['fijo', 'rotativo'].includes(raw.schedule_type) ? raw.schedule_type : 'fijo'
 
   if (!username || !password || !full_name || !plan_id) {
     return NextResponse.json({ error: 'Faltan campos obligatorios (username, password, full_name, plan_id)' }, { status: 400 })
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
 
   const { error: profileError } = await admin
     .from('profiles')
-    .update({ full_name, username: cleanUsername, phone: phone || null, plan_id })
+    .update({ full_name, username: cleanUsername, phone: phone || null, plan_id, schedule_type })
     .eq('id', created.user!.id)
 
   if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 })

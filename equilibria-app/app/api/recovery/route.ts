@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   // Verificar créditos de recuperación disponibles este mes
   const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0)
   const [{ data: profile }, { count: usedCredits }] = await Promise.all([
-    sb.from('profiles').select('plan_id, plans(max_recoveries_per_month)').eq('id', user.id).single(),
+    sb.from('profiles').select('plan_id, schedule_type, plans(max_recoveries_per_month)').eq('id', user.id).single(),
     sb.from('recovery_bookings')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
@@ -34,10 +34,13 @@ export async function POST(req: NextRequest) {
   const capacity = (regularCount ?? 0) - (absentCount ?? 0) + (recoveryCount ?? 0)
   if (capacity >= MAX_CAPACITY) return NextResponse.json({ error: 'La clase está completa' }, { status: 409 })
 
-  // No puede recuperar su propia clase fija
-  const { data: ownSlot } = await sb.from('regular_slots')
-    .select('id').eq('user_id', user.id).eq('slot_id', slot_id).single()
-  if (ownSlot) return NextResponse.json({ error: 'No puedes recuperar tu propia clase fija' }, { status: 400 })
+  // Clientes fijos no pueden reservar su propia clase fija como recuperación
+  const isRotating = (profile as unknown as { schedule_type?: string })?.schedule_type === 'rotativo'
+  if (!isRotating) {
+    const { data: ownSlot } = await sb.from('regular_slots')
+      .select('id').eq('user_id', user.id).eq('slot_id', slot_id).single()
+    if (ownSlot) return NextResponse.json({ error: 'No puedes recuperar tu propia clase fija' }, { status: 400 })
+  }
 
   const { error } = await sb.from('recovery_bookings').insert({ user_id: user.id, slot_id, class_date, status: 'confirmed' })
   if (error) {

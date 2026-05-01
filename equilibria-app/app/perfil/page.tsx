@@ -51,51 +51,74 @@ export default function PerfilPage() {
   const creditsMax  = plan?.max_recoveries_per_month ?? 0
   const creditsLeft = Math.max(0, creditsMax - recoveryUsed)
 
+  const initials = profile?.full_name
+    ? profile.full_name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
+    : '?'
+
   return (
     <div className="max-w-lg mx-auto px-4 pt-10">
-      <p className="font-mono text-[10px] uppercase tracking-widest text-ink/40 mb-1">Perfil</p>
-      <h1 className="font-display font-bold text-3xl text-navy mb-8">{profile?.full_name || 'Tu perfil'}</h1>
+      <p className="page-eyebrow">Perfil</p>
 
-      <div className="bg-white rounded-2xl divide-y divide-ink/5 mb-4">
-        <div className="px-4 py-4 flex items-center justify-between">
-          <div>
-            <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40 mb-0.5">Tu código</p>
-            <p className="font-display font-bold text-navy text-lg">{profile?.username ?? '—'}</p>
-          </div>
-          <div className="w-10 h-10 rounded-full bg-navy/5 flex items-center justify-center">
-            <span className="font-display font-bold text-navy text-sm">{profile?.username ?? '?'}</span>
-          </div>
+      {/* Avatar + nombre */}
+      <div className="flex items-center gap-4 mt-2 mb-7">
+        <div className="w-16 h-16 rounded-2xl bg-navy flex items-center justify-center flex-shrink-0"
+          style={{ boxShadow: '0 4px 20px rgba(11,31,77,0.28)' }}>
+          <span className="font-display font-extrabold text-xl text-paper">{initials}</span>
         </div>
+        <div>
+          <h1 className="font-display font-extrabold text-2xl text-navy leading-tight">
+            {profile?.full_name || 'Tu perfil'}
+          </h1>
+          <p className="font-mono text-[10px] text-ink/40 uppercase tracking-widest mt-0.5">
+            Código · {profile?.username ?? '—'}
+          </p>
+        </div>
+      </div>
 
+      {/* Datos */}
+      <div className="card divide-y divide-ink/5 mb-4">
         <div className="px-4 py-4">
-          <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40 mb-0.5">Plan</p>
-          <p className="text-ink font-display font-bold">{plan?.name ?? '—'}</p>
+          <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40 mb-1">Plan</p>
+          <p className="font-display font-bold text-navy">{plan?.name ?? '—'}</p>
           {plan && (
             <p className="font-mono text-[10px] text-ink/40 mt-0.5">
-              {plan.classes_per_week}× por semana · {creditsLeft}/{creditsMax} recuperaciones este mes
+              {plan.classes_per_week}× por semana
             </p>
           )}
         </div>
 
+        <div className="px-4 py-4">
+          <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40 mb-2">Recuperaciones este mes</p>
+          <div className="flex items-center gap-3">
+            <div className="flex gap-1">
+              {Array.from({ length: creditsMax || 4 }).map((_, i) => (
+                <div key={i} className="w-3 h-3 rounded-full transition-colors"
+                  style={{ backgroundColor: i < creditsLeft ? '#2E5BFF' : 'rgba(11,31,77,0.08)' }}/>
+              ))}
+            </div>
+            <span className="font-mono text-xs text-ink/50">
+              {creditsLeft}/{creditsMax} disponibles
+            </span>
+          </div>
+        </div>
+
         {profile?.phone && (
           <div className="px-4 py-4">
-            <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40 mb-0.5">Teléfono</p>
+            <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40 mb-1">Teléfono</p>
             <p className="text-ink text-sm">{profile.phone}</p>
           </div>
         )}
 
         <div className="px-4 py-4">
-          <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40 mb-0.5">Miembro desde</p>
+          <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40 mb-1">Miembro desde</p>
           <p className="text-ink text-sm">
             {profile?.created_at ? new Date(profile.created_at).toLocaleDateString('es-ES') : '—'}
           </p>
         </div>
       </div>
 
-      <button
-        onClick={handleSignOut}
-        className="w-full mt-2 bg-ink/5 text-ink/60 font-display font-bold py-4 rounded-2xl text-base"
-      >
+      <button onClick={handleSignOut}
+        className="btn-secondary mt-2">
         Cerrar sesión
       </button>
     </div>

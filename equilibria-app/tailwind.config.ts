@@ -24,9 +24,9 @@ const config: Config = {
         funcional: '#A9DE84',
       },
       fontFamily: {
-        display: ['Manrope', 'system-ui', 'sans-serif'],
-        sans:    ['Inter', 'system-ui', 'sans-serif'],
-        mono:    ['JetBrains Mono', 'ui-monospace', 'monospace'],
+        display: ['var(--font-display)', 'system-ui', 'sans-serif'],
+        sans:    ['var(--font-sans)',    'system-ui', 'sans-serif'],
+        mono:    ['var(--font-mono)',    'ui-monospace', 'monospace'],
       },
     },
   },

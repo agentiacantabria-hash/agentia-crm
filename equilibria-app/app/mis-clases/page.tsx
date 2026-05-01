@@ -1,13 +1,13 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { format, addDays, startOfWeek, isBefore } from 'date-fns'
+import { format, addDays, startOfWeek, isBefore, getISOWeek } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import type { ScheduleSlot, Plan } from '@/lib/types'
 import { DAY_NAMES, CANCEL_DEADLINE_HOURS } from '@/lib/types'
 
-type SlotFull = ScheduleSlot & { isAbsent: boolean }
+type SlotFull = ScheduleSlot & { isAbsent: boolean; week_parity: string }
 
 export default function MisClasesPage() {
   const [slots, setSlots]         = useState<SlotFull[]>([])
@@ -37,7 +37,7 @@ export default function MisClasesPage() {
       { count: creditsUsed },
     ] = await Promise.all([
       sb.from('profiles').select('plan_id, plans(*)').eq('id', user.id).single(),
-      sb.from('regular_slots').select('slot_id, schedule_slots(*, class_types(*))').eq('user_id', user.id),
+      sb.from('regular_slots').select('slot_id, week_parity, schedule_slots(*, class_types(*))').eq('user_id', user.id),
       sb.from('absences').select('slot_id, class_date').eq('user_id', user.id).gte('class_date', dateFrom).lte('class_date', dateTo),
       sb.from('recovery_bookings').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status','confirmed').gte('class_date', monthStart.toISOString().slice(0,10)),
     ])
@@ -47,14 +47,16 @@ export default function MisClasesPage() {
 
     const absentSet = new Set((absencesWeek ?? []).map((a: { slot_id: string; class_date: string }) => `${a.slot_id}|${a.class_date}`))
 
-    type UserRegRow = { slot_id: string; schedule_slots: ScheduleSlot }
-    const enriched = ((userRegular ?? []) as unknown as UserRegRow[]).map(r => {
-      const s = r.schedule_slots
-      // Para la semana actual, ver si está ausente algún día
-      const dayDate = weekDayDate(s.day_of_week)
-      const dateStr = format(dayDate, 'yyyy-MM-dd')
-      return { ...s, isAbsent: absentSet.has(`${s.id}|${dateStr}`) }
-    })
+    type UserRegRow = { slot_id: string; week_parity: string; schedule_slots: ScheduleSlot }
+    const weekIsEven = getISOWeek(weekStart) % 2 === 0
+    const enriched = ((userRegular ?? []) as unknown as UserRegRow[])
+      .filter(r => r.week_parity === 'all' || (r.week_parity === 'even') === weekIsEven)
+      .map(r => {
+        const s = r.schedule_slots
+        const dayDate = weekDayDate(s.day_of_week)
+        const dateStr = format(dayDate, 'yyyy-MM-dd')
+        return { ...s, week_parity: r.week_parity, isAbsent: absentSet.has(`${s.id}|${dateStr}`) }
+      })
     setSlots(enriched)
     setLoading(false)
   }
@@ -141,14 +143,17 @@ export default function MisClasesPage() {
               const isPast    = isBefore(dayDate, new Date(new Date().setHours(0,0,0,0)))
 
               return (
-                <div key={slot.id} className={`bg-white rounded-2xl overflow-hidden flex ${slot.isAbsent ? 'opacity-50' : ''}`}>
-                  <div className="w-2 flex-shrink-0" style={{ backgroundColor: slot.class_types.color }}/>
+                <div key={slot.id} className={`card overflow-hidden flex ${slot.isAbsent ? 'opacity-50' : ''}`}>
+                  <div className="w-1.5 flex-shrink-0" style={{ backgroundColor: slot.class_types.color }}/>
                   <div className="flex-1 px-4 py-4 flex items-center justify-between">
                     <div>
                       <p className="font-display font-bold text-navy">{slot.class_types.name}</p>
                       <p className="font-mono text-[10px] text-ink/40 uppercase tracking-wider mt-0.5 capitalize">
                         {dayLabel} · {slot.start_time.slice(0,5)}h
                       </p>
+                      {slot.week_parity !== 'all' && (
+                        <span className="inline-block mt-0.5 text-[9px] font-mono text-ink/30 uppercase tracking-wider">semanas alternas</span>
+                      )}
                       {slot.isAbsent && (
                         <span className="inline-block mt-1 text-[10px] font-mono text-red-500 uppercase tracking-wider">Falta marcada</span>
                       )}

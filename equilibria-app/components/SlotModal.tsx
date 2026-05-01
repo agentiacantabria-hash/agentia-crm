@@ -1,16 +1,30 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { format, getISOWeek } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { SlotInfo } from '@/app/horario/page'
 
-interface Props { info: SlotInfo; onClose: () => void; onSuccess: () => void }
+type Attendee = { user_id: string; full_name: string; type: 'regular' | 'recovery' | 'absent' | 'waitlist' }
 
-export default function SlotModal({ info, onClose, onSuccess }: Props) {
-  const { slot, date, capacity, regularCount, isUserRegular, userRegularParity, isUserAbsent, isUserRecovery, isUserWaitlist, isCancelled, waitlistCount } = info
+interface Props { info: SlotInfo; isAdmin?: boolean; onClose: () => void; onSuccess: () => void }
+
+export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) {
+  const { slot, date, capacity, regularCount, isUserRegular, userRegularParity, isUserAbsent, isUserRecovery, isUserWaitlist, isCancelled, waitlistCount, isRotating } = info
   const [loading, setLoading]           = useState(false)
   const [error, setError]               = useState('')
   const [showParityPicker, setShowParity] = useState(false)
+  const [attendees, setAttendees]       = useState<Attendee[]>([])
+  const [waitlistPeople, setWaitlistPeople] = useState<Attendee[]>([])
+  const [loadingAttendees, setLoadingAttendees] = useState(false)
+
+  useEffect(() => {
+    if (!isAdmin) return
+    setLoadingAttendees(true)
+    fetch(`/api/admin/attendees?slot_id=${slot.id}&class_date=${format(date, 'yyyy-MM-dd')}`)
+      .then(r => r.json())
+      .then(d => { setAttendees(d.attendees ?? []); setWaitlistPeople(d.waitlist ?? []) })
+      .finally(() => setLoadingAttendees(false))
+  }, [isAdmin, slot.id, date])
 
   const dateStr       = format(date, 'yyyy-MM-dd')
   const dayLabel      = format(date, "EEEE d 'de' MMMM", { locale: es })
@@ -49,12 +63,12 @@ export default function SlotModal({ info, onClose, onSuccess }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-ink/30 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg mx-auto rounded-t-3xl overflow-hidden"
-        style={{ boxShadow: '0 -8px 40px rgba(11,31,77,0.25)' }}
+      <div className="w-full max-w-lg mx-auto rounded-t-3xl overflow-hidden flex flex-col"
+        style={{ boxShadow: '0 -8px 40px rgba(11,31,77,0.25)', maxHeight: '90dvh' }}
         onClick={e => e.stopPropagation()}>
 
         {/* Colored header */}
-        <div className="relative px-6 pt-5 pb-5 overflow-hidden"
+        <div className="relative px-6 pt-5 pb-5 overflow-hidden flex-shrink-0"
           style={{ backgroundColor: slot.class_types.color }}>
           <div className="absolute inset-0 pointer-events-none"
             style={{ background: 'radial-gradient(circle at 90% 10%, rgba(255,255,255,0.5) 0%, transparent 55%)' }}/>
@@ -99,7 +113,7 @@ export default function SlotModal({ info, onClose, onSuccess }: Props) {
         </div>
 
         {/* White body */}
-        <div className="bg-white px-6 pt-5 pb-10">
+        <div className="bg-white px-6 pt-5 pb-10 overflow-y-auto flex-1">
           {/* Capacity */}
           {!isCancelled && (
             <div className="flex items-center gap-2.5 mb-5 pb-5 border-b border-ink/5">
@@ -126,7 +140,37 @@ export default function SlotModal({ info, onClose, onSuccess }: Props) {
 
           {/* Actions */}
           <div className="flex flex-col gap-2.5">
-            {isCancelled ? (
+            {isRotating ? (
+              isCancelled ? (
+                <div className="text-center text-ink/40 font-mono text-sm py-4 bg-paper rounded-2xl">
+                  Esta clase ha sido cancelada
+                </div>
+              ) : isPast ? (
+                <div className="text-center text-ink/30 font-mono text-sm py-4 bg-paper rounded-2xl">
+                  Esta clase ya ha pasado
+                </div>
+              ) : isUserRecovery ? (
+                <button onClick={() => call('/api/recovery', 'DELETE')} disabled={loading} className="btn-secondary">
+                  {loading ? '…' : 'Cancelar reserva'}
+                </button>
+              ) : spotsLeft > 0 ? (
+                <button onClick={() => call('/api/recovery', 'POST')} disabled={loading}
+                  className="w-full bg-blue text-white font-display font-bold py-4 rounded-2xl text-base transition-all active:scale-[0.98] disabled:opacity-40"
+                  style={{ boxShadow: '0 4px 16px rgba(46,91,255,0.3)' }}>
+                  {loading ? '…' : 'Reservar esta clase'}
+                </button>
+              ) : (
+                isUserWaitlist ? (
+                  <button onClick={() => call('/api/waitlist', 'DELETE')} disabled={loading} className="btn-secondary">
+                    {loading ? '…' : '✓ En lista de espera — Salir'}
+                  </button>
+                ) : (
+                  <button onClick={() => call('/api/waitlist', 'POST')} disabled={loading} className="btn-secondary">
+                    {loading ? '…' : 'Unirse a lista de espera'}
+                  </button>
+                )
+              )
+            ) : isCancelled ? (
               <div className="text-center text-ink/40 font-mono text-sm py-4 bg-paper rounded-2xl">
                 Esta clase ha sido cancelada
               </div>
@@ -170,6 +214,29 @@ export default function SlotModal({ info, onClose, onSuccess }: Props) {
                     className="w-full bg-blue text-white font-display font-bold py-4 rounded-2xl text-base transition-all active:scale-[0.98] disabled:opacity-40"
                     style={{ boxShadow: '0 4px 16px rgba(46,91,255,0.3)' }}>
                     {loading ? '…' : 'Usar recuperación aquí'}
+                  </button>
+                )}
+                {showParityPicker ? (
+                  <div className="flex flex-col gap-2">
+                    <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40 text-center py-1">
+                      ¿Cambiar frecuencia de esta clase?
+                    </p>
+                    <button onClick={() => call('/api/regular-slot', 'PATCH', { week_parity: 'all' })} disabled={loading}
+                      className="btn-primary">
+                      {loading ? '…' : 'Todas las semanas'}
+                    </button>
+                    <button onClick={() => call('/api/regular-slot', 'PATCH', { week_parity: thisWeekParity })} disabled={loading}
+                      className="btn-secondary">
+                      {loading ? '…' : 'Solo esta semana (cambiar alternancia)'}
+                    </button>
+                    <button onClick={() => setShowParity(false)}
+                      className="text-center text-xs text-ink/30 py-1 font-mono">
+                      ← Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => setShowParity(true)} className="btn-secondary">
+                    Añadir también a mis clases fijas
                   </button>
                 )}
                 <button onClick={() => call('/api/regular-slot', 'DELETE')} disabled={loading}
@@ -237,6 +304,56 @@ export default function SlotModal({ info, onClose, onSuccess }: Props) {
               Cerrar
             </button>
           </div>
+
+          {/* Lista de asistentes — solo admin */}
+          {isAdmin && (
+            <div className="mt-5 pt-5 border-t border-ink/5">
+              <p className="font-mono text-[9px] uppercase tracking-widest text-ink/30 mb-3">
+                Asistentes
+              </p>
+              {loadingAttendees ? (
+                <div className="flex justify-center py-3">
+                  <div className="w-4 h-4 rounded-full border-2 border-ink/20 border-t-ink/60 animate-spin"/>
+                </div>
+              ) : attendees.length === 0 ? (
+                <p className="text-xs text-ink/30 font-mono text-center py-2">Sin asistentes</p>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  {attendees.map(a => (
+                    <div key={a.user_id} className="flex items-center justify-between px-3 py-2 rounded-xl bg-paper">
+                      <span className={`text-sm font-display font-semibold ${a.type === 'absent' ? 'text-ink/25 line-through' : 'text-ink'}`}>
+                        {a.full_name}
+                      </span>
+                      {a.type === 'recovery' && (
+                        <span className="text-[8px] font-mono font-bold text-blue bg-blue/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Recup.
+                        </span>
+                      )}
+                      {a.type === 'absent' && (
+                        <span className="text-[8px] font-mono font-bold text-red-400 bg-red-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Falta
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {waitlistPeople.length > 0 && (
+                <>
+                  <p className="font-mono text-[9px] uppercase tracking-widest text-ink/30 mb-2 mt-4">
+                    Lista de espera
+                  </p>
+                  <div className="flex flex-col gap-1.5">
+                    {waitlistPeople.map(a => (
+                      <div key={a.user_id} className="flex items-center px-3 py-2 rounded-xl bg-paper">
+                        <span className="text-sm font-display font-semibold text-ink/50">{a.full_name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

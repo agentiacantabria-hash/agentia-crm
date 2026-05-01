@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { format, addDays, startOfWeek, startOfMonth, isBefore, startOfDay } from 'date-fns'
+import { format, addDays, startOfWeek, startOfMonth, isBefore, startOfDay, getISOWeek } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import type { ScheduleSlot, Plan } from '@/lib/types'
@@ -13,10 +13,10 @@ export default function RecuperarPage() {
   const [usedCredits, setUsed]        = useState(0)
   const [weekStart, setWeekStart]     = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [slots, setSlots]             = useState<ScheduleSlot[]>([])
-  const [regularCounts, setRC]        = useState<Record<string, number>>({})
+  const [regularParities, setRP]      = useState<Record<string, string[]>>({})
   const [absentCounts, setAC]         = useState<Record<string, Record<string, number>>>({})
   const [recoveryCounts, setRVC]      = useState<Record<string, Record<string, number>>>({})
-  const [userRegularIds, setURIds]    = useState<Set<string>>(new Set())
+  const [userRegularMap, setURMap]    = useState<Map<string, string>>(new Map())
   const [userAbsentMap, setUAM]       = useState<Record<string, Set<string>>>({})
   const [userRecoveryMap, setURM]     = useState<Record<string, Set<string>>>({})
   const [cancelledSet, setCancelled]  = useState<Set<string>>(new Set())
@@ -51,10 +51,10 @@ export default function RecuperarPage() {
     ] = await Promise.all([
       sb.from('profiles').select('plan_id, plans(*)').eq('id', user.id).single(),
       sb.from('schedule_slots').select('*, class_types(*)').eq('is_active', true),
-      sb.from('regular_slots').select('slot_id'),
+      sb.from('regular_slots').select('slot_id, week_parity'),
       sb.from('absences').select('slot_id, class_date').gte('class_date', dateFrom).lte('class_date', dateTo),
       sb.from('recovery_bookings').select('slot_id, class_date').eq('status', 'confirmed').gte('class_date', dateFrom).lte('class_date', dateTo),
-      sb.from('regular_slots').select('slot_id').eq('user_id', user.id),
+      sb.from('regular_slots').select('slot_id, week_parity').eq('user_id', user.id),
       sb.from('absences').select('slot_id, class_date').eq('user_id', user.id).gte('class_date', dateFrom).lte('class_date', dateTo),
       sb.from('recovery_bookings').select('slot_id, class_date').eq('user_id', user.id).eq('status', 'confirmed').gte('class_date', dateFrom).lte('class_date', dateTo),
       sb.from('cancelled_classes').select('slot_id, class_date').gte('class_date', dateFrom).lte('class_date', dateTo),
@@ -64,9 +64,11 @@ export default function RecuperarPage() {
     setPlan((profile?.plans as unknown as Plan) ?? null)
     setUsed(creditsUsed ?? 0)
 
-    const rc: Record<string, number> = {}
-    ;(allRegular ?? []).forEach((r: { slot_id: string }) => { rc[r.slot_id] = (rc[r.slot_id] ?? 0) + 1 })
-    setRC(rc)
+    const rp: Record<string, string[]> = {}
+    ;(allRegular ?? []).forEach((r: { slot_id: string; week_parity: string }) => {
+      rp[r.slot_id] ??= []; rp[r.slot_id].push(r.week_parity)
+    })
+    setRP(rp)
 
     const ac: Record<string, Record<string, number>> = {}
     ;(absencesAll ?? []).forEach((a: { slot_id: string; class_date: string }) => {
@@ -80,7 +82,9 @@ export default function RecuperarPage() {
     })
     setRVC(rvc)
 
-    setURIds(new Set((userRegular ?? []).map((r: { slot_id: string }) => r.slot_id)))
+    const urmReg = new Map<string, string>()
+    ;(userRegular ?? []).forEach((r: { slot_id: string; week_parity: string }) => urmReg.set(r.slot_id, r.week_parity))
+    setURMap(urmReg)
 
     const uam: Record<string, Set<string>> = {}
     ;(userAbsences ?? []).forEach((a: { slot_id: string; class_date: string }) => {
@@ -88,11 +92,11 @@ export default function RecuperarPage() {
     })
     setUAM(uam)
 
-    const urm: Record<string, Set<string>> = {}
+    const urmRec: Record<string, Set<string>> = {}
     ;(userRecoveries ?? []).forEach((r: { slot_id: string; class_date: string }) => {
-      urm[r.slot_id] ??= new Set(); urm[r.slot_id].add(r.class_date)
+      urmRec[r.slot_id] ??= new Set(); urmRec[r.slot_id].add(r.class_date)
     })
-    setURM(urm)
+    setURM(urmRec)
 
     setCancelled(new Set((cancelledAll ?? []).map((c: { slot_id: string; class_date: string }) => `${c.slot_id}|${c.class_date}`)))
     setSlots((rawSlots ?? []) as ScheduleSlot[])
@@ -101,8 +105,11 @@ export default function RecuperarPage() {
 
   useEffect(() => { load() }, [load])
 
-  function getCapacity(slotId: string, dateStr: string) {
-    return (regularCounts[slotId] ?? 0)
+  function getCapacity(slotId: string, dateStr: string, date: Date) {
+    const weekIsEven = getISOWeek(date) % 2 === 0
+    const regularCount = (regularParities[slotId] ?? [])
+      .filter(p => p === 'all' || (p === 'even') === weekIsEven).length
+    return regularCount
       - (absentCounts[slotId]?.[dateStr] ?? 0)
       + (recoveryCounts[slotId]?.[dateStr] ?? 0)
   }
@@ -159,13 +166,13 @@ export default function RecuperarPage() {
             <button
               onClick={() => setWeekStart(d => addDays(d, -7))}
               disabled={!isBefore(today, weekStart)}
-              className="w-8 h-8 rounded-full bg-paper-2 flex items-center justify-center text-navy font-bold disabled:opacity-30"
+              className="w-9 h-9 rounded-2xl bg-white border border-black/5 flex items-center justify-center text-navy font-bold shadow-sm active:scale-95 transition-transform disabled:opacity-30"
             >‹</button>
             <span className="flex-1 text-center font-mono text-xs text-ink/50">
               {format(weekStart, "d MMM", { locale: es })} — {format(addDays(weekStart, 4), "d MMM", { locale: es })}
             </span>
             <button onClick={() => setWeekStart(d => addDays(d, 7))}
-              className="w-8 h-8 rounded-full bg-paper-2 flex items-center justify-center text-navy font-bold">›</button>
+              className="w-9 h-9 rounded-2xl bg-white border border-black/5 flex items-center justify-center text-navy font-bold shadow-sm active:scale-95 transition-transform">›</button>
           </div>
 
           {error && <p className="mb-4 text-sm text-red-600 bg-red-50 rounded-2xl px-4 py-3">{error}</p>}
@@ -183,7 +190,9 @@ export default function RecuperarPage() {
                 .filter(s => !cancelledSet.has(`${s.id}|${dateStr}`))
                 .filter(s => !userRecoveryMap[s.id]?.has(dateStr))
                 .filter(s => {
-                  const isOwn    = userRegularIds.has(s.id)
+                  const parity   = userRegularMap.get(s.id)
+                  const weekIsEven = getISOWeek(date) % 2 === 0
+                  const isOwn    = parity !== undefined && (parity === 'all' || (parity === 'even') === weekIsEven)
                   const isAbsent = userAbsentMap[s.id]?.has(dateStr) ?? false
                   return !isOwn || isAbsent
                 })
@@ -198,13 +207,13 @@ export default function RecuperarPage() {
                   </p>
                   <div className="space-y-2">
                     {daySlots.map(slot => {
-                      const cap  = getCapacity(slot.id, dateStr)
+                      const cap  = getCapacity(slot.id, dateStr, date)
                       const full = cap >= MAX_CAPACITY
                       const key  = `${slot.id}|${dateStr}`
 
                       return (
-                        <div key={slot.id} className={`bg-white rounded-2xl overflow-hidden flex ${full ? 'opacity-50' : ''}`}>
-                          <div className="w-2 flex-shrink-0" style={{ backgroundColor: slot.class_types.color }}/>
+                        <div key={slot.id} className={`card overflow-hidden flex ${full ? 'opacity-50' : ''}`}>
+                          <div className="w-1.5 flex-shrink-0" style={{ backgroundColor: slot.class_types.color }}/>
                           <div className="flex-1 px-4 py-4 flex items-center justify-between">
                             <div>
                               <p className="font-display font-bold text-navy">{slot.class_types.name}</p>

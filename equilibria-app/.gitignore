@@ -1,3 +1,8 @@
 .next/
 node_modules/
 .env.local
+
+.vercel
+
+# TypeScript build cache (regenerated, no debe versionarse)
+tsconfig.tsbuildinfo

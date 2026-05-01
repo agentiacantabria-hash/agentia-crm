@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { format, addDays, startOfWeek, isBefore, startOfDay, getISOWeek } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
@@ -19,6 +19,7 @@ export type SlotInfo = {
   isUserWaitlist: boolean
   isCancelled: boolean
   waitlistCount: number
+  isRotating: boolean
 }
 
 function parityActive(parity: string, date: Date): boolean {
@@ -34,6 +35,8 @@ export default function HorarioPage() {
   const [slots, setSlots]             = useState<ScheduleSlot[]>([])
   const [selected, setSelected]       = useState<SlotInfo | null>(null)
   const [loading, setLoading]         = useState(true)
+  const [isAdmin, setIsAdmin]         = useState(false)
+  const [isRotating, setIsRotating]   = useState(false)
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [dismissed, setDismissed]     = useState<Set<string>>(new Set())
 
@@ -58,6 +61,14 @@ export default function HorarioPage() {
     setLoading(true)
     const sb = createClient()
     const { data: { user } } = await sb.auth.getUser()
+
+    if (user) {
+      sb.from('profiles').select('is_admin, schedule_type').eq('id', user.id).single()
+        .then(({ data }) => {
+          setIsAdmin(data?.is_admin ?? false)
+          setIsRotating((data as unknown as { schedule_type?: string })?.schedule_type === 'rotativo')
+        })
+    }
 
     const [
       { data: rawSlots },
@@ -142,6 +153,21 @@ export default function HorarioPage() {
 
   useEffect(() => { load() }, [load])
 
+  // Realtime: recargar cuando cambia cualquier dato del horario
+  const loadRef = useRef(load)
+  useEffect(() => { loadRef.current = load }, [load])
+  useEffect(() => {
+    const sb = createClient()
+    const ch = sb.channel('horario-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'regular_slots' },     () => loadRef.current())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'absences' },          () => loadRef.current())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recovery_bookings' }, () => loadRef.current())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'waitlist' },          () => loadRef.current())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cancelled_classes' }, () => loadRef.current())
+      .subscribe()
+    return () => { sb.removeChannel(ch) }
+  }, [])
+
   // Cargar anuncios activos + dismissed de localStorage
   useEffect(() => {
     const sb = createClient()
@@ -194,6 +220,7 @@ export default function HorarioPage() {
       isUserWaitlist:     userWaitlistMap[slot.id]?.has(dateStr) ?? false,
       isCancelled:        cancelledSet.has(`${slot.id}|${dateStr}`),
       waitlistCount:      waitlistCounts[slot.id]?.[dateStr] ?? 0,
+      isRotating,
     })
   }
 
@@ -361,7 +388,7 @@ export default function HorarioPage() {
       )}
 
       {selected && (
-        <SlotModal info={selected} onClose={() => setSelected(null)} onSuccess={() => { setSelected(null); load() }}/>
+        <SlotModal info={selected} isAdmin={isAdmin} onClose={() => setSelected(null)} onSuccess={() => { setSelected(null); load() }}/>
       )}
     </div>
   )

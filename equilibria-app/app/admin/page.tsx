@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, addDays, startOfWeek, startOfMonth, getISOWeek } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -59,6 +59,7 @@ type ClientRow = {
   notes: string | null
   recovery_used: number
   recovery_max: number
+  schedule_type: 'fijo' | 'rotativo'
 }
 
 type SimpleClient = { id: string; full_name: string; username: string | null }
@@ -354,7 +355,7 @@ export default function AdminPage() {
   const [loadingCli, setLoadingCli]      = useState(false)
   const [editingId, setEditingId]        = useState<string | null>(null)
   const [showNewClient, setShowNewClient] = useState(false)
-  const [newClient, setNewClient]        = useState({ username: '', password: '', full_name: '', phone: '', plan_id: '2x' })
+  const [newClient, setNewClient]        = useState({ username: '', password: '', full_name: '', phone: '', plan_id: '2x', schedule_type: 'fijo' })
   const [newClientLoading, setNCL]       = useState(false)
   const [newClientError, setNCE]         = useState('')
   const [deletingId, setDeletingId]      = useState<string | null>(null)
@@ -368,7 +369,7 @@ export default function AdminPage() {
       { data: profiles },
       { data: recoveryUsage },
     ] = await Promise.all([
-      sb.from('profiles').select('*, plans(*)').eq('is_admin', false).order('full_name'),
+      sb.from('profiles').select('*, plans(*)').eq('is_admin', false).order('full_name', { ascending: true }),
       sb.from('recovery_bookings').select('user_id').eq('status', 'confirmed').gte('class_date', monthStart),
     ])
 
@@ -378,6 +379,7 @@ export default function AdminPage() {
     setClients((profiles ?? []).map((p: {
       id: string; full_name: string; username: string | null; phone: string | null
       plan_id: string; payment_status: string; last_payment_date: string | null; notes: string | null
+      schedule_type: string | null
       plans: { name: string; max_recoveries_per_month: number } | null
     }) => ({
       id:                 p.id,
@@ -391,11 +393,12 @@ export default function AdminPage() {
       notes:              p.notes ?? null,
       recovery_used:      byUser[p.id] ?? 0,
       recovery_max:       p.plans?.max_recoveries_per_month ?? 0,
+      schedule_type:      (p.schedule_type ?? 'fijo') as ClientRow['schedule_type'],
     })))
     setLoadingCli(false)
   }, [])
 
-  async function updateClientPayment(userId: string, updates: Partial<Pick<ClientRow, 'payment_status' | 'last_payment_date' | 'notes' | 'plan_id'>>) {
+  async function updateClientPayment(userId: string, updates: Partial<Pick<ClientRow, 'payment_status' | 'last_payment_date' | 'notes' | 'plan_id' | 'schedule_type'>>) {
     await fetch('/api/admin/update-client', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -440,7 +443,7 @@ export default function AdminPage() {
     })
     const json = await res.json()
     if (!res.ok) { setNCE(json.error); setNCL(false); return }
-    setNewClient({ username: '', password: '', full_name: '', phone: '', plan_id: '2x' })
+    setNewClient({ username: '', password: '', full_name: '', phone: '', plan_id: '2x', schedule_type: 'fijo' })
     setShowNewClient(false); setNCL(false)
     loadClientes()
     const sb = createClient()
@@ -719,6 +722,33 @@ export default function AdminPage() {
 
   useEffect(() => { loadHoy() }, [loadHoy])
 
+  // Realtime: recargar el tab activo cuando cambian datos de otros usuarios
+  const reloadRef  = useRef<() => void>(() => {})
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    reloadRef.current = () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      debounceRef.current = setTimeout(() => {
+        if (tab === 'hoy')      loadHoy()
+        if (tab === 'semana')   loadSemana()
+        if (tab === 'clientes') loadClientes()
+        if (tab === 'horario')  loadHorario()
+        if (tab === 'registro') loadRegistro()
+      }, 800)
+    }
+  }, [tab, loadHoy, loadSemana, loadClientes, loadHorario, loadRegistro])
+  useEffect(() => {
+    const sb = createClient()
+    const ch = sb.channel('admin-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'regular_slots' },     () => reloadRef.current())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'absences' },          () => reloadRef.current())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recovery_bookings' }, () => reloadRef.current())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'waitlist' },          () => reloadRef.current())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cancelled_classes' }, () => reloadRef.current())
+      .subscribe()
+    return () => { sb.removeChannel(ch) }
+  }, [])
+
   const cancelDateOptions = Array.from({ length: 21 }, (_, i) => {
     const d = addDays(new Date(), i); const dow = d.getDay()
     if (dow === 0 || dow === 6) return null
@@ -837,6 +867,14 @@ export default function AdminPage() {
                 <select value={newClient.plan_id} onChange={e => setNewClient(v => ({ ...v, plan_id: e.target.value }))}
                   className="w-full font-mono text-sm px-3 py-2 rounded-xl bg-paper-2 text-navy border-none outline-none">
                   {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <p className="font-mono text-[9px] uppercase text-ink/40 mb-1">Tipo de horario *</p>
+                <select value={newClient.schedule_type} onChange={e => setNewClient(v => ({ ...v, schedule_type: e.target.value }))}
+                  className="w-full font-mono text-sm px-3 py-2 rounded-xl bg-paper-2 text-navy border-none outline-none">
+                  <option value="fijo">Horario fijo</option>
+                  <option value="rotativo">Turnos rotativos</option>
                 </select>
               </div>
               {newClientError && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2">{newClientError}</p>}
@@ -1349,7 +1387,7 @@ function ClientCard({
   isEditing: boolean
   isDeleting: boolean
   onToggleEdit: () => void
-  onUpdatePayment: (u: Partial<Pick<ClientRow, 'payment_status' | 'last_payment_date' | 'notes' | 'plan_id'>>) => void
+  onUpdatePayment: (u: Partial<Pick<ClientRow, 'payment_status' | 'last_payment_date' | 'notes' | 'plan_id' | 'schedule_type'>>) => void
   onUpdateProfile: (u: { full_name?: string; username?: string; phone?: string; password?: string }) => Promise<Response>
   onDelete: () => void
 }) {
@@ -1389,6 +1427,9 @@ function ClientCard({
             <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${paymentBadgeClass(client.payment_status)}`}>
               {paymentLabel(client.payment_status)}
             </span>
+            {client.schedule_type === 'rotativo' && (
+              <span className="text-[9px] font-mono font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full">Rotativo</span>
+            )}
             <span className="font-mono text-[9px] text-ink/30">{client.recovery_used}/{client.recovery_max} recup.</span>
             {client.last_payment_date && (
               <span className="font-mono text-[9px] text-ink/30">
@@ -1443,6 +1484,14 @@ function ClientCard({
               <select value={client.plan_id} onChange={e => onUpdatePayment({ plan_id: e.target.value })}
                 className="w-full font-mono text-xs px-3 py-2 rounded-xl bg-paper-2 text-navy border-none outline-none">
                 {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <p className="font-mono text-[9px] uppercase text-ink/40 mb-1">Tipo de horario</p>
+              <select value={client.schedule_type} onChange={e => onUpdatePayment({ schedule_type: e.target.value as 'fijo' | 'rotativo' })}
+                className="w-full font-mono text-xs px-3 py-2 rounded-xl bg-paper-2 text-navy border-none outline-none">
+                <option value="fijo">Horario fijo</option>
+                <option value="rotativo">Turnos rotativos</option>
               </select>
             </div>
             <div>
