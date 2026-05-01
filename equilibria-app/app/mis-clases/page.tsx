@@ -7,12 +7,14 @@ import { createClient } from '@/lib/supabase/client'
 import type { ScheduleSlot, Plan } from '@/lib/types'
 import { CANCEL_DEADLINE_HOURS } from '@/lib/types'
 import { parityActive } from '@/lib/parity'
+import { maxRecoveriesPerMonth } from '@/lib/plan'
 
 type SlotFull = ScheduleSlot & { isAbsent: boolean; week_parity: string }
 
 export default function MisClasesPage() {
   const [slots, setSlots]         = useState<SlotFull[]>([])
   const [plan, setPlan]           = useState<Plan | null>(null)
+  const [scheduleType, setScheduleType] = useState<string | null>(null)
   const [usedCredits, setUsed]    = useState(0)
   const [loading, setLoading]     = useState(true)
   const [actionLoading, setAL]    = useState<string | null>(null)
@@ -37,13 +39,14 @@ export default function MisClasesPage() {
       { data: absencesWeek },
       { count: creditsUsed },
     ] = await Promise.all([
-      sb.from('profiles').select('plan_id, plans(*)').eq('id', user.id).single(),
+      sb.from('profiles').select('plan_id, schedule_type, plans(*)').eq('id', user.id).single(),
       sb.from('regular_slots').select('slot_id, week_parity, schedule_slots(*, class_types(*))').eq('user_id', user.id),
       sb.from('absences').select('slot_id, class_date').eq('user_id', user.id).gte('class_date', dateFrom).lte('class_date', dateTo),
       sb.from('recovery_bookings').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status','confirmed').gte('class_date', monthStart.toISOString().slice(0,10)),
     ])
 
     setPlan((profile?.plans as unknown as Plan) ?? null)
+    setScheduleType((profile as { schedule_type?: string } | null)?.schedule_type ?? null)
     setUsed(creditsUsed ?? 0)
 
     const absentSet = new Set((absencesWeek ?? []).map((a: { slot_id: string; class_date: string }) => `${a.slot_id}|${a.class_date}`))
@@ -98,8 +101,9 @@ export default function MisClasesPage() {
     </div>
   )
 
-  const creditsMax = plan?.max_recoveries_per_month ?? 0
+  const creditsMax = maxRecoveriesPerMonth(scheduleType, plan)
   const creditsLeft = Math.max(0, creditsMax - usedCredits)
+  const isRotating = scheduleType === 'rotativo'
 
   return (
     <div className="max-w-lg mx-auto px-4 pt-10">
@@ -111,7 +115,7 @@ export default function MisClasesPage() {
         <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono font-bold
           ${creditsLeft > 0 ? 'bg-blue/10 text-blue' : 'bg-ink/8 text-ink/40'}`}>
           <span>{creditsLeft}/{creditsMax}</span>
-          <span className="font-normal">recuperaciones este mes</span>
+          <span className="font-normal">{isRotating ? 'reservas este mes' : 'recuperaciones este mes'}</span>
         </div>
         {creditsLeft > 0 && (
           <button onClick={() => router.push('/recuperar')}

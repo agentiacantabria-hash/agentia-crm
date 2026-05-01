@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile, Plan } from '@/lib/types'
+import { maxRecoveriesPerMonth } from '@/lib/plan'
 
 type HistoryItem = {
   id: string
@@ -99,8 +100,9 @@ export default function PerfilPage() {
     </div>
   )
 
-  const creditsMax  = plan?.max_recoveries_per_month ?? 0
+  const creditsMax  = maxRecoveriesPerMonth(profile?.schedule_type, plan)
   const creditsLeft = Math.max(0, creditsMax - recoveryUsed)
+  const isRotating  = profile?.schedule_type === 'rotativo'
 
   const initials = profile?.full_name
     ? profile.full_name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
@@ -139,11 +141,13 @@ export default function PerfilPage() {
         </div>
 
         <div className="px-4 py-4">
-          <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40 mb-2">Recuperaciones este mes</p>
+          <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40 mb-2">
+            {isRotating ? 'Reservas este mes' : 'Recuperaciones este mes'}
+          </p>
           <div className="flex items-center gap-3">
-            <div className="flex gap-1">
+            <div className="flex gap-1 flex-wrap">
               {Array.from({ length: creditsMax || 4 }).map((_, i) => (
-                <div key={i} className="w-3 h-3 rounded-full transition-colors"
+                <div key={i} className="w-3 h-3 rounded-full transition-colors flex-shrink-0"
                   style={{ backgroundColor: i < creditsLeft ? '#2E5BFF' : 'rgba(11,31,77,0.08)' }}/>
               ))}
             </div>

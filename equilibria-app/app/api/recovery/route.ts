@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { MAX_CAPACITY } from '@/lib/types'
+import { maxRecoveriesPerMonth } from '@/lib/plan'
 
 export async function POST(req: NextRequest) {
   const sb = await createClient()
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
   // Verificar créditos de recuperación disponibles este mes
   const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0)
   const [{ data: profile }, { count: usedCredits }] = await Promise.all([
-    sb.from('profiles').select('plan_id, schedule_type, plans(max_recoveries_per_month)').eq('id', user.id).single(),
+    sb.from('profiles').select('plan_id, schedule_type, plans(classes_per_week, max_recoveries_per_month)').eq('id', user.id).single(),
     sb.from('recovery_bookings')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
@@ -21,9 +22,10 @@ export async function POST(req: NextRequest) {
       .gte('class_date', monthStart.toISOString().slice(0,10)),
   ])
 
-  const maxRecoveries = (profile?.plans as unknown as { max_recoveries_per_month: number } | null)?.max_recoveries_per_month ?? 2
+  const plan = profile?.plans as unknown as { classes_per_week: number; max_recoveries_per_month: number } | null
+  const maxRecoveries = maxRecoveriesPerMonth(profile?.schedule_type, plan)
   if ((usedCredits ?? 0) >= maxRecoveries) {
-    return NextResponse.json({ error: `Has agotado tus ${maxRecoveries} recuperación${maxRecoveries > 1 ? 'es' : ''} de este mes` }, { status: 409 })
+    return NextResponse.json({ error: `Has agotado tus ${maxRecoveries} reserva${maxRecoveries > 1 ? 's' : ''} de este mes` }, { status: 409 })
   }
 
   // Capacidad: usar admin client para que el count NO esté sesgado por las
