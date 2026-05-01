@@ -61,6 +61,11 @@ export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) 
     }
   }
 
+  function confirmAndCall(message: string, url: string, method: string, extra?: Record<string, unknown>) {
+    if (typeof window !== 'undefined' && !window.confirm(message)) return
+    call(url, method, extra)
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-ink/30 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg mx-auto rounded-t-3xl overflow-hidden flex flex-col"
@@ -192,8 +197,11 @@ export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) 
                     {loading ? '…' : 'Marcar falta'}
                   </button>
                 )}
-                <button onClick={() => call('/api/regular-slot', 'DELETE')} disabled={loading}
-                  className="w-full bg-paper-2 text-ink/40 font-mono text-[11px] py-3 rounded-2xl disabled:opacity-40 uppercase tracking-wider">
+                <button onClick={() => confirmAndCall(
+                  '¿Seguro que quieres quitar esta clase de tu horario fijo? Tendrás que volver a apuntarte si cambias de idea.',
+                  '/api/regular-slot', 'DELETE'
+                )} disabled={loading}
+                  className="w-full bg-paper-2 text-ink/50 font-mono text-xs py-3 rounded-2xl disabled:opacity-40 uppercase tracking-wider">
                   Quitar de mis clases fijas
                 </button>
               </>
@@ -239,8 +247,11 @@ export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) 
                     Añadir también a mis clases fijas
                   </button>
                 )}
-                <button onClick={() => call('/api/regular-slot', 'DELETE')} disabled={loading}
-                  className="w-full bg-paper-2 text-ink/40 font-mono text-[11px] py-3 rounded-2xl disabled:opacity-40 uppercase tracking-wider">
+                <button onClick={() => confirmAndCall(
+                  '¿Seguro que quieres quitar esta clase de tu horario fijo? Tendrás que volver a apuntarte si cambias de idea.',
+                  '/api/regular-slot', 'DELETE'
+                )} disabled={loading}
+                  className="w-full bg-paper-2 text-ink/50 font-mono text-xs py-3 rounded-2xl disabled:opacity-40 uppercase tracking-wider">
                   Quitar de mis clases fijas
                 </button>
               </>

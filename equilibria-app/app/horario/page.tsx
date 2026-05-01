@@ -244,10 +244,12 @@ export default function HorarioPage() {
         </div>
         <div className="flex gap-1.5">
           <button onClick={() => setWeekStart(d => addDays(d, -7))}
+            aria-label="Semana anterior"
             className="w-9 h-9 rounded-2xl bg-white border border-black/5 flex items-center justify-center text-navy font-bold shadow-sm active:scale-95 transition-transform">‹</button>
           <button onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-            className="px-3 h-9 rounded-2xl bg-white border border-black/5 text-navy font-mono text-[9px] uppercase tracking-wider shadow-sm active:scale-95 transition-transform">Hoy</button>
+            className="px-3 h-9 rounded-2xl bg-white border border-black/5 text-navy font-bold text-xs uppercase tracking-wider shadow-sm active:scale-95 transition-transform">Hoy</button>
           <button onClick={() => setWeekStart(d => addDays(d, 7))}
+            aria-label="Semana siguiente"
             className="w-9 h-9 rounded-2xl bg-white border border-black/5 flex items-center justify-center text-navy font-bold shadow-sm active:scale-95 transition-transform">›</button>
         </div>
       </div>
@@ -260,8 +262,8 @@ export default function HorarioPage() {
             <div key={i} className={`text-center py-2 rounded-2xl transition-all
               ${isToday ? 'bg-navy' : 'bg-white/50'}`}
               style={isToday ? { boxShadow: '0 4px 16px rgba(11,31,77,0.25)' } : {}}>
-              <div className={`font-mono text-[8px] uppercase tracking-wider ${isToday ? 'text-paper/50' : 'text-ink/30'}`}>{DAY_SHORT[i+1]}</div>
-              <div className={`font-display font-bold text-sm mt-0.5 ${isToday ? 'text-paper' : 'text-ink/70'}`}>{format(day,'d')}</div>
+              <div className={`font-mono text-[10px] uppercase tracking-wider ${isToday ? 'text-paper/70' : 'text-ink/45'}`}>{DAY_SHORT[i+1]}</div>
+              <div className={`font-display font-bold text-base mt-0.5 ${isToday ? 'text-paper' : 'text-ink/80'}`}>{format(day,'d')}</div>
             </div>
           )
         })}
@@ -277,7 +279,7 @@ export default function HorarioPage() {
             const slotsAtTime = slots.filter(s => s.start_time === time)
             return (
               <div key={time}>
-                <div className="font-mono text-[9px] text-ink/30 uppercase tracking-widest mb-1.5 px-0.5">{time.slice(0,5)}</div>
+                <div className="font-mono text-[11px] text-ink/45 uppercase tracking-widest mb-1.5 px-0.5 font-semibold">{time.slice(0,5)}</div>
                 <div className="grid grid-cols-5 gap-1">
                   {[1,2,3,4,5].map(dow => {
                     const date    = weekDays[dow - 1]
@@ -318,19 +320,19 @@ export default function HorarioPage() {
                                     : `0 1px 6px rgba(11,31,77,0.08)`,
                               }}
                             >
-                              <div className="h-[3px] w-full" style={{ backgroundColor: slot.class_types.color }}/>
+                              <div className="h-1 w-full" style={{ backgroundColor: slot.class_types.color }}/>
                               <div className="px-1.5 pt-1.5 pb-2">
-                                <p className={`text-[8px] font-bold text-ink/80 leading-tight truncate ${cancelled ? 'line-through' : ''}`}>
+                                <p className={`text-[11px] font-bold text-ink/85 leading-tight truncate ${cancelled ? 'line-through' : ''}`}>
                                   {slot.class_types.name}
                                 </p>
                                 {cancelled ? (
-                                  <p className="text-[7px] font-mono text-ink/30 mt-0.5">cancel.</p>
+                                  <p className="text-[10px] font-mono text-ink/40 mt-1 uppercase tracking-wider">cancel.</p>
                                 ) : isAbsent ? (
-                                  <p className="text-[7px] font-mono text-red-400 mt-0.5">falta</p>
+                                  <p className="text-[10px] font-mono text-red-500 mt-1 uppercase tracking-wider">falta</p>
                                 ) : (
-                                  <div className="flex gap-[2px] mt-1.5 flex-wrap">
+                                  <div className="flex gap-[3px] mt-1.5 flex-wrap">
                                     {Array.from({ length: slotMax }).map((_, i) => (
-                                      <div key={i} className="w-[4px] h-[4px] rounded-full flex-shrink-0"
+                                      <div key={i} className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                                         style={{
                                           backgroundColor: i < capNum
                                             ? slot.class_types.color
@@ -341,10 +343,10 @@ export default function HorarioPage() {
                                   </div>
                                 )}
                                 {isEnFormacion && !cancelled && !isAbsent && (
-                                  <p className="text-[6px] font-mono text-amber-500 mt-0.5 uppercase tracking-wider">form.</p>
+                                  <p className="text-[9px] font-mono font-bold text-amber-600 mt-1 uppercase tracking-wider">form.</p>
                                 )}
                                 {isFull && !isEnFormacion && !cancelled && !isAbsent && (
-                                  <p className="text-[6px] font-mono text-ink/30 mt-0.5 uppercase tracking-wider">llena</p>
+                                  <p className="text-[9px] font-mono font-bold text-ink/45 mt-1 uppercase tracking-wider">llena</p>
                                 )}
                               </div>
                             </button>
