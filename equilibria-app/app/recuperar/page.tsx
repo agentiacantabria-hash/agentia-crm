@@ -1,15 +1,17 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { format, addDays, startOfWeek, startOfMonth, isBefore, startOfDay, getISOWeek } from 'date-fns'
+import { format, addDays, startOfWeek, startOfMonth, isBefore, startOfDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import type { ScheduleSlot, Plan } from '@/lib/types'
-import { MAX_CAPACITY } from '@/lib/types'
+import { parityActive } from '@/lib/parity'
+import { maxRecoveriesPerMonth } from '@/lib/plan'
 
 export default function RecuperarPage() {
   const router = useRouter()
   const [plan, setPlan]               = useState<Plan | null>(null)
+  const [scheduleType, setScheduleType] = useState<string | null>(null)
   const [usedCredits, setUsed]        = useState(0)
   const [weekStart, setWeekStart]     = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [slots, setSlots]             = useState<ScheduleSlot[]>([])
@@ -37,50 +39,38 @@ export default function RecuperarPage() {
 
     const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd')
 
+    const countsPromise = fetch('/api/horario-counts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date_from: dateFrom, date_to: dateTo }),
+    }).then(r => r.ok ? r.json() : null).catch(() => null)
+
     const [
       { data: profile },
       { data: rawSlots },
-      { data: allRegular },
-      { data: absencesAll },
-      { data: recoveriesAll },
+      counts,
       { data: userRegular },
       { data: userAbsences },
       { data: userRecoveries },
-      { data: cancelledAll },
       { count: creditsUsed },
     ] = await Promise.all([
-      sb.from('profiles').select('plan_id, plans(*)').eq('id', user.id).single(),
+      sb.from('profiles').select('plan_id, schedule_type, plans(*)').eq('id', user.id).single(),
       sb.from('schedule_slots').select('*, class_types(*)').eq('is_active', true),
-      sb.from('regular_slots').select('slot_id, week_parity'),
-      sb.from('absences').select('slot_id, class_date').gte('class_date', dateFrom).lte('class_date', dateTo),
-      sb.from('recovery_bookings').select('slot_id, class_date').eq('status', 'confirmed').gte('class_date', dateFrom).lte('class_date', dateTo),
+      countsPromise,
       sb.from('regular_slots').select('slot_id, week_parity').eq('user_id', user.id),
       sb.from('absences').select('slot_id, class_date').eq('user_id', user.id).gte('class_date', dateFrom).lte('class_date', dateTo),
       sb.from('recovery_bookings').select('slot_id, class_date').eq('user_id', user.id).eq('status', 'confirmed').gte('class_date', dateFrom).lte('class_date', dateTo),
-      sb.from('cancelled_classes').select('slot_id, class_date').gte('class_date', dateFrom).lte('class_date', dateTo),
       sb.from('recovery_bookings').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'confirmed').gte('class_date', monthStart),
     ])
 
     setPlan((profile?.plans as unknown as Plan) ?? null)
+    setScheduleType((profile as { schedule_type?: string } | null)?.schedule_type ?? null)
     setUsed(creditsUsed ?? 0)
 
-    const rp: Record<string, string[]> = {}
-    ;(allRegular ?? []).forEach((r: { slot_id: string; week_parity: string }) => {
-      rp[r.slot_id] ??= []; rp[r.slot_id].push(r.week_parity)
-    })
-    setRP(rp)
-
-    const ac: Record<string, Record<string, number>> = {}
-    ;(absencesAll ?? []).forEach((a: { slot_id: string; class_date: string }) => {
-      ac[a.slot_id] ??= {}; ac[a.slot_id][a.class_date] = (ac[a.slot_id][a.class_date] ?? 0) + 1
-    })
-    setAC(ac)
-
-    const rvc: Record<string, Record<string, number>> = {}
-    ;(recoveriesAll ?? []).forEach((r: { slot_id: string; class_date: string }) => {
-      rvc[r.slot_id] ??= {}; rvc[r.slot_id][r.class_date] = (rvc[r.slot_id][r.class_date] ?? 0) + 1
-    })
-    setRVC(rvc)
+    setRP(counts?.regularParities ?? {})
+    setAC(counts?.absentCounts ?? {})
+    setRVC(counts?.recoveryCounts ?? {})
+    setCancelled(new Set<string>(counts?.cancelledKeys ?? []))
 
     const urmReg = new Map<string, string>()
     ;(userRegular ?? []).forEach((r: { slot_id: string; week_parity: string }) => urmReg.set(r.slot_id, r.week_parity))
@@ -98,7 +88,6 @@ export default function RecuperarPage() {
     })
     setURM(urmRec)
 
-    setCancelled(new Set((cancelledAll ?? []).map((c: { slot_id: string; class_date: string }) => `${c.slot_id}|${c.class_date}`)))
     setSlots((rawSlots ?? []) as ScheduleSlot[])
     setLoading(false)
   }, [dateFrom, dateTo, router])
@@ -106,9 +95,7 @@ export default function RecuperarPage() {
   useEffect(() => { load() }, [load])
 
   function getCapacity(slotId: string, dateStr: string, date: Date) {
-    const weekIsEven = getISOWeek(date) % 2 === 0
-    const regularCount = (regularParities[slotId] ?? [])
-      .filter(p => p === 'all' || (p === 'even') === weekIsEven).length
+    const regularCount = (regularParities[slotId] ?? []).filter(p => parityActive(p, date)).length
     return regularCount
       - (absentCounts[slotId]?.[dateStr] ?? 0)
       + (recoveryCounts[slotId]?.[dateStr] ?? 0)
@@ -129,35 +116,51 @@ export default function RecuperarPage() {
     load()
   }
 
-  const creditsMax  = plan?.max_recoveries_per_month ?? 0
+  const creditsMax  = maxRecoveriesPerMonth(scheduleType, plan)
   const creditsLeft = Math.max(0, creditsMax - usedCredits)
+  const isRotating  = scheduleType === 'rotativo'
   const today       = startOfDay(new Date())
 
   if (loading) return (
     <div className="flex justify-center items-center min-h-screen">
-      <div className="w-7 h-7 rounded-full border-2 border-navy border-t-transparent animate-spin"/>
+      <div className="w-8 h-8 rounded-full border-2 border-brand/30 border-t-brand animate-spin"/>
     </div>
   )
 
   return (
-    <div className="max-w-lg mx-auto px-4 pt-10">
-      <p className="font-mono text-[10px] uppercase tracking-widest text-ink/40 mb-1">Recuperaciones</p>
-      <h1 className="font-display font-bold text-3xl text-navy mb-1">Recuperar clase</h1>
+    <div className="max-w-lg mx-auto px-4 pt-8">
+      <p className="page-eyebrow">{isRotating ? 'Reservar' : 'Recuperar'}</p>
+      <h1 className="page-title">
+        {isRotating ? <>Reserva una <em>clase</em></> : <>Recuperar <em>clase</em></>}
+      </h1>
 
-      {/* Badge créditos */}
-      <div className="mb-6">
-        <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono font-bold
-          ${creditsLeft > 0 ? 'bg-blue/10 text-blue' : 'bg-ink/8 text-ink/40'}`}>
-          <span>{creditsLeft}/{creditsMax}</span>
-          <span className="font-normal">recuperaciones disponibles este mes</span>
+      {/* Card de cupo */}
+      <div className="card-tint mt-5 mb-6 px-5 py-4" style={{ ['--tint' as string]: '#1E4DB7' }}>
+        <p className="font-mono text-[10px] uppercase tracking-widest text-brand-deep/70 font-semibold">
+          {isRotating ? 'Reservas disponibles' : 'Recuperaciones disponibles'}
+        </p>
+        <div className="flex items-center gap-3 mt-2">
+          <p className="font-display text-3xl font-semibold text-brand-deep tabular-nums leading-none">
+            {creditsLeft}
+            <span className="text-brand-deep/30 text-2xl">/{creditsMax}</span>
+          </p>
+          <div className="flex flex-wrap gap-1 flex-1 max-w-[60%]">
+            {Array.from({ length: creditsMax || 4 }).map((_, i) => (
+              <span key={i} className="w-2.5 h-2.5 rounded-full transition-all flex-shrink-0"
+                style={{ backgroundColor: i < creditsLeft ? '#1E4DB7' : 'rgba(30,77,183,0.15)' }}/>
+            ))}
+          </div>
         </div>
       </div>
 
       {creditsLeft === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-4xl mb-3">🎫</p>
-          <p className="font-display font-bold text-xl text-navy mb-2">Sin créditos este mes</p>
-          <p className="text-ink/40 text-sm">Los créditos se renuevan el 1 de cada mes</p>
+        <div className="text-center py-16 animate-fade-in">
+          <div className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center"
+            style={{ background: 'radial-gradient(circle, rgba(232,200,147,0.25) 0%, transparent 70%)' }}>
+            <span className="text-4xl">🎫</span>
+          </div>
+          <p className="font-display text-xl text-navy mb-1">Sin cupo este mes</p>
+          <p className="text-ink/45 text-sm max-w-xs mx-auto">El cupo se renueva el día 1 de cada mes</p>
         </div>
       ) : (
         <>
@@ -166,18 +169,24 @@ export default function RecuperarPage() {
             <button
               onClick={() => setWeekStart(d => addDays(d, -7))}
               disabled={!isBefore(today, weekStart)}
-              className="w-9 h-9 rounded-2xl bg-white border border-black/5 flex items-center justify-center text-navy font-bold shadow-sm active:scale-95 transition-transform disabled:opacity-30"
+              aria-label="Semana anterior"
+              className="w-10 h-10 rounded-2xl bg-white border border-ink/5 flex items-center justify-center text-brand text-lg font-semibold shadow-card-soft active:scale-95 transition-transform disabled:opacity-30 disabled:cursor-not-allowed"
             >‹</button>
-            <span className="flex-1 text-center font-mono text-xs text-ink/50">
-              {format(weekStart, "d MMM", { locale: es })} — {format(addDays(weekStart, 4), "d MMM", { locale: es })}
+            <span className="flex-1 text-center font-mono text-[11px] text-ink/50 uppercase tracking-widest font-semibold">
+              {format(weekStart, "d MMM", { locale: es })} → {format(addDays(weekStart, 4), "d MMM", { locale: es })}
             </span>
             <button onClick={() => setWeekStart(d => addDays(d, 7))}
-              className="w-9 h-9 rounded-2xl bg-white border border-black/5 flex items-center justify-center text-navy font-bold shadow-sm active:scale-95 transition-transform">›</button>
+              aria-label="Semana siguiente"
+              className="w-10 h-10 rounded-2xl bg-white border border-ink/5 flex items-center justify-center text-brand text-lg font-semibold shadow-card-soft active:scale-95 transition-transform">›</button>
           </div>
 
-          {error && <p className="mb-4 text-sm text-red-600 bg-red-50 rounded-2xl px-4 py-3">{error}</p>}
+          {error && (
+            <div className="mb-4 px-4 py-3 rounded-2xl bg-red-50 border border-red-100 animate-fade-in">
+              <p className="font-mono text-sm text-red-700">{error}</p>
+            </div>
+          )}
 
-          <div className="space-y-5 pb-6">
+          <div className="space-y-5 pb-8">
             {weekDays.map((date, i) => {
               const dateStr = format(date, 'yyyy-MM-dd')
               if (isBefore(date, today)) return null
@@ -191,8 +200,7 @@ export default function RecuperarPage() {
                 .filter(s => !userRecoveryMap[s.id]?.has(dateStr))
                 .filter(s => {
                   const parity   = userRegularMap.get(s.id)
-                  const weekIsEven = getISOWeek(date) % 2 === 0
-                  const isOwn    = parity !== undefined && (parity === 'all' || (parity === 'even') === weekIsEven)
+                  const isOwn    = parity !== undefined && parityActive(parity, date)
                   const isAbsent = userAbsentMap[s.id]?.has(dateStr) ?? false
                   return !isOwn || isAbsent
                 })
@@ -201,33 +209,49 @@ export default function RecuperarPage() {
               if (!daySlots.length) return null
 
               return (
-                <div key={dateStr}>
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-ink/40 mb-2 capitalize">
-                    {dayLabel}
-                  </p>
+                <div key={dateStr} className="animate-slide-up">
+                  <div className="flex items-center gap-2 mb-2 px-0.5">
+                    <p className="font-mono text-[11px] text-brand-deep tracking-widest font-semibold capitalize">
+                      {dayLabel}
+                    </p>
+                    <span className="flex-1 h-px bg-gradient-to-r from-brand/15 to-transparent"/>
+                  </div>
                   <div className="space-y-2">
                     {daySlots.map(slot => {
-                      const cap  = getCapacity(slot.id, dateStr, date)
-                      const full = cap >= MAX_CAPACITY
-                      const key  = `${slot.id}|${dateStr}`
+                      const cap     = getCapacity(slot.id, dateStr, date)
+                      const slotMax = slot.max_capacity ?? 7
+                      const capNum  = Math.max(0, cap)
+                      const full    = capNum >= slotMax
+                      const key     = `${slot.id}|${dateStr}`
+                      const color   = slot.class_types.color
 
                       return (
-                        <div key={slot.id} className={`card overflow-hidden flex ${full ? 'opacity-50' : ''}`}>
-                          <div className="w-1.5 flex-shrink-0" style={{ backgroundColor: slot.class_types.color }}/>
-                          <div className="flex-1 px-4 py-4 flex items-center justify-between">
-                            <div>
-                              <p className="font-display font-bold text-navy">{slot.class_types.name}</p>
-                              <p className="font-mono text-[10px] text-ink/40 uppercase tracking-wider mt-0.5">
-                                {slot.start_time.slice(0, 5)}h · {Math.max(0, cap)}/{MAX_CAPACITY} plazas
+                        <div key={slot.id}
+                          className={`card-tint overflow-hidden flex transition-all ${full ? 'opacity-55' : ''}`}
+                          style={{ ['--tint' as string]: color }}>
+                          <div className="w-1.5 flex-shrink-0" style={{ backgroundColor: color }}/>
+                          <div className="flex-1 px-4 py-3.5 flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-display font-semibold text-navy text-base tracking-tight">
+                                {slot.class_types.name}
+                              </p>
+                              <p className="font-mono text-[11px] text-ink/55 mt-1 tabular-nums">
+                                {slot.start_time.slice(0, 5)}h
+                                <span className="mx-1.5 text-ink/30">·</span>
+                                <span className={full ? '' : 'font-semibold text-ink/70'}>{capNum}/{slotMax}</span>
                               </p>
                               {bookedKey === key && (
-                                <span className="inline-block mt-1 text-[10px] font-mono text-green-600 uppercase tracking-wider">✓ Reservado</span>
+                                <span className="badge badge-success mt-1.5">✓ Reservado</span>
                               )}
                             </div>
                             <button
                               onClick={() => bookRecovery(slot, dateStr)}
                               disabled={full || actionLoading === key}
-                              className="text-xs font-mono px-3 py-2 rounded-xl bg-blue/10 text-blue disabled:opacity-40 font-bold"
+                              className="flex-shrink-0 font-mono text-[11px] font-bold uppercase tracking-wider px-4 py-2.5 rounded-xl transition-all active:scale-95
+                                disabled:opacity-40 disabled:cursor-not-allowed
+                                bg-brand text-paper hover:bg-brand-deep
+                                disabled:bg-ink/10 disabled:text-ink/40"
+                              style={!full ? { boxShadow: '0 4px 14px rgba(30,77,183,0.28)' } : {}}
                             >
                               {actionLoading === key ? '…' : full ? 'Llena' : 'Reservar'}
                             </button>
