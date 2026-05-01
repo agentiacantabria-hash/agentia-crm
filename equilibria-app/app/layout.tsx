@@ -1,12 +1,15 @@
 import type { Metadata, Viewport } from 'next'
-import { Manrope, Inter, JetBrains_Mono } from 'next/font/google'
+import { Fraunces, Inter, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import NavBar from '@/components/NavBar'
 import PwaRegister from '@/components/PwaRegister'
 
-const manrope = Manrope({
+// Fraunces: serif editorial cálida con curvas suaves. Aporta personalidad
+// "boutique" sin perder legibilidad en móvil.
+const fraunces = Fraunces({
   subsets: ['latin'],
-  weight: ['500', '600', '700', '800'],
+  weight: ['400', '500', '600', '700', '800', '900'],
+  style: ['normal', 'italic'],
   variable: '--font-display',
   display: 'swap',
 })
@@ -39,12 +42,12 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#0B1F4D',
+  themeColor: '#1E4DB7',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={`${manrope.variable} ${inter.variable} ${mono.variable}`}>
+    <html lang="es" className={`${fraunces.variable} ${inter.variable} ${mono.variable}`}>
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>

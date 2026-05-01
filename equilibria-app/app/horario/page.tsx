@@ -12,9 +12,9 @@ export type SlotInfo = {
   slot: ScheduleSlot
   date: Date
   capacity: number
-  regularCount: number              // activos esta semana (antes de ausencias/recuperaciones)
-  isUserRegular: boolean            // fijo Y paridad activa esta semana
-  userRegularParity: string | null  // paridad si tiene entrada (cualquier semana)
+  regularCount: number
+  isUserRegular: boolean
+  userRegularParity: string | null
   isUserAbsent: boolean
   isUserRecovery: boolean
   isUserWaitlist: boolean
@@ -35,14 +35,12 @@ export default function HorarioPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [dismissed, setDismissed]     = useState<Set<string>>(new Set())
 
-  // Contadores globales: slot_id → lista de week_parity de cada alumno fijo
   const [regularParities,  setRegularParities]  = useState<Record<string, string[]>>({})
   const [absentCounts,     setAbsentCounts]     = useState<Record<string, Record<string, number>>>({})
   const [recoveryCounts,   setRecoveryCounts]   = useState<Record<string, Record<string, number>>>({})
   const [waitlistCounts,   setWaitlistCounts]   = useState<Record<string, Record<string, number>>>({})
   const [cancelledSet,     setCancelledSet]     = useState<Set<string>>(new Set())
 
-  // Estado del usuario: slot_id → week_parity (o undefined si no es fijo)
   const [userRegularMap,  setUserRegularMap]  = useState<Map<string, string>>(new Map())
   const [userAbsentMap,   setUserAbsentMap]   = useState<Record<string, Set<string>>>({})
   const [userRecoveryMap, setUserRecoveryMap] = useState<Record<string, Set<string>>>({})
@@ -65,8 +63,6 @@ export default function HorarioPage() {
         })
     }
 
-    // Conteos GLOBALES → endpoint server-side con admin client (saltarse RLS).
-    // Datos PROPIOS del usuario → queries directas con RLS (filtran a su id).
     const countsPromise = fetch('/api/horario-counts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -95,7 +91,6 @@ export default function HorarioPage() {
     setWaitlistCounts(counts?.waitlistCounts ?? {})
     setCancelledSet(new Set<string>(counts?.cancelledKeys ?? []))
 
-    // Mapa usuario: slot_id → week_parity
     const urm = new Map<string, string>()
     ;(userRegular ?? []).forEach((r: { slot_id: string; week_parity: string }) => {
       urm.set(r.slot_id, r.week_parity)
@@ -126,7 +121,6 @@ export default function HorarioPage() {
 
   useEffect(() => { load() }, [load])
 
-  // Realtime: recargar cuando cambia cualquier dato del horario
   const loadRef = useRef(load)
   useEffect(() => { loadRef.current = load }, [load])
   useEffect(() => {
@@ -141,7 +135,6 @@ export default function HorarioPage() {
     return () => { sb.removeChannel(ch) }
   }, [])
 
-  // Cargar anuncios activos + dismissed de localStorage
   useEffect(() => {
     const sb = createClient()
     sb.from('announcements').select('*')
@@ -197,32 +190,36 @@ export default function HorarioPage() {
     })
   }
 
+  const isCurrentWeek = format(weekStart, 'yyyy-MM-dd') === format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
+
   return (
-    <div className="max-w-lg mx-auto px-3 pt-6">
+    <div className="max-w-lg mx-auto px-4 pt-6">
 
       {/* ── Anuncios ──────────────────────────────────── */}
       {visibleAnnouncements.length > 0 && (
-        <div className="space-y-2 mb-5">
+        <div className="space-y-2.5 mb-6 animate-fade-in">
           {visibleAnnouncements.map(a => (
             <div key={a.id}
-              className="relative rounded-2xl overflow-hidden"
-              style={{ background: 'linear-gradient(135deg, #07153A 0%, #15306B 100%)' }}>
-              {/* Blob decorativo */}
-              <div className="absolute top-0 right-0 w-32 h-32 rounded-full pointer-events-none"
-                style={{ background: 'radial-gradient(circle, rgba(46,91,255,0.35) 0%, transparent 70%)', transform: 'translate(30%, -30%)' }}/>
-              <div className="relative px-4 py-4 flex gap-3">
-                <span className="text-3xl flex-shrink-0 leading-none mt-0.5">{a.emoji}</span>
+              className="relative rounded-3xl overflow-hidden"
+              style={{ background: 'linear-gradient(135deg, #143A8C 0%, #1E4DB7 60%, #2657C9 100%)' }}>
+              <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full pointer-events-none"
+                style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 65%)' }}/>
+              <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full pointer-events-none"
+                style={{ background: 'radial-gradient(circle, rgba(232,200,147,0.22) 0%, transparent 70%)', transform: 'translate(-30%, 30%)' }}/>
+              <div className="relative px-5 py-5 flex gap-4">
+                <span className="text-3xl flex-shrink-0 leading-none mt-0.5 drop-shadow-sm">{a.emoji}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="font-display font-bold text-paper text-base leading-tight">{a.title}</p>
-                  <p className="font-mono text-paper/70 text-xs mt-1 leading-relaxed whitespace-pre-wrap">{a.body}</p>
-                  <p className="font-mono text-paper/30 text-[9px] uppercase tracking-wider mt-2">
+                  <p className="font-display font-semibold text-paper text-lg leading-tight tracking-tight">{a.title}</p>
+                  <p className="text-paper/80 text-sm mt-1.5 leading-relaxed whitespace-pre-wrap">{a.body}</p>
+                  <p className="font-mono text-paper/40 text-[10px] uppercase tracking-widest mt-3">
                     {new Date(a.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}
-                    {a.pinned && <span className="ml-2 text-paper/40">· Fijado</span>}
+                    {a.pinned && <span className="ml-2 text-paper/50">· Fijado</span>}
                   </p>
                 </div>
                 {!a.pinned && (
                   <button onClick={() => dismiss(a.id)}
-                    className="flex-shrink-0 w-6 h-6 rounded-full bg-paper/10 flex items-center justify-center text-paper/50 text-xs font-bold hover:bg-paper/20 transition-colors">
+                    aria-label="Descartar aviso"
+                    className="flex-shrink-0 w-7 h-7 rounded-full bg-paper/15 backdrop-blur flex items-center justify-center text-paper/70 text-sm hover:bg-paper/25 active:scale-95 transition-all">
                     ✕
                   </button>
                 )}
@@ -232,38 +229,57 @@ export default function HorarioPage() {
         </div>
       )}
 
-      {/* Cabecera */}
-      <div className="flex items-center justify-between mb-5 px-1">
-        <div>
-          <p className="page-eyebrow">Horario</p>
-          <h1 className="font-display font-extrabold text-2xl text-navy leading-tight tracking-tight">
-            {format(weekStart, "d MMM", { locale: es })}
-            <span className="text-ink/30 font-normal"> — </span>
-            {format(addDays(weekStart, 4), "d MMM", { locale: es })}
-          </h1>
-        </div>
-        <div className="flex gap-1.5">
-          <button onClick={() => setWeekStart(d => addDays(d, -7))}
-            aria-label="Semana anterior"
-            className="w-9 h-9 rounded-2xl bg-white border border-black/5 flex items-center justify-center text-navy font-bold shadow-sm active:scale-95 transition-transform">‹</button>
-          <button onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-            className="px-3 h-9 rounded-2xl bg-white border border-black/5 text-navy font-bold text-xs uppercase tracking-wider shadow-sm active:scale-95 transition-transform">Hoy</button>
-          <button onClick={() => setWeekStart(d => addDays(d, 7))}
-            aria-label="Semana siguiente"
-            className="w-9 h-9 rounded-2xl bg-white border border-black/5 flex items-center justify-center text-navy font-bold shadow-sm active:scale-95 transition-transform">›</button>
-        </div>
+      {/* ── Cabecera ──────────────────────────────────── */}
+      <div className="mb-5">
+        <p className="page-eyebrow">Horario</p>
+        <h1 className="page-title">
+          {isCurrentWeek ? <>Esta <em>semana</em></> : <em>{format(weekStart, "MMMM", { locale: es })}</em>}
+        </h1>
+        <p className="font-mono text-xs text-ink/45 mt-2 tracking-wide">
+          {format(weekStart, "d 'de' MMM", { locale: es })}
+          <span className="mx-1.5 text-ink/25">→</span>
+          {format(addDays(weekStart, 4), "d 'de' MMM", { locale: es })}
+        </p>
       </div>
 
-      {/* Días */}
-      <div className="grid grid-cols-5 gap-1.5 mb-4">
+      {/* ── Nav semana ────────────────────────────────── */}
+      <div className="flex items-center justify-end gap-1.5 mb-5">
+        <button onClick={() => setWeekStart(d => addDays(d, -7))}
+          aria-label="Semana anterior"
+          className="w-10 h-10 rounded-2xl bg-white border border-ink/5 flex items-center justify-center text-brand text-lg font-semibold shadow-card-soft active:scale-95 transition-transform">‹</button>
+        <button onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
+          disabled={isCurrentWeek}
+          className="px-4 h-10 rounded-2xl bg-white border border-ink/5 text-brand-deep font-mono text-[11px] uppercase tracking-widest font-bold shadow-card-soft active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-not-allowed">
+          Hoy
+        </button>
+        <button onClick={() => setWeekStart(d => addDays(d, 7))}
+          aria-label="Semana siguiente"
+          className="w-10 h-10 rounded-2xl bg-white border border-ink/5 flex items-center justify-center text-brand text-lg font-semibold shadow-card-soft active:scale-95 transition-transform">›</button>
+      </div>
+
+      {/* ── Días ─────────────────────────────────────── */}
+      <div className="grid grid-cols-5 gap-2 mb-5">
         {weekDays.map((day, i) => {
           const isToday = format(day,'yyyy-MM-dd') === format(new Date(),'yyyy-MM-dd')
+          const isPast = isBefore(day, today)
           return (
-            <div key={i} className={`text-center py-2 rounded-2xl transition-all
-              ${isToday ? 'bg-navy' : 'bg-white/50'}`}
-              style={isToday ? { boxShadow: '0 4px 16px rgba(11,31,77,0.25)' } : {}}>
-              <div className={`font-mono text-[10px] uppercase tracking-wider ${isToday ? 'text-paper/70' : 'text-ink/45'}`}>{DAY_SHORT[i+1]}</div>
-              <div className={`font-display font-bold text-base mt-0.5 ${isToday ? 'text-paper' : 'text-ink/80'}`}>{format(day,'d')}</div>
+            <div key={i}
+              className={`relative text-center py-3 rounded-2xl transition-all
+                ${isToday ? '' : 'bg-white/60 border border-ink/5'}
+                ${isPast && !isToday ? 'opacity-50' : ''}`}
+              style={isToday ? {
+                background: 'linear-gradient(180deg, #2657C9 0%, #1E4DB7 100%)',
+                boxShadow: '0 8px 28px rgba(30,77,183,0.35), inset 0 1px 0 rgba(255,255,255,0.15)',
+              } : {}}>
+              <div className={`font-mono text-[10px] uppercase tracking-widest font-semibold ${isToday ? 'text-paper/80' : 'text-ink/45'}`}>
+                {DAY_SHORT[i+1]}
+              </div>
+              <div className={`font-display font-semibold text-xl mt-0.5 leading-none tracking-tight ${isToday ? 'text-paper' : 'text-ink/85'}`}>
+                {format(day,'d')}
+              </div>
+              {isToday && (
+                <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-paper/60"/>
+              )}
             </div>
           )
         })}
@@ -271,16 +287,19 @@ export default function HorarioPage() {
 
       {loading ? (
         <div className="flex justify-center py-20">
-          <div className="w-7 h-7 rounded-full border-2 border-navy border-t-transparent animate-spin"/>
+          <div className="w-8 h-8 rounded-full border-2 border-brand/30 border-t-brand animate-spin"/>
         </div>
       ) : (
-        <div className="space-y-4 pb-6">
+        <div className="space-y-5 pb-8">
           {times.map(time => {
             const slotsAtTime = slots.filter(s => s.start_time === time)
             return (
-              <div key={time}>
-                <div className="font-mono text-[11px] text-ink/45 uppercase tracking-widest mb-1.5 px-0.5 font-semibold">{time.slice(0,5)}</div>
-                <div className="grid grid-cols-5 gap-1">
+              <div key={time} className="animate-slide-up">
+                <div className="flex items-center gap-2 mb-2 px-0.5">
+                  <span className="font-mono text-sm text-brand-deep tracking-widest font-semibold">{time.slice(0,5)}</span>
+                  <span className="flex-1 h-px bg-gradient-to-r from-brand/15 to-transparent"/>
+                </div>
+                <div className="grid grid-cols-5 gap-1.5">
                   {[1,2,3,4,5].map(dow => {
                     const date    = weekDays[dow - 1]
                     const dateStr = format(date, 'yyyy-MM-dd')
@@ -288,7 +307,7 @@ export default function HorarioPage() {
                     const daySlots = slotsAtTime.filter(s => s.day_of_week === dow)
                     if (!daySlots.length) return <div key={dow}/>
                     return (
-                      <div key={dow} className="flex flex-col gap-1">
+                      <div key={dow} className="flex flex-col gap-1.5">
                         {daySlots.map(slot => {
                           const cap          = getCapacity(slot.id, dateStr, date)
                           const cancelled    = cancelledSet.has(`${slot.id}|${dateStr}`)
@@ -296,57 +315,79 @@ export default function HorarioPage() {
                           const isRegular    = userParity !== undefined && parityActive(userParity, date)
                           const isAbsent     = userAbsentMap[slot.id]?.has(dateStr) ?? false
                           const isRecovery   = userRecoveryMap[slot.id]?.has(dateStr) ?? false
-                          const capNum        = Math.max(0, cap)
-                          const slotMax       = slot.max_capacity ?? 7
-                          const isFull        = capNum >= slotMax
-                          const activeRegs    = (regularParities[slot.id] ?? []).filter(p => parityActive(p, date)).length
-                          const isEnFormacion = slot.min_regulars > 0 && activeRegs < slot.min_regulars
+                          const capNum       = Math.max(0, cap)
+                          const slotMax      = slot.max_capacity ?? 7
+                          const spotsLeft    = Math.max(0, slotMax - capNum)
+                          const isFull       = capNum >= slotMax
+                          const activeRegs   = (regularParities[slot.id] ?? []).filter(p => parityActive(p, date)).length
+                          const isEnFormacion= slot.min_regulars > 0 && activeRegs < slot.min_regulars
+                          const color        = slot.class_types.color
+
+                          // Estado del puntito superior derecha
+                          let statusColor = '#9BC4BC' // verde teal — libre
+                          if (isFull && !isAbsent) statusColor = 'rgba(11,31,77,0.2)'
+                          else if (spotsLeft <= 2 && !isAbsent) statusColor = '#E8C893' // amber
 
                           return (
                             <button
                               key={slot.id}
                               onClick={() => handleCell(slot, date)}
-                              className={`w-full rounded-xl overflow-hidden text-left transition-all active:scale-[0.94] select-none
-                                ${cancelled ? 'opacity-20' : ''}
-                                ${isPast && !cancelled ? 'opacity-35' : ''}
-                                ${isAbsent ? 'opacity-40' : ''}
+                              className={`group relative w-full rounded-2xl overflow-hidden text-left transition-all active:scale-[0.96] select-none
+                                ${cancelled ? 'opacity-25' : ''}
+                                ${isPast && !cancelled ? 'opacity-40' : ''}
+                                ${isAbsent ? 'opacity-45' : ''}
                               `}
                               style={{
-                                backgroundColor: 'white',
-                                boxShadow: isRegular && !isAbsent
-                                  ? `0 0 0 2px #0B1F4D, 0 2px 10px rgba(11,31,77,0.18)`
+                                background: `linear-gradient(180deg, ${color}1F 0%, ${color}0A 60%, white 100%)`,
+                                border: isRegular && !isAbsent
+                                  ? `1.5px solid #1E4DB7`
                                   : isRecovery
-                                    ? `0 0 0 2px #2E5BFF, 0 2px 10px rgba(46,91,255,0.18)`
-                                    : `0 1px 6px rgba(11,31,77,0.08)`,
+                                    ? `1.5px solid #3D6FD9`
+                                    : `1px solid ${color}33`,
+                                boxShadow: isRegular && !isAbsent
+                                  ? `0 6px 20px rgba(30,77,183,0.18)`
+                                  : isRecovery
+                                    ? `0 4px 16px rgba(30,77,183,0.14)`
+                                    : `0 2px 10px rgba(11,31,77,0.05)`,
+                                minHeight: '78px',
                               }}
                             >
-                              <div className="h-1 w-full" style={{ backgroundColor: slot.class_types.color }}/>
-                              <div className="px-1.5 pt-1.5 pb-2">
-                                <p className={`text-[11px] font-bold text-ink/85 leading-tight truncate ${cancelled ? 'line-through' : ''}`}>
+                              {/* Franja de color clase arriba */}
+                              <div className="h-1 w-full" style={{ backgroundColor: color }}/>
+
+                              {/* Status dot */}
+                              {!cancelled && !isAbsent && (
+                                <span
+                                  className={`absolute top-2 right-2 w-2 h-2 rounded-full ${spotsLeft > 0 && spotsLeft <= 2 ? 'animate-pulse-soft' : ''}`}
+                                  style={{ backgroundColor: statusColor }}
+                                />
+                              )}
+
+                              <div className="px-2 pt-2 pb-2.5">
+                                <p className={`font-display font-semibold text-[12px] text-ink leading-tight truncate tracking-tight ${cancelled ? 'line-through' : ''}`}>
                                   {slot.class_types.name}
                                 </p>
                                 {cancelled ? (
-                                  <p className="text-[10px] font-mono text-ink/40 mt-1 uppercase tracking-wider">cancel.</p>
+                                  <p className="font-mono text-[9px] font-bold text-ink/40 mt-1 uppercase tracking-wider">cancel.</p>
                                 ) : isAbsent ? (
-                                  <p className="text-[10px] font-mono text-red-500 mt-1 uppercase tracking-wider">falta</p>
+                                  <p className="font-mono text-[9px] font-bold text-red-500 mt-1 uppercase tracking-wider">falta</p>
                                 ) : (
-                                  <div className="flex gap-[3px] mt-1.5 flex-wrap">
-                                    {Array.from({ length: slotMax }).map((_, i) => (
-                                      <div key={i} className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                                        style={{
-                                          backgroundColor: i < capNum
-                                            ? slot.class_types.color
-                                            : `${slot.class_types.color}30`,
-                                        }}
-                                      />
-                                    ))}
-                                  </div>
+                                  <p className="font-mono text-[10px] text-ink/55 mt-1 tabular-nums">
+                                    <span className="font-bold text-ink/85">{capNum}</span>
+                                    <span className="text-ink/30">/{slotMax}</span>
+                                  </p>
                                 )}
                                 {isEnFormacion && !cancelled && !isAbsent && (
-                                  <p className="text-[9px] font-mono font-bold text-amber-600 mt-1 uppercase tracking-wider">form.</p>
+                                  <p className="font-mono text-[8px] font-bold text-amber-700 mt-0.5 uppercase tracking-widest">en form.</p>
                                 )}
                                 {isFull && !isEnFormacion && !cancelled && !isAbsent && (
-                                  <p className="text-[9px] font-mono font-bold text-ink/45 mt-1 uppercase tracking-wider">llena</p>
+                                  <p className="font-mono text-[8px] font-bold text-ink/40 mt-0.5 uppercase tracking-widest">llena</p>
+                                )}
+                                {isRegular && !isAbsent && !cancelled && (
+                                  <p className="font-mono text-[8px] font-bold text-brand mt-0.5 uppercase tracking-widest">tu clase</p>
+                                )}
+                                {isRecovery && !cancelled && (
+                                  <p className="font-mono text-[8px] font-bold text-brand-soft mt-0.5 uppercase tracking-widest">recup.</p>
                                 )}
                               </div>
                             </button>

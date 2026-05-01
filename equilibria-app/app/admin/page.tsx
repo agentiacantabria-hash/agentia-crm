@@ -639,6 +639,12 @@ export default function AdminPage() {
   async function createAnnouncement() {
     if (!newAnnounce.title || !newAnnounce.body) { setAnnounceErr('Título y mensaje obligatorios'); return }
     setAnnounceL(true); setAnnounceErr('')
+    // El input type="date" devuelve "YYYY-MM-DD" → en Postgres se trata como
+    // 00:00 del día y el anuncio "caduca" al empezar la jornada. Lo
+    // interpretamos como "fin del día indicado" para que dure todo ese día.
+    const expiresAt = newAnnounce.expires_at
+      ? new Date(`${newAnnounce.expires_at}T23:59:59`).toISOString()
+      : null
     const res = await fetch('/api/admin/announcement', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -647,7 +653,7 @@ export default function AdminPage() {
         title:      newAnnounce.title,
         body:       newAnnounce.body,
         pinned:     newAnnounce.pinned,
-        expires_at: newAnnounce.expires_at || null,
+        expires_at: expiresAt,
       }),
     })
     if (res.ok) {
