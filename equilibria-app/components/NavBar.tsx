@@ -50,33 +50,50 @@ export default function NavBar() {
     const sb = createClient()
     let channel: ReturnType<typeof sb.channel> | null = null
 
-    sb.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) return
+    async function applyUser(userId: string | null) {
+      if (channel) {
+        sb.removeChannel(channel)
+        channel = null
+      }
+      if (!userId) {
+        setLoggedIn(false)
+        setIsAdmin(false)
+        setUnread(0)
+        return
+      }
       setLoggedIn(true)
 
-      sb.from('profiles').select('is_admin').eq('id', user.id).single()
-        .then(({ data }) => { if (data?.is_admin) setIsAdmin(true) })
+      const { data } = await sb.from('profiles').select('is_admin').eq('id', userId).single()
+      setIsAdmin((data as { is_admin?: boolean } | null)?.is_admin ?? false)
 
       const refreshUnread = async () => {
         const { count } = await sb
           .from('notifications')
           .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .eq('is_read', false)
         setUnread(count ?? 0)
       }
       refreshUnread()
 
       // Realtime — RLS filtra a las notifs del propio user
-      channel = sb.channel('notifs-' + user.id)
+      channel = sb.channel('notifs-' + userId)
         .on('postgres_changes', {
           event: '*', schema: 'public', table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
+          filter: `user_id=eq.${userId}`,
         }, () => refreshUnread())
         .subscribe()
+    }
+
+    sb.auth.getUser().then(({ data: { user } }) => applyUser(user?.id ?? null))
+
+    // Reaccionar a login / logout / refresh de sesión sin recargar la página
+    const { data: { subscription } } = sb.auth.onAuthStateChange((_evt, session) => {
+      applyUser(session?.user?.id ?? null)
     })
 
     return () => {
+      subscription.unsubscribe()
       if (channel) sb.removeChannel(channel)
     }
   }, [])
