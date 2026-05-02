@@ -60,6 +60,8 @@ type ClientRow = {
   recovery_used: number
   recovery_max: number
   schedule_type: 'fijo' | 'rotativo'
+  created_at: string
+  regular_slots: { day_of_week: number; start_time: string; class_name: string; color: string }[]
 }
 
 type SimpleClient = { id: string; full_name: string; username: string | null }
@@ -359,6 +361,10 @@ export default function AdminPage() {
   const [clients, setClients]            = useState<ClientRow[]>([])
   const [loadingCli, setLoadingCli]      = useState(false)
   const [editingId, setEditingId]        = useState<string | null>(null)
+  const [expandedId, setExpandedId]      = useState<string | null>(null)
+  const [search, setSearch]              = useState('')
+  const [filterPay, setFilterPay]        = useState<'all' | 'al_dia' | 'pendiente' | 'atrasado'>('all')
+  const [filterSched, setFilterSched]    = useState<'all' | 'fijo' | 'rotativo'>('all')
   const [showNewClient, setShowNewClient] = useState(false)
   const [newClient, setNewClient]        = useState({ username: '', password: '', full_name: '', phone: '', plan_id: '2x', schedule_type: 'fijo' })
   const [newClientLoading, setNCL]       = useState(false)
@@ -373,33 +379,62 @@ export default function AdminPage() {
     const [
       { data: profiles },
       { data: recoveryUsage },
+      { data: regularsAll },
     ] = await Promise.all([
       sb.from('profiles').select('*, plans(*)').eq('is_admin', false).order('full_name', { ascending: true }),
       sb.from('recovery_bookings').select('user_id').eq('status', 'confirmed').gte('class_date', monthStart),
+      sb.from('regular_slots').select('user_id, schedule_slots(day_of_week, start_time, class_types(name, color))'),
     ])
 
     const byUser: Record<string, number> = {}
     recoveryUsage?.forEach((r: { user_id: string }) => { byUser[r.user_id] = (byUser[r.user_id] ?? 0) + 1 })
 
+    type RegRow = {
+      user_id: string
+      schedule_slots: { day_of_week: number; start_time: string; class_types: { name: string; color: string } | null } | null
+    }
+    const regularsByUser: Record<string, ClientRow['regular_slots']> = {}
+    ;((regularsAll ?? []) as unknown as RegRow[]).forEach(r => {
+      const s = r.schedule_slots
+      if (!s) return
+      const list = (regularsByUser[r.user_id] ??= [])
+      list.push({
+        day_of_week: s.day_of_week,
+        start_time:  s.start_time,
+        class_name:  s.class_types?.name ?? '—',
+        color:       s.class_types?.color ?? '#1E4DB7',
+      })
+    })
+    Object.values(regularsByUser).forEach(arr =>
+      arr.sort((a, b) => a.day_of_week - b.day_of_week || a.start_time.localeCompare(b.start_time))
+    )
+
     setClients((profiles ?? []).map((p: {
       id: string; full_name: string; username: string | null; phone: string | null
       plan_id: string; payment_status: string; last_payment_date: string | null; notes: string | null
-      schedule_type: string | null
-      plans: { name: string; max_recoveries_per_month: number } | null
-    }) => ({
-      id:                 p.id,
-      full_name:          p.full_name,
-      username:           p.username,
-      phone:              p.phone,
-      plan_id:            p.plan_id ?? '',
-      plan_name:          p.plans?.name ?? '—',
-      payment_status:     (p.payment_status ?? 'al_dia') as ClientRow['payment_status'],
-      last_payment_date:  p.last_payment_date ?? null,
-      notes:              p.notes ?? null,
-      recovery_used:      byUser[p.id] ?? 0,
-      recovery_max:       p.plans?.max_recoveries_per_month ?? 0,
-      schedule_type:      (p.schedule_type ?? 'fijo') as ClientRow['schedule_type'],
-    })))
+      schedule_type: string | null; created_at: string
+      plans: { name: string; max_recoveries_per_month: number; classes_per_week: number } | null
+    }) => {
+      const stype = (p.schedule_type ?? 'fijo') as ClientRow['schedule_type']
+      const cpw   = p.plans?.classes_per_week ?? 0
+      const max   = stype === 'rotativo' ? cpw * 4 : (p.plans?.max_recoveries_per_month ?? 0)
+      return {
+        id:                 p.id,
+        full_name:          p.full_name,
+        username:           p.username,
+        phone:              p.phone,
+        plan_id:            p.plan_id ?? '',
+        plan_name:          p.plans?.name ?? '—',
+        payment_status:     (p.payment_status ?? 'al_dia') as ClientRow['payment_status'],
+        last_payment_date:  p.last_payment_date ?? null,
+        notes:              p.notes ?? null,
+        recovery_used:      byUser[p.id] ?? 0,
+        recovery_max:       max,
+        schedule_type:      stype,
+        created_at:         p.created_at,
+        regular_slots:      regularsByUser[p.id] ?? [],
+      }
+    }))
     setLoadingCli(false)
   }, [])
 
@@ -842,86 +877,160 @@ export default function AdminPage() {
       )}
 
       {/* ─── CLIENTES ─────────────────────────────────── */}
-      {tab === 'clientes' && (
-        <div>
-          {/* Botón nuevo cliente */}
-          <button onClick={() => setShowNewClient(v => !v)}
-            className="w-full mb-4 bg-navy text-paper font-display font-bold py-3 rounded-2xl text-sm">
-            {showNewClient ? 'Cancelar' : '+ Nuevo cliente'}
-          </button>
+      {tab === 'clientes' && (() => {
+        const total      = clients.length
+        const alDia      = clients.filter(c => c.payment_status === 'al_dia').length
+        const pendientes = clients.filter(c => c.payment_status === 'pendiente').length
+        const atrasados  = clients.filter(c => c.payment_status === 'atrasado').length
+        const totalRecups = clients.reduce((sum, c) => sum + c.recovery_used, 0)
 
-          {/* Formulario nuevo cliente */}
-          {showNewClient && (
-            <div className="card px-4 py-4 mb-4 space-y-3">
-              <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40">Crear cliente</p>
-              <p className="font-mono text-[9px] text-ink/30 leading-relaxed">
-                El usuario es el código con el que entrará a la app. No se usa email.
+        const filtered = clients.filter(c => {
+          if (filterPay !== 'all' && c.payment_status !== filterPay) return false
+          if (filterSched !== 'all' && c.schedule_type !== filterSched) return false
+          const q = search.trim().toLowerCase()
+          if (q && !c.full_name.toLowerCase().includes(q) && !(c.username ?? '').toLowerCase().includes(q)) return false
+          return true
+        })
+
+        return (
+          <div>
+            {/* ── Stats header ── */}
+            <div className="grid grid-cols-4 gap-2 mb-4">
+              <div className="card px-3 py-3 text-center">
+                <p className="font-display font-semibold text-2xl text-navy tabular-nums leading-none">{total}</p>
+                <p className="font-mono text-[9px] uppercase tracking-widest text-ink/45 mt-1">Total</p>
+              </div>
+              <div className="card px-3 py-3 text-center" style={{ background: 'rgba(155,196,188,0.18)' }}>
+                <p className="font-display font-semibold text-2xl text-emerald-800 tabular-nums leading-none">{alDia}</p>
+                <p className="font-mono text-[9px] uppercase tracking-widest text-emerald-700 mt-1">Al día</p>
+              </div>
+              <div className="card px-3 py-3 text-center" style={{ background: 'rgba(232,200,147,0.22)' }}>
+                <p className="font-display font-semibold text-2xl text-amber-800 tabular-nums leading-none">{pendientes}</p>
+                <p className="font-mono text-[9px] uppercase tracking-widest text-amber-700 mt-1">Pendientes</p>
+              </div>
+              <div className="card px-3 py-3 text-center" style={{ background: 'rgba(220,38,38,0.10)' }}>
+                <p className="font-display font-semibold text-2xl text-red-700 tabular-nums leading-none">{atrasados}</p>
+                <p className="font-mono text-[9px] uppercase tracking-widest text-red-600 mt-1">Atrasados</p>
+              </div>
+            </div>
+
+            <div className="card-tint mb-4 px-4 py-3 flex items-center justify-between" style={{ ['--tint' as string]: '#1E4DB7' }}>
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-brand-deep/70 font-semibold">Recuperaciones / Reservas este mes</p>
+                <p className="font-display text-xl font-semibold text-brand-deep tabular-nums mt-1">{totalRecups}</p>
+              </div>
+              <p className="font-mono text-[10px] text-brand-deep/55 text-right max-w-[40%] leading-relaxed">
+                Total consumido por todas las clientas en {format(new Date(), 'MMMM', { locale: es })}
               </p>
-              {[
-                { label: 'Nombre completo *', key: 'full_name', type: 'text', placeholder: 'Ana García' },
-                { label: 'Usuario (código de acceso) *', key: 'username', type: 'text', placeholder: 'anagarcia' },
-                { label: 'Contraseña *', key: 'password', type: 'password', placeholder: 'Mínimo 6 caracteres' },
-                { label: 'Teléfono (opcional)', key: 'phone', type: 'tel', placeholder: '600 000 000' },
-              ].map(f => (
-                <div key={f.key}>
-                  <p className="font-mono text-[9px] uppercase text-ink/40 mb-1">{f.label}</p>
-                  <input type={f.type} placeholder={f.placeholder}
-                    value={newClient[f.key as keyof typeof newClient]}
-                    onChange={e => setNewClient(v => ({ ...v, [f.key]: e.target.value }))}
-                    className="w-full font-mono text-sm px-3 py-2 rounded-xl bg-paper-2 text-navy border-none outline-none"/>
-                </div>
-              ))}
-              <div>
-                <p className="font-mono text-[9px] uppercase text-ink/40 mb-1">Plan *</p>
-                <select value={newClient.plan_id} onChange={e => setNewClient(v => ({ ...v, plan_id: e.target.value }))}
-                  className="w-full font-mono text-sm px-3 py-2 rounded-xl bg-paper-2 text-navy border-none outline-none">
-                  {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <p className="font-mono text-[9px] uppercase text-ink/40 mb-1">Tipo de horario *</p>
-                <select value={newClient.schedule_type} onChange={e => setNewClient(v => ({ ...v, schedule_type: e.target.value }))}
-                  className="w-full font-mono text-sm px-3 py-2 rounded-xl bg-paper-2 text-navy border-none outline-none">
-                  <option value="fijo">Horario fijo</option>
-                  <option value="rotativo">Turnos rotativos</option>
-                </select>
-              </div>
-              {newClientError && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2">{newClientError}</p>}
-              <button onClick={createNewClient} disabled={newClientLoading}
-                className="w-full bg-navy text-paper font-display font-bold py-3 rounded-2xl disabled:opacity-40">
-                {newClientLoading ? 'Creando…' : 'Crear cliente'}
-              </button>
             </div>
-          )}
 
-          {loadingCli ? <Spinner/> : clients.length === 0 ? <Empty text="Sin clientes"/> : (
-            <div className="space-y-2">
-              {clients.some(c => c.payment_status !== 'al_dia') && (
-                <div className="bg-amber-50 rounded-2xl px-4 py-3 mb-3 flex items-center gap-2">
-                  <span className="text-amber-600">⚠</span>
-                  <p className="font-mono text-xs text-amber-700">
-                    {clients.filter(c => c.payment_status === 'atrasado').length} atrasado(s) ·{' '}
-                    {clients.filter(c => c.payment_status === 'pendiente').length} pendiente(s)
-                  </p>
+            {/* ── Botón nuevo cliente ── */}
+            <button onClick={() => setShowNewClient(v => !v)}
+              className="btn-primary mb-4">
+              {showNewClient ? 'Cancelar' : '+ Nuevo cliente'}
+            </button>
+
+            {showNewClient && (
+              <div className="card px-4 py-4 mb-4 space-y-3 animate-fade-in">
+                <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40">Crear cliente</p>
+                <p className="font-mono text-[9px] text-ink/30 leading-relaxed">
+                  El usuario es el código con el que entrará a la app. No se usa email.
+                </p>
+                {[
+                  { label: 'Nombre completo *', key: 'full_name', type: 'text', placeholder: 'Ana García' },
+                  { label: 'Usuario (código de acceso) *', key: 'username', type: 'text', placeholder: 'anagarcia' },
+                  { label: 'Contraseña *', key: 'password', type: 'password', placeholder: 'Mínimo 6 caracteres' },
+                  { label: 'Teléfono (opcional)', key: 'phone', type: 'tel', placeholder: '600 000 000' },
+                ].map(f => (
+                  <div key={f.key}>
+                    <p className="font-mono text-[9px] uppercase text-ink/40 mb-1">{f.label}</p>
+                    <input type={f.type} placeholder={f.placeholder}
+                      value={newClient[f.key as keyof typeof newClient]}
+                      onChange={e => setNewClient(v => ({ ...v, [f.key]: e.target.value }))}
+                      className="w-full font-mono text-sm px-3 py-2 rounded-xl bg-paper-2 text-navy border-none outline-none"/>
+                  </div>
+                ))}
+                <div>
+                  <p className="font-mono text-[9px] uppercase text-ink/40 mb-1">Plan *</p>
+                  <select value={newClient.plan_id} onChange={e => setNewClient(v => ({ ...v, plan_id: e.target.value }))}
+                    className="w-full font-mono text-sm px-3 py-2 rounded-xl bg-paper-2 text-navy border-none outline-none">
+                    {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
                 </div>
-              )}
-              {clients.map(client => (
-                <ClientCard
-                  key={client.id}
-                  client={client}
-                  plans={plans}
-                  isEditing={editingId === client.id}
-                  isDeleting={deletingId === client.id}
-                  onToggleEdit={() => setEditingId(editingId === client.id ? null : client.id)}
-                  onUpdatePayment={updates => updateClientPayment(client.id, updates)}
-                  onUpdateProfile={updates => updateClientProfile(client.id, updates)}
-                  onDelete={() => deleteClient(client.id)}
-                />
+                <div>
+                  <p className="font-mono text-[9px] uppercase text-ink/40 mb-1">Tipo de horario *</p>
+                  <select value={newClient.schedule_type} onChange={e => setNewClient(v => ({ ...v, schedule_type: e.target.value }))}
+                    className="w-full font-mono text-sm px-3 py-2 rounded-xl bg-paper-2 text-navy border-none outline-none">
+                    <option value="fijo">Horario fijo</option>
+                    <option value="rotativo">Turnos rotativos</option>
+                  </select>
+                </div>
+                {newClientError && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2">{newClientError}</p>}
+                <button onClick={createNewClient} disabled={newClientLoading}
+                  className="btn-primary">
+                  {newClientLoading ? 'Creando…' : 'Crear cliente'}
+                </button>
+              </div>
+            )}
+
+            {/* ── Buscador ── */}
+            <input
+              type="text"
+              placeholder="Buscar por nombre o código…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full font-mono text-sm px-4 py-2.5 rounded-xl bg-paper-2 text-navy border-none outline-none mb-2"
+            />
+
+            {/* ── Filtros ── */}
+            <div className="flex gap-2 mb-4 overflow-x-auto scrollbar-hide pb-1">
+              {(['all', 'al_dia', 'pendiente', 'atrasado'] as const).map(opt => (
+                <button key={opt} onClick={() => setFilterPay(opt)}
+                  className={`flex-shrink-0 font-mono text-[10px] uppercase tracking-wider px-3 py-1.5 rounded-full transition-all
+                    ${filterPay === opt ? 'bg-navy text-paper' : 'bg-ink/5 text-ink/55 hover:bg-ink/10'}`}>
+                  {opt === 'all' ? 'Todos' : opt === 'al_dia' ? 'Al día' : opt === 'pendiente' ? 'Pendientes' : 'Atrasados'}
+                </button>
+              ))}
+              <span className="w-px bg-ink/10 mx-1 flex-shrink-0"/>
+              {(['all', 'fijo', 'rotativo'] as const).map(opt => (
+                <button key={opt} onClick={() => setFilterSched(opt)}
+                  className={`flex-shrink-0 font-mono text-[10px] uppercase tracking-wider px-3 py-1.5 rounded-full transition-all
+                    ${filterSched === opt ? 'bg-navy text-paper' : 'bg-ink/5 text-ink/55 hover:bg-ink/10'}`}>
+                  {opt === 'all' ? 'Cualquiera' : opt === 'fijo' ? 'Fijo' : 'Rotativo'}
+                </button>
               ))}
             </div>
-          )}
-        </div>
-      )}
+
+            {loadingCli ? <Spinner/> : filtered.length === 0 ? (
+              <p className="font-mono text-xs text-ink/40 text-center py-8 italic">
+                {clients.length === 0 ? 'Sin clientes todavía' : 'Sin resultados con esos filtros'}
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {filtered.map(client => (
+                  <ClientCard
+                    key={client.id}
+                    client={client}
+                    plans={plans}
+                    isExpanded={expandedId === client.id}
+                    isEditing={editingId === client.id}
+                    isDeleting={deletingId === client.id}
+                    onToggleExpand={() => setExpandedId(expandedId === client.id ? null : client.id)}
+                    onToggleEdit={() => setEditingId(editingId === client.id ? null : client.id)}
+                    onUpdatePayment={updates => updateClientPayment(client.id, updates)}
+                    onUpdateProfile={updates => updateClientProfile(client.id, updates)}
+                    onMarkPaid={() => updateClientPayment(client.id, {
+                      payment_status: 'al_dia',
+                      last_payment_date: format(new Date(), 'yyyy-MM-dd'),
+                    })}
+                    onDelete={() => deleteClient(client.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* ─── HORARIO ──────────────────────────────────── */}
       {tab === 'horario' && (
@@ -1389,15 +1498,18 @@ function HistorialRow({ item, type }: { item: { id: string; class_date: string; 
 
 // ─── ClientCard ───────────────────────────────────────────────────────────────
 function ClientCard({
-  client, plans, isEditing, isDeleting, onToggleEdit, onUpdatePayment, onUpdateProfile, onDelete,
+  client, plans, isExpanded, isEditing, isDeleting, onToggleExpand, onToggleEdit, onUpdatePayment, onUpdateProfile, onMarkPaid, onDelete,
 }: {
   client: ClientRow
   plans: Plan[]
+  isExpanded: boolean
   isEditing: boolean
   isDeleting: boolean
+  onToggleExpand: () => void
   onToggleEdit: () => void
   onUpdatePayment: (u: Partial<Pick<ClientRow, 'payment_status' | 'last_payment_date' | 'notes' | 'plan_id' | 'schedule_type'>>) => void
   onUpdateProfile: (u: { full_name?: string; username?: string; phone?: string; password?: string }) => Promise<Response>
+  onMarkPaid: () => void
   onDelete: () => void
 }) {
   const [draft, setDraft]         = useState({ full_name: client.full_name, username: client.username ?? '', phone: client.phone ?? '' })
@@ -1419,46 +1531,139 @@ function ClientCard({
     setPSav(false)
   }
 
+  // Cinta lateral según estado de pago
+  const stripeColor =
+    client.payment_status === 'al_dia'    ? '#9BC4BC' :
+    client.payment_status === 'pendiente' ? '#E8C893' :
+    /* atrasado */                          '#DC2626'
+
   return (
-    <div className="card overflow-hidden">
-      <div className="px-4 py-4">
-        <div className="flex items-start justify-between">
-          <div className="flex-1 min-w-0 mr-3">
-            <p className="font-display font-bold text-navy text-sm truncate">{client.full_name}</p>
-            <p className="font-mono text-[10px] text-ink/40 mt-0.5">
-              {client.username ?? '—'} · {client.plan_name}
+    <div className="card overflow-hidden flex">
+      {/* Cinta lateral indicadora */}
+      <div className="w-1.5 flex-shrink-0" style={{ backgroundColor: stripeColor }}/>
+      <div className="flex-1 px-4 py-4">
+        <button onClick={onToggleExpand}
+          className="w-full text-left flex items-start justify-between gap-3 active:opacity-70 transition-opacity">
+          <div className="flex-1 min-w-0">
+            <p className="font-display font-semibold text-navy text-base tracking-tight truncate">{client.full_name}</p>
+            <p className="font-mono text-[11px] text-ink/55 mt-0.5">
+              <span className="font-semibold text-brand-deep">{client.username ?? '—'}</span>
+              <span className="text-ink/35"> · </span>
+              {client.plan_name}
+              {client.schedule_type === 'rotativo' && <span className="text-ink/35"> · rotativo</span>}
             </p>
             {client.phone && (
-              <a href={`tel:${client.phone}`} className="font-mono text-[10px] text-ink/40 block mt-0.5">{client.phone}</a>
+              <a href={`tel:${client.phone}`} onClick={e => e.stopPropagation()}
+                className="font-mono text-[11px] text-ink/45 block mt-0.5 hover:text-brand-deep">{client.phone}</a>
             )}
           </div>
-          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-            <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${paymentBadgeClass(client.payment_status)}`}>
+          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+            <span className={`badge ${client.payment_status === 'al_dia' ? 'badge-success' : client.payment_status === 'pendiente' ? 'badge-warn' : 'badge-danger'}`}>
               {paymentLabel(client.payment_status)}
             </span>
-            {client.schedule_type === 'rotativo' && (
-              <span className="text-[9px] font-mono font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full">Rotativo</span>
-            )}
-            <span className="font-mono text-[9px] text-ink/30">{client.recovery_used}/{client.recovery_max} recup.</span>
+            <span className="font-mono text-[10px] text-ink/45 tabular-nums">
+              {client.recovery_used}/{client.recovery_max} {client.schedule_type === 'rotativo' ? 'res.' : 'rec.'}
+            </span>
             {client.last_payment_date && (
-              <span className="font-mono text-[9px] text-ink/30">
-                Pago: {new Date(client.last_payment_date + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+              <span className="font-mono text-[9px] text-ink/35">
+                Pago {new Date(client.last_payment_date + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
               </span>
             )}
+            <span className="font-mono text-[9px] text-brand/70">{isExpanded ? '▲' : '▼'}</span>
           </div>
-        </div>
+        </button>
 
-        <div className="flex items-center gap-3 mt-2">
-          <button onClick={onToggleEdit} className="text-[10px] font-mono text-ink/30 underline underline-offset-2">
-            {isEditing ? 'Cerrar' : 'Editar'}
+        {/* Acción rápida: marcar pagado */}
+        {client.payment_status !== 'al_dia' && (
+          <button onClick={onMarkPaid}
+            className="mt-3 w-full font-mono text-[11px] uppercase tracking-widest font-bold text-emerald-800 bg-teal/30 hover:bg-teal/40 py-2 rounded-xl transition-colors active:scale-95">
+            ✓ Marcar pagado hoy
           </button>
-          <button onClick={onDelete} disabled={isDeleting}
-            className="text-[10px] font-mono text-red-400 underline underline-offset-2 disabled:opacity-40">
-            {isDeleting ? '…' : 'Eliminar'}
-          </button>
-        </div>
+        )}
 
-        {isEditing && (
+        {/* Detalle expandible */}
+        {isExpanded && (
+          <div className="mt-4 pt-4 border-t border-ink/5 space-y-3 animate-fade-in">
+            {/* Clases fijas */}
+            <div>
+              <p className="font-mono text-[9px] uppercase tracking-widest text-ink/45 mb-2 font-semibold">
+                Clases fijas {client.schedule_type === 'rotativo' && '(no aplica · rotativa)'}
+              </p>
+              {client.regular_slots.length === 0 ? (
+                <p className="font-mono text-[11px] text-ink/35 italic">
+                  {client.schedule_type === 'rotativo' ? 'Reserva puntualmente cada semana' : 'Aún no se ha apuntado a ninguna'}
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  {client.regular_slots.map((rs, i) => (
+                    <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-paper">
+                      <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ backgroundColor: rs.color }}/>
+                      <span className="font-display text-sm text-ink">{rs.class_name}</span>
+                      <span className="font-mono text-[10px] text-ink/45 ml-auto">
+                        {DAY_NAMES[rs.day_of_week]} · {rs.start_time.slice(0,5)}h
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Cupo del mes */}
+            <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-paper">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-ink/45">
+                  {client.schedule_type === 'rotativo' ? 'Reservas este mes' : 'Recuperaciones este mes'}
+                </p>
+                <p className="font-display text-lg font-semibold text-brand-deep tabular-nums leading-none mt-1">
+                  {client.recovery_used}<span className="text-brand-deep/35 text-base">/{client.recovery_max}</span>
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-1 max-w-[55%] justify-end">
+                {Array.from({ length: client.recovery_max || 4 }).map((_, i) => (
+                  <span key={i} className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: i < client.recovery_used ? '#1E4DB7' : 'rgba(30,77,183,0.15)' }}/>
+                ))}
+              </div>
+            </div>
+
+            {/* Datos secundarios */}
+            <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+              <div className="px-3 py-2 rounded-xl bg-paper">
+                <p className="text-[9px] uppercase tracking-widest text-ink/40">Miembro desde</p>
+                <p className="text-ink/75 mt-0.5 capitalize">
+                  {client.created_at ? format(new Date(client.created_at), "MMM yyyy", { locale: es }) : '—'}
+                </p>
+              </div>
+              <div className="px-3 py-2 rounded-xl bg-paper">
+                <p className="text-[9px] uppercase tracking-widest text-ink/40">Último pago</p>
+                <p className="text-ink/75 mt-0.5">
+                  {client.last_payment_date ? new Date(client.last_payment_date + 'T00:00:00').toLocaleDateString('es-ES') : '—'}
+                </p>
+              </div>
+            </div>
+
+            {/* Notas */}
+            {client.notes && (
+              <div className="px-3 py-2 rounded-xl bg-amber-50 border border-amber-100">
+                <p className="font-mono text-[9px] uppercase tracking-widest text-amber-800 mb-1">Notas</p>
+                <p className="text-sm text-amber-900 whitespace-pre-wrap leading-relaxed">{client.notes}</p>
+              </div>
+            )}
+
+            {/* Acciones */}
+            <div className="flex items-center gap-3 pt-1">
+              <button onClick={onToggleEdit} className="font-mono text-[11px] uppercase tracking-widest font-bold text-brand-deep underline-offset-2 hover:underline">
+                {isEditing ? '↑ Cerrar edición' : 'Editar'}
+              </button>
+              <button onClick={onDelete} disabled={isDeleting}
+                className="font-mono text-[11px] uppercase tracking-widest font-bold text-red-500 disabled:opacity-40 underline-offset-2 hover:underline ml-auto">
+                {isDeleting ? '…' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {isExpanded && isEditing && (
           <div className="mt-3 pt-3 border-t border-ink/5 space-y-3">
             {/* Datos personales */}
             <p className="font-mono text-[8px] uppercase tracking-widest text-ink/30">Datos personales</p>
