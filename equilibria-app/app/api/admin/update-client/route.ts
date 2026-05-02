@@ -3,6 +3,7 @@ import { assertAdmin } from '@/lib/auth/admin-guard'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createNotification } from '@/lib/notifications'
 import { broadcastScheduleChange } from '@/lib/schedule-events'
+import { maxRecoveriesPerMonth } from '@/lib/plan'
 
 /**
  * PATCH /api/admin/update-client — actualiza datos de cliente con
@@ -38,16 +39,35 @@ export async function PATCH(req: NextRequest) {
   const currentPlan = (profile?.plans as unknown as { classes_per_week: number } | null) ?? null
   const currentScheduleType = (profile as { schedule_type?: string } | null)?.schedule_type ?? null
 
-  // Gating: si baja classes_per_week por debajo de las regulares actuales
+  // Gating: si baja classes_per_week por debajo de las regulares actuales,
+  // o si baja el cupo mensual de recoveries por debajo de las ya usadas este mes
   if (plan_id && plan_id !== profile?.plan_id && !force) {
-    const { data: newPlan } = await admin.from('plans').select('classes_per_week, name').eq('id', plan_id).single()
+    const { data: newPlanData } = await admin.from('plans').select('classes_per_week, max_recoveries_per_month, name').eq('id', plan_id).single()
+    const newPlan = newPlanData as { classes_per_week: number; max_recoveries_per_month: number; name: string } | null
     if (newPlan && regulars && regulars.length) {
-      const cpw = (newPlan as { classes_per_week: number }).classes_per_week
+      const cpw = newPlan.classes_per_week
       const total = regulars.length
       if (total > cpw) {
         return NextResponse.json({
-          error: `Esta clienta tiene ${total} clase${total !== 1 ? 's' : ''} fija${total !== 1 ? 's' : ''} a la semana, pero el plan "${(newPlan as { name: string }).name}" solo permite ${cpw}. Retira ${total - cpw} clase${total - cpw !== 1 ? 's' : ''} primero.`,
+          error: `Esta clienta tiene ${total} clase${total !== 1 ? 's' : ''} fija${total !== 1 ? 's' : ''} a la semana, pero el plan "${newPlan.name}" solo permite ${cpw}. Retira ${total - cpw} clase${total - cpw !== 1 ? 's' : ''} primero.`,
           code: 'plan_conflict',
+        }, { status: 409 })
+      }
+    }
+
+    // Recoveries usadas este mes vs cupo del nuevo plan
+    if (newPlan) {
+      const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0)
+      const { count: usedThisMonth } = await admin
+        .from('recovery_bookings').select('*', { count: 'exact', head: true })
+        .eq('user_id', user_id).eq('status', 'confirmed').gte('class_date', monthStart.toISOString().slice(0,10))
+      const targetScheduleType = schedule_type ?? currentScheduleType
+      const newCupo = maxRecoveriesPerMonth(targetScheduleType, newPlan)
+      const used = usedThisMonth ?? 0
+      if (used > newCupo) {
+        return NextResponse.json({
+          error: `Esta clienta ya ha usado ${used} ${targetScheduleType === 'rotativo' ? 'reservas' : 'recuperaciones'} este mes y el plan "${newPlan.name}" solo permite ${newCupo}. Espera al mes que viene o usa force=true.`,
+          code: 'cupo_conflict',
         }, { status: 409 })
       }
     }

@@ -63,6 +63,26 @@ export async function DELETE(req: NextRequest) {
   if (!user_id) return NextResponse.json({ error: 'Falta user_id' }, { status: 400 })
 
   const admin = createAdminClient()
+
+  // No permitir borrar el último admin (te quedas sin acceso al panel)
+  const { data: target } = await admin.from('profiles').select('is_admin').eq('id', user_id).single()
+  if ((target as { is_admin?: boolean } | null)?.is_admin) {
+    const { count: adminCount } = await admin
+      .from('profiles').select('*', { count: 'exact', head: true }).eq('is_admin', true)
+    if ((adminCount ?? 0) <= 1) {
+      return NextResponse.json({
+        error: 'No puedes eliminar al único administrador. Crea otro admin antes de borrar este.',
+        code: 'last_admin',
+      }, { status: 409 })
+    }
+    if (user_id === guard.user.id) {
+      return NextResponse.json({
+        error: 'No puedes borrarte a ti mismo desde aquí. Pídele a otro admin que lo haga.',
+        code: 'self_delete',
+      }, { status: 409 })
+    }
+  }
+
   const { error } = await admin.auth.admin.deleteUser(user_id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
