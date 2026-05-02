@@ -864,24 +864,74 @@ export default function AdminPage() {
     acc[s.day_of_week].push(s); return acc
   }, {})
 
-  const TAB_LABELS: Record<Tab, string> = {
-    hoy: 'Hoy', semana: 'Semana', clientes: 'Clientes', horario: 'Horario', stats: 'Stats', gestion: 'Gestión', registro: 'Registro',
+  const TAB_LABELS: Record<Tab, { label: string; icon: React.ReactNode }> = {
+    hoy: { label: 'Hoy', icon: (
+      <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+      </svg>
+    )},
+    semana: { label: 'Semana', icon: (
+      <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+      </svg>
+    )},
+    clientes: { label: 'Clientes', icon: (
+      <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+      </svg>
+    )},
+    horario: { label: 'Horario', icon: (
+      <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+      </svg>
+    )},
+    stats: { label: 'Stats', icon: (
+      <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M3 3v18h18"/><rect x="7" y="13" width="3" height="5"/><rect x="12" y="9" width="3" height="9"/><rect x="17" y="5" width="3" height="13"/>
+      </svg>
+    )},
+    gestion: { label: 'Gestión', icon: (
+      <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 11-5.8-1.6"/>
+      </svg>
+    )},
+    registro: { label: 'Registro', icon: (
+      <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/>
+      </svg>
+    )},
   }
 
   return (
-    <div className="max-w-lg mx-auto px-4 pt-10 pb-28">
-      <p className="font-mono text-[10px] uppercase tracking-widest text-ink/40 mb-1">Panel</p>
-      <h1 className="font-display font-bold text-3xl text-navy mb-4">Admin</h1>
+    <div className="max-w-lg mx-auto px-4 pt-8 pb-28">
+      <p className="page-eyebrow">Panel administrador</p>
 
-      {/* Tabs — scrollable */}
-      <div className="flex gap-0.5 mb-6 bg-paper-2 p-1 rounded-2xl overflow-x-auto">
-        {(['hoy', 'semana', 'clientes', 'horario', 'stats', 'gestion', 'registro'] as Tab[]).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`flex-shrink-0 px-2.5 py-1.5 rounded-xl font-mono text-[8px] uppercase tracking-wider transition-colors whitespace-nowrap
-              ${tab === t ? 'bg-white text-navy font-bold shadow-sm' : 'text-ink/40'}`}>
-            {TAB_LABELS[t]}
-          </button>
-        ))}
+      {/* Tabs scrollables con iconos + label, estilo premium */}
+      <div className="relative -mx-4 mb-6 mt-3">
+        {/* Gradients laterales para indicar más contenido */}
+        <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 z-10"
+          style={{ background: 'linear-gradient(to right, rgba(244,239,230,1), rgba(244,239,230,0))' }}/>
+        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 z-10"
+          style={{ background: 'linear-gradient(to left, rgba(244,239,230,1), rgba(244,239,230,0))' }}/>
+        <div className="flex gap-1.5 px-4 overflow-x-auto scrollbar-hide">
+          {(['hoy', 'semana', 'clientes', 'horario', 'stats', 'gestion', 'registro'] as Tab[]).map(t => {
+            const meta = TAB_LABELS[t]
+            const active = tab === t
+            return (
+              <button key={t} onClick={() => setTab(t)}
+                className={`group flex-shrink-0 inline-flex items-center gap-2 px-4 py-3 rounded-2xl font-display text-[13px] tracking-tight whitespace-nowrap transition-all duration-300 ease-spring
+                  ${active
+                    ? 'bg-navy text-paper font-semibold'
+                    : 'bg-white/70 text-ink/60 hover:bg-white hover:text-ink/85 font-medium'}`}
+                style={active ? { boxShadow: '0 8px 24px rgba(11,31,77,0.32), inset 0 1px 0 rgba(255,255,255,0.12)' } : { boxShadow: '0 1px 3px rgba(11,31,77,0.04)' }}>
+                <span className={`transition-transform duration-300 ease-spring ${active ? 'scale-110' : 'scale-100'}`}>
+                  {meta.icon}
+                </span>
+                <span>{meta.label}</span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* ─── HOY ──────────────────────────────────────── */}
