@@ -113,24 +113,27 @@ function ClassCard({
     setAddLoading(false); setShowAdd(false); setAddUserId(''); onReload?.()
   }
 
+  const color = cv.slot.class_types.color
   return (
-    <div className={`card overflow-hidden flex ${cv.isCancelled ? 'opacity-40' : ''}`}>
-      <div className="w-1.5 flex-shrink-0" style={{ backgroundColor: cv.slot.class_types.color }}/>
-      <div className="flex-1 px-4 py-3">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <p className="font-display font-bold text-navy text-sm">{cv.slot.class_types.name}</p>
-            <p className="font-mono text-[10px] text-ink/40">{cv.slot.start_time.slice(0, 5)}h</p>
+    <div className={`card-tint overflow-hidden flex ${cv.isCancelled ? 'opacity-50' : ''}`}
+      style={{ ['--tint' as string]: color }}>
+      <div className="w-1.5 flex-shrink-0" style={{ backgroundColor: color }}/>
+      <div className="flex-1 px-4 py-3.5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="min-w-0">
+            <p className="font-display font-semibold text-navy text-base tracking-tight">{cv.slot.class_types.name}</p>
+            <p className="font-mono text-[11px] text-ink/55 mt-0.5 tabular-nums">{cv.slot.start_time.slice(0, 5)}h</p>
           </div>
-          <div className="flex items-center gap-2">
-            {cv.isCancelled && <span className="font-mono text-[9px] text-red-500 uppercase tracking-wider">Cancelada</span>}
-            <span className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded-full
-              ${cv.attendees.length >= cv.slot.max_capacity ? 'bg-navy/10 text-navy' : 'bg-ink/5 text-ink/50'}`}>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {cv.isCancelled && <span className="badge badge-danger">Cancelada</span>}
+            <span className={`font-mono text-[11px] font-bold px-2.5 py-1 rounded-full tabular-nums
+              ${cv.attendees.length >= cv.slot.max_capacity ? 'bg-brand/12 text-brand-deep' : 'bg-ink/5 text-ink/55'}`}>
               {cv.attendees.length}/{cv.slot.max_capacity}
             </span>
             {!cv.isCancelled && allClients && (
               <button onClick={() => setShowAdd(v => !v)}
-                className="w-6 h-6 rounded-full bg-navy/10 text-navy font-bold text-sm flex items-center justify-center leading-none">
+                aria-label={showAdd ? 'Cerrar añadir' : 'Añadir asistente'}
+                className="w-7 h-7 rounded-full bg-brand/12 text-brand-deep font-bold text-base flex items-center justify-center leading-none active:scale-95 transition-transform">
                 {showAdd ? '−' : '+'}
               </button>
             )}
@@ -138,32 +141,38 @@ function ClassCard({
         </div>
 
         {cv.attendees.length > 0 ? (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
             {cv.attendees.map(a => (
-              <div key={a.user_id} className="flex items-center justify-between gap-2">
-                <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full flex-shrink-0
-                  ${a.type === 'recovery' ? 'bg-blue/10 text-blue' : 'bg-paper-2 text-ink/60'}`}>
-                  {a.full_name.split(' ')[0]}{a.username ? ` (${a.username})` : ''}
-                </span>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {a.type === 'regular' && !cv.isCancelled && (
-                    <button onClick={() => markAbsent(a.user_id)} disabled={markingId === a.user_id}
-                      className="text-[9px] font-mono text-amber-500 disabled:opacity-40">
-                      {markingId === a.user_id ? '…' : '✗ falta'}
-                    </button>
-                  )}
-                  {!cv.isCancelled && (
-                    <button onClick={() => removeAttendee(a)} disabled={removingId === a.user_id}
-                      className="text-[9px] font-mono text-red-400 disabled:opacity-40">
-                      {removingId === a.user_id ? '…' : a.type === 'regular' ? '✗ quitar fija' : '✗ quitar'}
-                    </button>
-                  )}
+              <div key={a.user_id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white/70">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`badge ${a.type === 'recovery' ? 'badge-brand' : 'badge-neutral'}`}>
+                    {a.type === 'recovery' ? 'Recup.' : 'Fija'}
+                  </span>
+                  <span className="font-display text-sm text-ink truncate">
+                    {a.full_name}
+                    {a.username && <span className="text-ink/35 font-mono text-[11px]"> · {a.username}</span>}
+                  </span>
                 </div>
+                {!cv.isCancelled && (
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {a.type === 'regular' && (
+                      <button onClick={() => markAbsent(a.user_id)} disabled={markingId === a.user_id}
+                        className="font-mono text-[10px] uppercase tracking-wider text-amber-700 hover:text-amber-900 disabled:opacity-40 px-1.5 py-1">
+                        {markingId === a.user_id ? '…' : 'Falta'}
+                      </button>
+                    )}
+                    <button onClick={() => removeAttendee(a)} disabled={removingId === a.user_id}
+                      aria-label={a.type === 'regular' ? 'Quitar fija' : 'Quitar reserva'}
+                      className="font-mono text-[10px] uppercase tracking-wider text-red-500 hover:text-red-700 disabled:opacity-40 px-1.5 py-1">
+                      {removingId === a.user_id ? '…' : 'Quitar'}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         ) : (
-          !cv.isCancelled && <p className="text-[10px] font-mono text-ink/30">Sin asistentes confirmados</p>
+          !cv.isCancelled && <p className="font-mono text-[11px] text-ink/40 text-center py-3 italic">Sin asistentes confirmados</p>
         )}
 
         {showAdd && (
