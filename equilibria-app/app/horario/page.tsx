@@ -448,7 +448,7 @@ export default function HorarioPage() {
                                   <p className="font-mono text-[8px] font-bold text-brand mt-0.5 uppercase tracking-widest">tu clase</p>
                                 )}
                                 {isRecovery && !cancelled && (
-                                  <p className="font-mono text-[8px] font-bold text-brand-soft mt-0.5 uppercase tracking-widest">recup.</p>
+                                  <p className="font-mono text-[8px] font-bold text-brand-soft mt-0.5 uppercase tracking-widest">{isRotating ? 'reserv.' : 'recup.'}</p>
                                 )}
                               </div>
                             </button>

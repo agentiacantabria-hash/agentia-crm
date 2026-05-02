@@ -135,7 +135,7 @@ export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) 
                 <span className="badge bg-white/40 text-ink/65">Alterna</span>
               )}
               {isUserRecovery && (
-                <span className="badge bg-white/55 text-brand-deep">Recuperación</span>
+                <span className="badge bg-white/55 text-brand-deep">{isRotating ? 'Reservada' : 'Recuperación'}</span>
               )}
               {isEnFormacion && (
                 <span className="badge bg-amber-100/80 text-amber-800">

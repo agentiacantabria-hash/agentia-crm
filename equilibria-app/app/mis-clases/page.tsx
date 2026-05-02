@@ -178,7 +178,7 @@ export default function MisClasesPage() {
             {cupLabel} este mes
           </p>
           {creditsLeft > 0 && (
-            <button onClick={() => router.push('/recuperar')}
+            <button onClick={() => router.push(isRotating ? '/horario' : '/recuperar')}
               className="font-mono text-[10px] uppercase tracking-widest text-brand font-bold underline-offset-2 hover:underline">
               {isRotating ? 'Reservar →' : 'Usar →'}
             </button>

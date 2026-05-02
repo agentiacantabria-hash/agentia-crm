@@ -199,7 +199,7 @@ export default function PerfilPage() {
                   </p>
                 </div>
                 <span className={`badge ${item.type === 'recovery' ? 'badge-brand' : 'badge-danger'}`}>
-                  {item.type === 'recovery' ? 'Recup.' : 'Falta'}
+                  {item.type === 'recovery' ? (isRotating ? 'Reserva' : 'Recup.') : 'Falta'}
                 </span>
               </div>
             ))}
