@@ -61,7 +61,19 @@ type ClientRow = {
   recovery_max: number
   schedule_type: 'fijo' | 'rotativo'
   created_at: string
+  birthday: string | null
   regular_slots: { day_of_week: number; start_time: string; class_name: string; color: string }[]
+  attended_estimate: number  // clases asistidas este mes (estimado)
+  attended_max: number        // total potencial este mes
+  last_activity: string | null // última recovery o falta (yyyy-mm-dd)
+}
+
+type PaymentRow = {
+  id: string
+  amount: number | null
+  method: string | null
+  notes: string | null
+  paid_at: string
 }
 
 type SimpleClient = { id: string; full_name: string; username: string | null }
@@ -366,7 +378,7 @@ export default function AdminPage() {
   const [filterPay, setFilterPay]        = useState<'all' | 'al_dia' | 'pendiente' | 'atrasado'>('all')
   const [filterSched, setFilterSched]    = useState<'all' | 'fijo' | 'rotativo'>('all')
   const [showNewClient, setShowNewClient] = useState(false)
-  const [newClient, setNewClient]        = useState({ username: '', password: '', full_name: '', phone: '', plan_id: '2x', schedule_type: 'fijo' })
+  const [newClient, setNewClient]        = useState({ username: '', password: '', full_name: '', phone: '', birthday: '', plan_id: '2x', schedule_type: 'fijo' })
   const [newClientLoading, setNCL]       = useState(false)
   const [newClientError, setNCE]         = useState('')
   const [deletingId, setDeletingId]      = useState<string | null>(null)
@@ -380,14 +392,39 @@ export default function AdminPage() {
       { data: profiles },
       { data: recoveryUsage },
       { data: regularsAll },
+      { data: absencesMonth },
+      { data: recoveriesMonth },
+      { data: lastActivityRecov },
+      { data: lastActivityAbs },
     ] = await Promise.all([
       sb.from('profiles').select('*, plans(*)').eq('is_admin', false).order('full_name', { ascending: true }),
       sb.from('recovery_bookings').select('user_id').eq('status', 'confirmed').gte('class_date', monthStart),
       sb.from('regular_slots').select('user_id, schedule_slots(day_of_week, start_time, class_types(name, color))'),
+      sb.from('absences').select('user_id').gte('class_date', monthStart),
+      sb.from('recovery_bookings').select('user_id').eq('status', 'confirmed').gte('class_date', monthStart),
+      sb.from('recovery_bookings').select('user_id, class_date').eq('status', 'confirmed').order('class_date', { ascending: false }),
+      sb.from('absences').select('user_id, class_date').order('class_date', { ascending: false }),
     ])
 
     const byUser: Record<string, number> = {}
     recoveryUsage?.forEach((r: { user_id: string }) => { byUser[r.user_id] = (byUser[r.user_id] ?? 0) + 1 })
+
+    const absencesByUser: Record<string, number> = {}
+    ;(absencesMonth ?? []).forEach((a: { user_id: string }) => {
+      absencesByUser[a.user_id] = (absencesByUser[a.user_id] ?? 0) + 1
+    })
+    const recoveriesByUser: Record<string, number> = {}
+    ;(recoveriesMonth ?? []).forEach((r: { user_id: string }) => {
+      recoveriesByUser[r.user_id] = (recoveriesByUser[r.user_id] ?? 0) + 1
+    })
+
+    // Última señal por usuario: el max de su última recovery o última falta
+    const lastByUser: Record<string, string> = {}
+    ;[...(lastActivityRecov ?? []), ...(lastActivityAbs ?? [])]
+      .forEach((r: { user_id: string; class_date: string }) => {
+        const prev = lastByUser[r.user_id]
+        if (!prev || r.class_date > prev) lastByUser[r.user_id] = r.class_date
+      })
 
     type RegRow = {
       user_id: string
@@ -412,12 +449,19 @@ export default function AdminPage() {
     setClients((profiles ?? []).map((p: {
       id: string; full_name: string; username: string | null; phone: string | null
       plan_id: string; payment_status: string; last_payment_date: string | null; notes: string | null
-      schedule_type: string | null; created_at: string
+      schedule_type: string | null; created_at: string; birthday: string | null
       plans: { name: string; max_recoveries_per_month: number; classes_per_week: number } | null
     }) => {
       const stype = (p.schedule_type ?? 'fijo') as ClientRow['schedule_type']
       const cpw   = p.plans?.classes_per_week ?? 0
       const max   = stype === 'rotativo' ? cpw * 4 : (p.plans?.max_recoveries_per_month ?? 0)
+      const regulars = regularsByUser[p.id] ?? []
+      // Asistencia estimada: (regulars × 4 semanas) - faltas + recoveries
+      // Para rotativos: solo cuentan las recoveries
+      const attendedMax = stype === 'rotativo' ? (recoveriesByUser[p.id] ?? 0) : regulars.length * 4
+      const attendedEst = stype === 'rotativo'
+        ? (recoveriesByUser[p.id] ?? 0)
+        : Math.max(0, regulars.length * 4 - (absencesByUser[p.id] ?? 0) + (recoveriesByUser[p.id] ?? 0))
       return {
         id:                 p.id,
         full_name:          p.full_name,
@@ -432,7 +476,11 @@ export default function AdminPage() {
         recovery_max:       max,
         schedule_type:      stype,
         created_at:         p.created_at,
-        regular_slots:      regularsByUser[p.id] ?? [],
+        birthday:           p.birthday ?? null,
+        regular_slots:      regulars,
+        attended_estimate:  attendedEst,
+        attended_max:       attendedMax,
+        last_activity:      lastByUser[p.id] ?? null,
       }
     }))
     setLoadingCli(false)
@@ -455,7 +503,7 @@ export default function AdminPage() {
     }))
   }
 
-  async function updateClientProfile(userId: string, updates: { full_name?: string; username?: string; phone?: string; password?: string }) {
+  async function updateClientProfile(userId: string, updates: { full_name?: string; username?: string; phone?: string; password?: string; birthday?: string | null }) {
     const res = await fetch('/api/admin/update-profile', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -483,7 +531,7 @@ export default function AdminPage() {
     })
     const json = await res.json()
     if (!res.ok) { setNCE(json.error); setNCL(false); return }
-    setNewClient({ username: '', password: '', full_name: '', phone: '', plan_id: '2x', schedule_type: 'fijo' })
+    setNewClient({ username: '', password: '', full_name: '', phone: '', birthday: '', plan_id: '2x', schedule_type: 'fijo' })
     setShowNewClient(false); setNCL(false)
     loadClientes()
     const sb = createClient()
@@ -924,11 +972,18 @@ export default function AdminPage() {
               </p>
             </div>
 
-            {/* ── Botón nuevo cliente ── */}
-            <button onClick={() => setShowNewClient(v => !v)}
-              className="btn-primary mb-4">
-              {showNewClient ? 'Cancelar' : '+ Nuevo cliente'}
-            </button>
+            {/* ── Toolbar nuevo cliente + exportar ── */}
+            <div className="flex gap-2 mb-4">
+              <button onClick={() => setShowNewClient(v => !v)}
+                className="btn-primary flex-1">
+                {showNewClient ? 'Cancelar' : '+ Nuevo cliente'}
+              </button>
+              <a href="/api/admin/clients-export" download
+                className="flex items-center justify-center px-4 rounded-[1.1rem] bg-paper-2 text-brand-deep font-mono text-xs uppercase tracking-widest font-bold hover:bg-paper-3 transition-colors active:scale-95"
+                title="Descargar CSV">
+                ↓ CSV
+              </a>
+            </div>
 
             {showNewClient && (
               <div className="card px-4 py-4 mb-4 space-y-3 animate-fade-in">
@@ -941,6 +996,7 @@ export default function AdminPage() {
                   { label: 'Usuario (código de acceso) *', key: 'username', type: 'text', placeholder: 'anagarcia' },
                   { label: 'Contraseña *', key: 'password', type: 'password', placeholder: 'Mínimo 6 caracteres' },
                   { label: 'Teléfono (opcional)', key: 'phone', type: 'tel', placeholder: '600 000 000' },
+                  { label: 'Cumpleaños (opcional)', key: 'birthday', type: 'date', placeholder: '' },
                 ].map(f => (
                   <div key={f.key}>
                     <p className="font-mono text-[9px] uppercase text-ink/40 mb-1">{f.label}</p>
@@ -1019,10 +1075,7 @@ export default function AdminPage() {
                     onToggleEdit={() => setEditingId(editingId === client.id ? null : client.id)}
                     onUpdatePayment={updates => updateClientPayment(client.id, updates)}
                     onUpdateProfile={updates => updateClientProfile(client.id, updates)}
-                    onMarkPaid={() => updateClientPayment(client.id, {
-                      payment_status: 'al_dia',
-                      last_payment_date: format(new Date(), 'yyyy-MM-dd'),
-                    })}
+                    onPaymentRefresh={() => loadClientes()}
                     onDelete={() => deleteClient(client.id)}
                   />
                 ))}
@@ -1498,7 +1551,7 @@ function HistorialRow({ item, type }: { item: { id: string; class_date: string; 
 
 // ─── ClientCard ───────────────────────────────────────────────────────────────
 function ClientCard({
-  client, plans, isExpanded, isEditing, isDeleting, onToggleExpand, onToggleEdit, onUpdatePayment, onUpdateProfile, onMarkPaid, onDelete,
+  client, plans, isExpanded, isEditing, isDeleting, onToggleExpand, onToggleEdit, onUpdatePayment, onUpdateProfile, onPaymentRefresh, onDelete,
 }: {
   client: ClientRow
   plans: Plan[]
@@ -1508,27 +1561,111 @@ function ClientCard({
   onToggleExpand: () => void
   onToggleEdit: () => void
   onUpdatePayment: (u: Partial<Pick<ClientRow, 'payment_status' | 'last_payment_date' | 'notes' | 'plan_id' | 'schedule_type'>>) => void
-  onUpdateProfile: (u: { full_name?: string; username?: string; phone?: string; password?: string }) => Promise<Response>
-  onMarkPaid: () => void
+  onUpdateProfile: (u: { full_name?: string; username?: string; phone?: string; password?: string; birthday?: string | null }) => Promise<Response>
+  onPaymentRefresh: () => void
   onDelete: () => void
 }) {
-  const [draft, setDraft]         = useState({ full_name: client.full_name, username: client.username ?? '', phone: client.phone ?? '' })
+  const [draft, setDraft]         = useState({ full_name: client.full_name, username: client.username ?? '', phone: client.phone ?? '', birthday: client.birthday ?? '' })
   const [newPw, setNewPw]         = useState('')
   const [profileSaving, setPSav]  = useState(false)
   const [profileError, setPErr]   = useState('')
 
+  // Histórico de pagos (lazy)
+  const [payments, setPayments]    = useState<PaymentRow[]>([])
+  const [paymentsLoaded, setPLoad] = useState(false)
+  const [paymentsLoading, setPLoading] = useState(false)
+
+  // Modal registrar pago
+  const [showPayModal, setShowPayModal] = useState(false)
+  const [payAmount, setPayAmount] = useState('')
+  const [payMethod, setPayMethod] = useState('')
+  const [payNotes, setPayNotes]   = useState('')
+  const [paySaving, setPaySaving] = useState(false)
+
+  // Modal mensaje
+  const [showMsgModal, setShowMsgModal] = useState(false)
+  const [msgTitle, setMsgTitle] = useState('')
+  const [msgBody,  setMsgBody]  = useState('')
+  const [msgSaving, setMsgSaving] = useState(false)
+
+  // Cargar pagos cuando se expande por primera vez
+  if (isExpanded && !paymentsLoaded && !paymentsLoading) {
+    setPLoading(true)
+    fetch(`/api/admin/payments?user_id=${client.id}&limit=10`)
+      .then(r => r.json())
+      .then(d => { setPayments(d.payments ?? []); setPLoaded(true) })
+      .finally(() => setPLoading(false))
+  }
+  function setPLoaded(v: boolean) { setPLoad(v) }
+
   async function saveProfile() {
     setPSav(true); setPErr('')
-    const updates: Record<string, string> = {
+    const updates: Record<string, string | null> = {
       full_name: draft.full_name,
       username:  draft.username,
       phone:     draft.phone,
+      birthday:  draft.birthday || null,
     }
     if (newPw) updates.password = newPw
     const res = await onUpdateProfile(updates)
     if (!res.ok) { const j = await res.json(); setPErr(j.error) }
     else setNewPw('')
     setPSav(false)
+  }
+
+  async function registerPayment() {
+    setPaySaving(true)
+    const res = await fetch('/api/admin/payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: client.id,
+        amount: payAmount ? parseFloat(payAmount) : null,
+        method: payMethod || null,
+        notes:  payNotes || null,
+      }),
+    })
+    setPaySaving(false)
+    if (res.ok) {
+      setShowPayModal(false)
+      setPayAmount(''); setPayMethod(''); setPayNotes('')
+      setPLoaded(false) // forzar recarga
+      onPaymentRefresh() // refresca el card padre (status al_dia)
+    }
+  }
+
+  async function sendMessage() {
+    if (!msgTitle.trim()) return
+    setMsgSaving(true)
+    const res = await fetch('/api/admin/notify-client', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: client.id, title: msgTitle.trim(), body: msgBody.trim() || null }),
+    })
+    setMsgSaving(false)
+    if (res.ok) {
+      setShowMsgModal(false)
+      setMsgTitle(''); setMsgBody('')
+    }
+  }
+
+  // Helpers visuales
+  const today = new Date()
+  const daysSinceActivity = client.last_activity
+    ? Math.floor((today.getTime() - new Date(client.last_activity + 'T12:00:00').getTime()) / (1000 * 60 * 60 * 24))
+    : Math.floor((today.getTime() - new Date(client.created_at).getTime()) / (1000 * 60 * 60 * 24))
+  const isInactive = daysSinceActivity > 30 && client.regular_slots.length === 0
+
+  // Cumpleaños próximo (próximos 30 días)
+  let birthdayBadge: { label: string; soon: boolean } | null = null
+  if (client.birthday) {
+    const [, m, d] = client.birthday.split('-').map(Number)
+    const thisYear = new Date(today.getFullYear(), m - 1, d)
+    const target = thisYear < today ? new Date(today.getFullYear() + 1, m - 1, d) : thisYear
+    const diff = Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    if (diff === 0) birthdayBadge = { label: '🎂 Hoy cumple', soon: true }
+    else if (diff <= 7)  birthdayBadge = { label: `🎂 En ${diff}d`, soon: true }
+    else if (diff <= 30) birthdayBadge = { label: `🎂 ${target.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`, soon: false }
   }
 
   // Cinta lateral según estado de pago
@@ -1573,11 +1710,23 @@ function ClientCard({
           </div>
         </button>
 
-        {/* Acción rápida: marcar pagado */}
+        {/* Badges de aviso */}
+        {(birthdayBadge || isInactive) && (
+          <div className="flex flex-wrap gap-1.5 mt-2.5">
+            {birthdayBadge && (
+              <span className={`badge ${birthdayBadge.soon ? 'badge-warn' : 'badge-neutral'}`}>{birthdayBadge.label}</span>
+            )}
+            {isInactive && (
+              <span className="badge badge-danger">Sin venir hace {Math.floor(daysSinceActivity / 7)} sem.</span>
+            )}
+          </div>
+        )}
+
+        {/* Acción rápida: registrar pago */}
         {client.payment_status !== 'al_dia' && (
-          <button onClick={onMarkPaid}
+          <button onClick={() => setShowPayModal(true)}
             className="mt-3 w-full font-mono text-[11px] uppercase tracking-widest font-bold text-emerald-800 bg-teal/30 hover:bg-teal/40 py-2 rounded-xl transition-colors active:scale-95">
-            ✓ Marcar pagado hoy
+            ✓ Registrar pago
           </button>
         )}
 
@@ -1608,21 +1757,23 @@ function ClientCard({
               )}
             </div>
 
-            {/* Cupo del mes */}
-            <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-paper">
-              <div>
+            {/* Cupo del mes y asistencia estimada */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="px-3 py-2 rounded-xl bg-paper">
                 <p className="font-mono text-[10px] uppercase tracking-widest text-ink/45">
-                  {client.schedule_type === 'rotativo' ? 'Reservas este mes' : 'Recuperaciones este mes'}
+                  {client.schedule_type === 'rotativo' ? 'Reservas mes' : 'Recup. mes'}
                 </p>
                 <p className="font-display text-lg font-semibold text-brand-deep tabular-nums leading-none mt-1">
                   {client.recovery_used}<span className="text-brand-deep/35 text-base">/{client.recovery_max}</span>
                 </p>
               </div>
-              <div className="flex flex-wrap gap-1 max-w-[55%] justify-end">
-                {Array.from({ length: client.recovery_max || 4 }).map((_, i) => (
-                  <span key={i} className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: i < client.recovery_used ? '#1E4DB7' : 'rgba(30,77,183,0.15)' }}/>
-                ))}
+              <div className="px-3 py-2 rounded-xl bg-paper">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-ink/45">Asistencia mes</p>
+                <p className="font-display text-lg font-semibold text-emerald-800 tabular-nums leading-none mt-1">
+                  ~{client.attended_estimate}
+                  {client.attended_max > 0 && <span className="text-emerald-800/35 text-base">/{client.attended_max}</span>}
+                </p>
+                <p className="font-mono text-[9px] text-ink/35 mt-1">estimado</p>
               </div>
             </div>
 
@@ -1640,7 +1791,54 @@ function ClientCard({
                   {client.last_payment_date ? new Date(client.last_payment_date + 'T00:00:00').toLocaleDateString('es-ES') : '—'}
                 </p>
               </div>
+              {client.birthday && (
+                <div className="px-3 py-2 rounded-xl bg-paper col-span-2">
+                  <p className="text-[9px] uppercase tracking-widest text-ink/40">Cumpleaños</p>
+                  <p className="text-ink/75 mt-0.5 capitalize">
+                    {format(new Date(client.birthday + 'T12:00:00'), "d 'de' MMMM", { locale: es })}
+                  </p>
+                </div>
+              )}
             </div>
+
+            {/* Histórico de pagos */}
+            <div>
+              <p className="font-mono text-[9px] uppercase tracking-widest text-ink/45 mb-2 font-semibold">
+                Pagos recientes
+              </p>
+              {paymentsLoading ? (
+                <p className="text-xs text-ink/35 font-mono text-center py-2">Cargando…</p>
+              ) : payments.length === 0 ? (
+                <p className="text-xs text-ink/35 font-mono italic">Sin pagos registrados</p>
+              ) : (
+                <div className="space-y-1">
+                  {payments.slice(0, 5).map(p => (
+                    <div key={p.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-paper">
+                      <div className="min-w-0">
+                        <p className="font-display text-sm text-ink tabular-nums">
+                          {p.amount != null ? `${p.amount.toFixed(2)}€` : 'Pago registrado'}
+                          {p.method && <span className="text-ink/45 font-mono text-[11px] ml-2">· {p.method}</span>}
+                        </p>
+                        {p.notes && <p className="font-mono text-[10px] text-ink/45 mt-0.5 truncate">{p.notes}</p>}
+                      </div>
+                      <span className="font-mono text-[10px] text-ink/45 flex-shrink-0">
+                        {new Date(p.paid_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: '2-digit' })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button onClick={() => setShowPayModal(true)}
+                className="w-full mt-2 font-mono text-[10px] uppercase tracking-widest font-bold text-brand-deep bg-brand/10 hover:bg-brand/15 py-2 rounded-xl transition-colors">
+                + Registrar nuevo pago
+              </button>
+            </div>
+
+            {/* Botón mensaje directo */}
+            <button onClick={() => setShowMsgModal(true)}
+              className="w-full font-mono text-[11px] uppercase tracking-widest font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 py-2.5 rounded-xl transition-colors border border-amber-100">
+              💬 Enviar mensaje
+            </button>
 
             {/* Notas */}
             {client.notes && (
@@ -1679,6 +1877,12 @@ function ClientCard({
                   className="w-full font-mono text-xs px-3 py-2 rounded-xl bg-paper-2 text-navy border-none outline-none"/>
               </div>
             ))}
+            <div>
+              <p className="font-mono text-[9px] uppercase text-ink/40 mb-1">Cumpleaños</p>
+              <input type="date" value={draft.birthday}
+                onChange={e => setDraft(v => ({ ...v, birthday: e.target.value }))}
+                className="w-full font-mono text-xs px-3 py-2 rounded-xl bg-paper-2 text-navy border-none outline-none"/>
+            </div>
             <div>
               <p className="font-mono text-[9px] uppercase text-ink/40 mb-1">Nueva contraseña (dejar vacío = no cambiar)</p>
               <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)}
@@ -1734,6 +1938,99 @@ function ClientCard({
           </div>
         )}
       </div>
+
+      {/* ── Modal: registrar pago ── */}
+      {showPayModal && (
+        <div className="fixed inset-0 z-50 flex items-end animate-fade-in"
+          style={{ background: 'rgba(7,21,58,0.45)', backdropFilter: 'blur(8px)' }}
+          onClick={() => setShowPayModal(false)}>
+          <div className="w-full max-w-lg mx-auto bg-white rounded-t-3xl px-6 pt-5 pb-10 animate-spring-in"
+            style={{ boxShadow: '0 -16px 60px rgba(7,21,58,0.35)' }}
+            onClick={e => e.stopPropagation()}>
+            <div className="w-12 h-1 rounded-full mx-auto mb-5 bg-ink/15"/>
+            <p className="page-eyebrow">{client.full_name}</p>
+            <h2 className="page-title text-2xl"><em>Registrar</em> pago</h2>
+
+            <div className="space-y-3 mt-5">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-ink/45 mb-1">Importe (€)</p>
+                <input type="number" step="0.01" placeholder="Opcional" inputMode="decimal"
+                  value={payAmount} onChange={e => setPayAmount(e.target.value)}
+                  className="input-field"/>
+              </div>
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-ink/45 mb-1">Método</p>
+                <select value={payMethod} onChange={e => setPayMethod(e.target.value)} className="input-field">
+                  <option value="">— Seleccionar —</option>
+                  <option value="efectivo">Efectivo</option>
+                  <option value="bizum">Bizum</option>
+                  <option value="transferencia">Transferencia</option>
+                  <option value="tarjeta">Tarjeta</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </div>
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-ink/45 mb-1">Notas (opcional)</p>
+                <textarea rows={2} value={payNotes} onChange={e => setPayNotes(e.target.value)}
+                  placeholder="Ej: cubre mes de mayo · pagó en mano…"
+                  className="input-field resize-none"/>
+              </div>
+
+              <button onClick={registerPayment} disabled={paySaving} className="btn-primary mt-3">
+                {paySaving ? 'Registrando…' : '✓ Registrar pago'}
+              </button>
+              <button onClick={() => setShowPayModal(false)}
+                className="w-full text-center text-[11px] text-ink/40 py-2 font-mono uppercase tracking-widest">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: enviar mensaje ── */}
+      {showMsgModal && (
+        <div className="fixed inset-0 z-50 flex items-end animate-fade-in"
+          style={{ background: 'rgba(7,21,58,0.45)', backdropFilter: 'blur(8px)' }}
+          onClick={() => setShowMsgModal(false)}>
+          <div className="w-full max-w-lg mx-auto bg-white rounded-t-3xl px-6 pt-5 pb-10 animate-spring-in"
+            style={{ boxShadow: '0 -16px 60px rgba(7,21,58,0.35)' }}
+            onClick={e => e.stopPropagation()}>
+            <div className="w-12 h-1 rounded-full mx-auto mb-5 bg-ink/15"/>
+            <p className="page-eyebrow">Mensaje a {client.full_name}</p>
+            <h2 className="page-title text-2xl"><em>Enviar</em> aviso</h2>
+
+            <div className="space-y-3 mt-5">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-ink/45 mb-1">Título *</p>
+                <input type="text" value={msgTitle} onChange={e => setMsgTitle(e.target.value)}
+                  placeholder="Ej: Recordatorio de pago"
+                  maxLength={120}
+                  className="input-field"/>
+              </div>
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-ink/45 mb-1">Mensaje (opcional)</p>
+                <textarea rows={3} value={msgBody} onChange={e => setMsgBody(e.target.value)}
+                  placeholder="Escribe el detalle…"
+                  maxLength={500}
+                  className="input-field resize-none"/>
+              </div>
+
+              <p className="font-mono text-[10px] text-ink/45 leading-relaxed">
+                Aparecerá como notificación in-app en su sección Avisos.
+              </p>
+
+              <button onClick={sendMessage} disabled={msgSaving || !msgTitle.trim()} className="btn-primary mt-3">
+                {msgSaving ? 'Enviando…' : '💬 Enviar mensaje'}
+              </button>
+              <button onClick={() => setShowMsgModal(false)}
+                className="w-full text-center text-[11px] text-ink/40 py-2 font-mono uppercase tracking-widest">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

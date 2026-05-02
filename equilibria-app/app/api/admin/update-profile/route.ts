@@ -30,6 +30,9 @@ export async function PATCH(req: NextRequest) {
   const username  = raw.username  !== undefined ? sanitizeText(String(raw.username))     : undefined
   const phone     = raw.phone     !== undefined ? sanitizeText(String(raw.phone))        : undefined
   const password  = raw.password  !== undefined ? sanitizePassword(String(raw.password)) : undefined
+  const birthday  = raw.birthday  !== undefined
+    ? (typeof raw.birthday === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.birthday) ? raw.birthday : null)
+    : undefined
 
   const admin = createAdminClient()
 
@@ -46,6 +49,7 @@ export async function PATCH(req: NextRequest) {
   if (full_name !== undefined) profileUpdates.full_name = full_name
   if (username  !== undefined) profileUpdates.username  = username.toLowerCase().replace(/\s+/g, '') || null
   if (phone     !== undefined) profileUpdates.phone     = phone || null
+  if (birthday  !== undefined) profileUpdates.birthday  = birthday
 
   if (Object.keys(profileUpdates).length > 0) {
     const { error } = await admin.from('profiles').update(profileUpdates).eq('id', user_id)
