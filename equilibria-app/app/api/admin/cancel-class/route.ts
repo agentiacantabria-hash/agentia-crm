@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { assertAdmin } from '@/lib/auth/admin-guard'
 import { createNotifications } from '@/lib/notifications'
 import { parityActive } from '@/lib/parity'
+import { broadcastScheduleChange } from '@/lib/schedule-events'
 
 export async function POST(req: NextRequest) {
   const guard = await assertAdmin()
@@ -27,6 +28,7 @@ export async function POST(req: NextRequest) {
 
   // Enviar email a afectados
   await notifyAffected(sb, slot_id, class_date, reason)
+  await broadcastScheduleChange({ slotId: slot_id, classDate: class_date })
 
   return NextResponse.json({ ok: true })
 }
@@ -38,6 +40,7 @@ export async function DELETE(req: NextRequest) {
 
   const { slot_id, class_date } = await req.json()
   await sb.from('cancelled_classes').delete().eq('slot_id', slot_id).eq('class_date', class_date)
+  await broadcastScheduleChange({ slotId: slot_id, classDate: class_date })
   return NextResponse.json({ ok: true })
 }
 

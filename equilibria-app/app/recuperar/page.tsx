@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, addDays, startOfWeek, startOfMonth, isBefore, startOfDay } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { ScheduleSlot, Plan } from '@/lib/types'
 import { parityActive } from '@/lib/parity'
 import { maxRecoveriesPerMonth } from '@/lib/plan'
+import { SCHEDULE_REALTIME_TOPIC } from '@/lib/schedule-events'
 import { toast } from '@/lib/toast'
 
 export default function RecuperarPage() {
@@ -94,6 +95,23 @@ export default function RecuperarPage() {
   }, [dateFrom, dateTo, router])
 
   useEffect(() => { load() }, [load])
+
+  // Realtime: postgres_changes propios + broadcast compartido
+  const loadRef = useRef(load)
+  useEffect(() => { loadRef.current = load }, [load])
+  useEffect(() => {
+    const sb = createClient()
+    const ownCh = sb.channel('recuperar-own')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'regular_slots' },     () => loadRef.current())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'absences' },          () => loadRef.current())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recovery_bookings' }, () => loadRef.current())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cancelled_classes' }, () => loadRef.current())
+      .subscribe()
+    const sharedCh = sb.channel(SCHEDULE_REALTIME_TOPIC)
+      .on('broadcast', { event: 'change' }, () => loadRef.current())
+      .subscribe()
+    return () => { sb.removeChannel(ownCh); sb.removeChannel(sharedCh) }
+  }, [])
 
   function getCapacity(slotId: string, dateStr: string, date: Date) {
     const regularCount = (regularParities[slotId] ?? []).filter(p => parityActive(p, date)).length

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { broadcastScheduleChange } from '@/lib/schedule-events'
 
 export async function POST(req: NextRequest) {
   const sb = await createClient()
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
     if (error.code === '23505') return NextResponse.json({ error: 'Ya tienes esta clase en tu horario' }, { status: 409 })
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+  await broadcastScheduleChange({ slotId: slot_id })
   return NextResponse.json({ ok: true })
 }
 
@@ -70,6 +72,7 @@ export async function PATCH(req: NextRequest) {
     .eq('user_id', user.id)
     .eq('slot_id', slot_id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await broadcastScheduleChange({ slotId: slot_id })
   return NextResponse.json({ ok: true })
 }
 
@@ -81,5 +84,6 @@ export async function DELETE(req: NextRequest) {
   const { slot_id } = await req.json()
   const { error } = await sb.from('regular_slots').delete().eq('user_id', user.id).eq('slot_id', slot_id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await broadcastScheduleChange({ slotId: slot_id })
   return NextResponse.json({ ok: true })
 }

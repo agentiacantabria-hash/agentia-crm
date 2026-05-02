@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { ScheduleSlot, Announcement } from '@/lib/types'
 import { DAY_SHORT } from '@/lib/types'
 import { parityActive } from '@/lib/parity'
+import { SCHEDULE_REALTIME_TOPIC } from '@/lib/schedule-events'
 import SlotModal from '@/components/SlotModal'
 
 export type SlotInfo = {
@@ -128,14 +129,21 @@ export default function HorarioPage() {
   useEffect(() => { loadRef.current = load }, [load])
   useEffect(() => {
     const sb = createClient()
-    const ch = sb.channel('horario-live')
+    // postgres_changes: actualiza al instante para los rows del PROPIO
+    // usuario (RLS filtra los eventos al user_id, así que solo veo los míos)
+    const ownCh = sb.channel('horario-own')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'regular_slots' },     () => loadRef.current())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'absences' },          () => loadRef.current())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'recovery_bookings' }, () => loadRef.current())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'waitlist' },          () => loadRef.current())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cancelled_classes' }, () => loadRef.current())
       .subscribe()
-    return () => { sb.removeChannel(ch) }
+    // broadcast: el server publica aquí cuando cualquier alumna modifica
+    // algo. RLS no aplica → todas reciben el evento y se actualizan
+    const sharedCh = sb.channel(SCHEDULE_REALTIME_TOPIC)
+      .on('broadcast', { event: 'change' }, () => loadRef.current())
+      .subscribe()
+    return () => { sb.removeChannel(ownCh); sb.removeChannel(sharedCh) }
   }, [])
 
   useEffect(() => {

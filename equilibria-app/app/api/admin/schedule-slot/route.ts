@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { assertAdmin } from '@/lib/auth/admin-guard'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { broadcastScheduleChange } from '@/lib/schedule-events'
 
 export async function POST(req: NextRequest) {
   const guard = await assertAdmin()
@@ -18,6 +20,7 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await broadcastScheduleChange({})
   return NextResponse.json({ ok: true, slot: data })
 }
 
@@ -26,8 +29,23 @@ export async function PATCH(req: NextRequest) {
   if (!guard.ok) return guard.response
   const { sb } = guard
 
-  const { slot_id, day_of_week, start_time, duration_minutes, class_type_id, is_active, min_regulars, max_capacity } = await req.json()
+  const { slot_id, day_of_week, start_time, duration_minutes, class_type_id, is_active, min_regulars, max_capacity, force } = await req.json()
   if (!slot_id) return NextResponse.json({ error: 'Falta slot_id' }, { status: 400 })
+
+  // Si se intenta bajar max_capacity, comprobar que no quedan inscripciones por encima
+  if (typeof max_capacity === 'number' && !force) {
+    const admin = createAdminClient()
+    const { data: regulars } = await admin
+      .from('regular_slots').select('week_parity').eq('slot_id', slot_id)
+    const counts = countParities((regulars ?? []).map((r: { week_parity: string }) => r.week_parity))
+    const worstRegular = Math.max(counts.odd, counts.even)
+    if (worstRegular > max_capacity) {
+      return NextResponse.json({
+        error: `No puedes bajar el aforo a ${max_capacity}: hay ${worstRegular} alumna${worstRegular !== 1 ? 's' : ''} con esta clase como fija. Quita las regulares sobrantes primero.`,
+        code: 'capacity_conflict',
+      }, { status: 409 })
+    }
+  }
 
   const updates: Record<string, unknown> = {}
   if (day_of_week      !== undefined) updates.day_of_week      = day_of_week
@@ -40,6 +58,7 @@ export async function PATCH(req: NextRequest) {
 
   const { error } = await sb.from('schedule_slots').update(updates).eq('id', slot_id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await broadcastScheduleChange({ slotId: slot_id })
   return NextResponse.json({ ok: true })
 }
 
@@ -53,5 +72,16 @@ export async function DELETE(req: NextRequest) {
 
   const { error } = await sb.from('schedule_slots').update({ is_active: false }).eq('id', slot_id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await broadcastScheduleChange({ slotId: slot_id })
   return NextResponse.json({ ok: true })
+}
+
+function countParities(parities: string[]): { odd: number; even: number } {
+  let odd = 0, even = 0
+  for (const p of parities) {
+    if (p === 'all')  { odd++; even++ }
+    if (p === 'odd')  odd++
+    if (p === 'even') even++
+  }
+  return { odd, even }
 }

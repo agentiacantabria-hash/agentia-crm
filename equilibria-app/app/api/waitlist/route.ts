@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { broadcastScheduleChange } from '@/lib/schedule-events'
 
 export async function POST(req: NextRequest) {
   const sb = await createClient()
@@ -12,6 +13,7 @@ export async function POST(req: NextRequest) {
     if (error.code === '23505') return NextResponse.json({ error: 'Ya estás en la lista de espera' }, { status: 409 })
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+  await broadcastScheduleChange({ slotId: slot_id, classDate: class_date })
   return NextResponse.json({ ok: true })
 }
 
@@ -22,5 +24,6 @@ export async function DELETE(req: NextRequest) {
 
   const { slot_id, class_date } = await req.json()
   await sb.from('waitlist').delete().eq('user_id', user.id).eq('slot_id', slot_id).eq('class_date', class_date)
+  await broadcastScheduleChange({ slotId: slot_id, classDate: class_date })
   return NextResponse.json({ ok: true })
 }

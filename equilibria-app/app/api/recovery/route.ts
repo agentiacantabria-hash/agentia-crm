@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { MAX_CAPACITY } from '@/lib/types'
 import { maxRecoveriesPerMonth } from '@/lib/plan'
+import { notifyFirstInWaitlist } from '@/lib/waitlist-notify'
+import { broadcastScheduleChange } from '@/lib/schedule-events'
 
 export async function POST(req: NextRequest) {
   const sb = await createClient()
@@ -85,6 +87,8 @@ export async function POST(req: NextRequest) {
   // Quitar de la lista de espera si estaba
   await sb.from('waitlist').delete().eq('user_id', user.id).eq('slot_id', slot_id).eq('class_date', class_date)
 
+  await broadcastScheduleChange({ slotId: slot_id, classDate: class_date })
+
   return NextResponse.json({ ok: true })
 }
 
@@ -98,5 +102,10 @@ export async function DELETE(req: NextRequest) {
     .update({ status: 'cancelled' })
     .eq('user_id', user.id).eq('slot_id', slot_id).eq('class_date', class_date)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Cancelar recovery libera plaza → avisar al primero de la cola si hay
+  await notifyFirstInWaitlist(slot_id, class_date)
+  await broadcastScheduleChange({ slotId: slot_id, classDate: class_date })
+
   return NextResponse.json({ ok: true })
 }
