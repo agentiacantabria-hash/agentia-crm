@@ -5,7 +5,6 @@ import { format, addDays, startOfWeek, startOfMonth, isBefore, startOfDay } from
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import type { ScheduleSlot, Plan } from '@/lib/types'
-import { parityActive } from '@/lib/parity'
 import { maxRecoveriesPerMonth } from '@/lib/plan'
 import { SCHEDULE_REALTIME_TOPIC } from '@/lib/schedule-events'
 import { toast } from '@/lib/toast'
@@ -17,10 +16,10 @@ export default function RecuperarPage() {
   const [usedCredits, setUsed]        = useState(0)
   const [weekStart, setWeekStart]     = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [slots, setSlots]             = useState<ScheduleSlot[]>([])
-  const [regularParities, setRP]      = useState<Record<string, string[]>>({})
+  const [regularCountsBySlot, setRP] = useState<Record<string, number>>({})
   const [absentCounts, setAC]         = useState<Record<string, Record<string, number>>>({})
   const [recoveryCounts, setRVC]      = useState<Record<string, Record<string, number>>>({})
-  const [userRegularMap, setURMap]    = useState<Map<string, string>>(new Map())
+  const [userRegularSet, setURMap]   = useState<Set<string>>(new Set())
   const [userAbsentMap, setUAM]       = useState<Record<string, Set<string>>>({})
   const [userRecoveryMap, setURM]     = useState<Record<string, Set<string>>>({})
   const [cancelledSet, setCancelled]  = useState<Set<string>>(new Set())
@@ -59,7 +58,7 @@ export default function RecuperarPage() {
       sb.from('profiles').select('plan_id, schedule_type, plans(*)').eq('id', user.id).single(),
       sb.from('schedule_slots').select('*, class_types(*)').eq('is_active', true),
       countsPromise,
-      sb.from('regular_slots').select('slot_id, week_parity').eq('user_id', user.id),
+      sb.from('regular_slots').select('slot_id').eq('user_id', user.id),
       sb.from('absences').select('slot_id, class_date').eq('user_id', user.id).gte('class_date', dateFrom).lte('class_date', dateTo),
       sb.from('recovery_bookings').select('slot_id, class_date').eq('user_id', user.id).eq('status', 'confirmed').gte('class_date', dateFrom).lte('class_date', dateTo),
       sb.from('recovery_bookings').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'confirmed').gte('class_date', monthStart),
@@ -69,14 +68,14 @@ export default function RecuperarPage() {
     setScheduleType((profile as { schedule_type?: string } | null)?.schedule_type ?? null)
     setUsed(creditsUsed ?? 0)
 
-    setRP(counts?.regularParities ?? {})
+    setRP(counts?.regularCounts ?? {})
     setAC(counts?.absentCounts ?? {})
     setRVC(counts?.recoveryCounts ?? {})
     setCancelled(new Set<string>(counts?.cancelledKeys ?? []))
 
-    const urmReg = new Map<string, string>()
-    ;(userRegular ?? []).forEach((r: { slot_id: string; week_parity: string }) => urmReg.set(r.slot_id, r.week_parity))
-    setURMap(urmReg)
+    const urs = new Set<string>()
+    ;(userRegular ?? []).forEach((r: { slot_id: string }) => urs.add(r.slot_id))
+    setURMap(urs)
 
     const uam: Record<string, Set<string>> = {}
     ;(userAbsences ?? []).forEach((a: { slot_id: string; class_date: string }) => {
@@ -113,8 +112,8 @@ export default function RecuperarPage() {
     return () => { sb.removeChannel(ownCh); sb.removeChannel(sharedCh) }
   }, [])
 
-  function getCapacity(slotId: string, dateStr: string, date: Date) {
-    const regularCount = (regularParities[slotId] ?? []).filter(p => parityActive(p, date)).length
+  function getCapacity(slotId: string, dateStr: string) {
+    const regularCount = regularCountsBySlot[slotId] ?? 0
     return regularCount
       - (absentCounts[slotId]?.[dateStr] ?? 0)
       + (recoveryCounts[slotId]?.[dateStr] ?? 0)
@@ -219,8 +218,7 @@ export default function RecuperarPage() {
                 .filter(s => !cancelledSet.has(`${s.id}|${dateStr}`))
                 .filter(s => !userRecoveryMap[s.id]?.has(dateStr))
                 .filter(s => {
-                  const parity   = userRegularMap.get(s.id)
-                  const isOwn    = parity !== undefined && parityActive(parity, date)
+                  const isOwn    = userRegularSet.has(s.id)
                   const isAbsent = userAbsentMap[s.id]?.has(dateStr) ?? false
                   return !isOwn || isAbsent
                 })
@@ -238,7 +236,7 @@ export default function RecuperarPage() {
                   </div>
                   <div className="space-y-2">
                     {daySlots.map(slot => {
-                      const cap     = getCapacity(slot.id, dateStr, date)
+                      const cap     = getCapacity(slot.id, dateStr)
                       const slotMax = slot.max_capacity ?? 7
                       const capNum  = Math.max(0, cap)
                       const full    = capNum >= slotMax

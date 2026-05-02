@@ -6,11 +6,10 @@ import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import type { ScheduleSlot, Plan } from '@/lib/types'
 import { CANCEL_DEADLINE_HOURS } from '@/lib/types'
-import { parityActive } from '@/lib/parity'
 import { maxRecoveriesPerMonth } from '@/lib/plan'
 import { toast } from '@/lib/toast'
 
-type SlotFull = ScheduleSlot & { isAbsent: boolean; week_parity: string }
+type SlotFull = ScheduleSlot & { isAbsent: boolean }
 
 type Booking = {
   id: string
@@ -53,7 +52,7 @@ export default function MisClasesPage() {
       { count: creditsUsed },
     ] = await Promise.all([
       sb.from('profiles').select('plan_id, schedule_type, plans(*)').eq('id', user.id).single(),
-      sb.from('regular_slots').select('slot_id, week_parity, schedule_slots(*, class_types(*))').eq('user_id', user.id),
+      sb.from('regular_slots').select('slot_id, schedule_slots(*, class_types(*))').eq('user_id', user.id),
       sb.from('absences').select('slot_id, class_date').eq('user_id', user.id).gte('class_date', dateFrom).lte('class_date', dateTo),
       sb.from('recovery_bookings')
         .select('id, slot_id, class_date, schedule_slots(start_time, class_types(name, color))')
@@ -69,14 +68,13 @@ export default function MisClasesPage() {
 
     // Regulares activas esta semana
     const absentSet = new Set((absencesWeek ?? []).map((a: { slot_id: string; class_date: string }) => `${a.slot_id}|${a.class_date}`))
-    type UserRegRow = { slot_id: string; week_parity: string; schedule_slots: ScheduleSlot }
+    type UserRegRow = { slot_id: string; schedule_slots: ScheduleSlot }
     const enriched = ((userRegular ?? []) as unknown as UserRegRow[])
-      .filter(r => parityActive(r.week_parity, weekStart))
       .map(r => {
         const s = r.schedule_slots
         const dayDate = weekDayDate(s.day_of_week)
         const dateStr = format(dayDate, 'yyyy-MM-dd')
-        return { ...s, week_parity: r.week_parity, isAbsent: absentSet.has(`${s.id}|${dateStr}`) }
+        return { ...s, isAbsent: absentSet.has(`${s.id}|${dateStr}`) }
       })
     setSlots(enriched)
 
@@ -278,14 +276,11 @@ export default function MisClasesPage() {
                           <p className="font-mono text-[11px] text-ink/55 uppercase tracking-widest mt-1 capitalize">
                             {dayLabel} · {slot.start_time.slice(0,5)}h
                           </p>
-                          <div className="flex flex-wrap gap-1.5 mt-1.5">
-                            {slot.week_parity !== 'all' && (
-                              <span className="badge badge-neutral !text-[9px]">Alternas</span>
-                            )}
-                            {slot.isAbsent && (
+                          {slot.isAbsent && (
+                            <div className="flex flex-wrap gap-1.5 mt-1.5">
                               <span className="badge badge-danger !text-[9px]">Falta marcada</span>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
                         {!isPast && (
                           <button

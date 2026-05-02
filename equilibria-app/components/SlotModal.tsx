@@ -1,14 +1,12 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { format, getISOWeek } from 'date-fns'
+import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { SlotInfo } from '@/app/horario/page'
 import { toast } from '@/lib/toast'
-import Spinner from '@/components/Spinner'
 
 const SUCCESS_MESSAGES: Record<string, string> = {
   'POST /api/regular-slot':    'Te has apuntado a esta clase fija',
-  'PATCH /api/regular-slot':   'Frecuencia actualizada',
   'DELETE /api/regular-slot':  'Has quitado la clase fija',
   'POST /api/recovery':        'Reserva confirmada',
   'DELETE /api/recovery':      'Reserva cancelada',
@@ -23,10 +21,9 @@ type Attendee = { user_id: string; full_name: string; type: 'regular' | 'recover
 interface Props { info: SlotInfo; isAdmin?: boolean; onClose: () => void; onSuccess: () => void }
 
 export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) {
-  const { slot, date, capacity, regularCount, isUserRegular, userRegularParity, isUserAbsent, isUserRecovery, isUserWaitlist, isCancelled, waitlistCount, isRotating } = info
+  const { slot, date, capacity, regularCount, isUserRegular, isUserAbsent, isUserRecovery, isUserWaitlist, isCancelled, waitlistCount, isRotating } = info
   const [loading, setLoading]           = useState(false)
   const [error, setError]               = useState('')
-  const [showParityPicker, setShowParity] = useState(false)
   const [attendees, setAttendees]       = useState<Attendee[]>([])
   const [waitlistPeople, setWaitlistPeople] = useState<Attendee[]>([])
   const [loadingAttendees, setLoadingAttendees] = useState(false)
@@ -52,12 +49,6 @@ export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) 
   const isFull        = capNum >= slotMax
   const color         = slot.class_types.color
 
-  const weekIsEven     = getISOWeek(date) % 2 === 0
-  const thisWeekParity = weekIsEven ? 'even' : 'odd'
-  const otherParity    = weekIsEven ? 'odd' : 'even'
-
-  const hasSlotOtherWeek = userRegularParity !== null && !isUserRegular
-
   async function call(url: string, method: string, extra?: Record<string, unknown>) {
     setLoading(true); setError('')
     try {
@@ -73,7 +64,6 @@ export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) 
       onSuccess()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error inesperado')
-      setShowParity(false)
     } finally {
       setLoading(false)
     }
@@ -84,7 +74,6 @@ export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) 
     call(url, method, extra)
   }
 
-  // Status semántico para la cinta de aforo
   const fillPct = Math.min(100, (capNum / slotMax) * 100)
 
   return (
@@ -100,11 +89,9 @@ export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) 
         {/* Header con color de disciplina */}
         <div className="relative px-7 pt-4 pb-6 overflow-hidden flex-shrink-0"
           style={{ background: `linear-gradient(160deg, ${color} 0%, ${color}E0 60%, ${color}CC 100%)` }}>
-          {/* Glow decorativo */}
           <div className="absolute inset-0 pointer-events-none"
             style={{ background: 'radial-gradient(60% 50% at 90% 0%, rgba(255,255,255,0.5) 0%, transparent 65%), radial-gradient(40% 30% at 0% 100%, rgba(11,31,77,0.1) 0%, transparent 70%)' }}/>
 
-          {/* Drag handle */}
           <div className="w-12 h-1 rounded-full mx-auto mb-5"
             style={{ backgroundColor: 'rgba(11,31,77,0.18)' }}/>
 
@@ -130,9 +117,6 @@ export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) 
               )}
               {isUserRegular && !isUserAbsent && !isCancelled && (
                 <span className="badge bg-white/55 text-ink/75">★ Tu clase</span>
-              )}
-              {hasSlotOtherWeek && (
-                <span className="badge bg-white/40 text-ink/65">Alterna</span>
               )}
               {isUserRecovery && (
                 <span className="badge bg-white/55 text-brand-deep">{isRotating ? 'Reservada' : 'Recuperación'}</span>
@@ -242,60 +226,18 @@ export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) 
                 {loading ? '…' : 'Cancelar recuperación'}
               </button>
 
-            ) : hasSlotOtherWeek ? (
-              <>
-                <InfoBlock>Tienes esta clase las semanas alternas</InfoBlock>
-                {spotsLeft > 0 && (
-                  <button onClick={() => call('/api/recovery', 'POST')} disabled={loading} className="btn-primary">
-                    {loading ? '…' : 'Usar recuperación aquí'}
-                  </button>
-                )}
-                {showParityPicker ? (
-                  <ParityPicker
-                    title="¿Cambiar la frecuencia de esta clase?"
-                    loading={loading}
-                    onCancel={() => setShowParity(false)}
-                    options={[
-                      { label: 'Todas las semanas',                        onClick: () => call('/api/regular-slot', 'PATCH', { week_parity: 'all' }), variant: 'primary' },
-                      { label: 'Solo esta semana (cambiar alternancia)',   onClick: () => call('/api/regular-slot', 'PATCH', { week_parity: thisWeekParity }) },
-                    ]}
-                  />
-                ) : (
-                  <button onClick={() => setShowParity(true)} className="btn-secondary">
-                    Añadir también a mis clases fijas
-                  </button>
-                )}
-                <button onClick={() => confirmAndCall(
-                  '¿Seguro que quieres quitar esta clase de tu horario fijo? Tendrás que volver a apuntarte si cambias de idea.',
-                  '/api/regular-slot', 'DELETE'
-                )} disabled={loading}
-                  className="w-full bg-paper-2 text-ink/55 font-mono text-[11px] py-3 rounded-2xl disabled:opacity-40 uppercase tracking-widest hover:bg-paper-3 transition-colors">
-                  Quitar de mis clases fijas
-                </button>
-              </>
-
             ) : spotsLeft > 0 ? (
               <>
                 <button onClick={() => call('/api/recovery', 'POST')} disabled={loading} className="btn-primary">
                   {loading ? '…' : 'Usar recuperación aquí'}
                 </button>
-
-                {showParityPicker ? (
-                  <ParityPicker
-                    title="¿Cada cuánto vas a esta clase?"
-                    loading={loading}
-                    onCancel={() => setShowParity(false)}
-                    helper={isEnFormacion ? `Al apuntarte ayudas a activar esta clase (${regularCount + 1}/${slot.min_regulars})` : null}
-                    options={[
-                      { label: 'Todas las semanas',                onClick: () => call('/api/regular-slot', 'POST', { week_parity: 'all' }), variant: 'primary' },
-                      { label: 'Alternas — esta semana sí',        onClick: () => call('/api/regular-slot', 'POST', { week_parity: thisWeekParity }) },
-                      { label: 'Alternas — esta semana no',        onClick: () => call('/api/regular-slot', 'POST', { week_parity: otherParity }) },
-                    ]}
-                  />
-                ) : (
-                  <button onClick={() => setShowParity(true)} className="btn-secondary">
-                    Añadir a mis clases fijas
-                  </button>
+                <button onClick={() => call('/api/regular-slot', 'POST', { week_parity: 'all' })} disabled={loading} className="btn-secondary">
+                  {loading ? '…' : 'Añadir a mis clases fijas'}
+                </button>
+                {isEnFormacion && (
+                  <p className="text-center text-[11px] font-mono text-amber-700 bg-amber-50 rounded-xl px-3 py-2 border border-amber-100">
+                    Al apuntarte fijo ayudas a activar esta clase ({regularCount + 1}/{slot.min_regulars})
+                  </p>
                 )}
               </>
 
@@ -369,48 +311,10 @@ export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) 
   )
 }
 
-// ─────────────────────────────────────────────────────────────────
-// Subcomponentes locales
-// ─────────────────────────────────────────────────────────────────
 function InfoBlock({ children }: { children: React.ReactNode }) {
   return (
     <div className="text-center font-mono text-sm text-ink/50 py-4 px-4 bg-paper rounded-2xl tracking-wide">
       {children}
-    </div>
-  )
-}
-
-type ParityOption = { label: string; onClick: () => void; variant?: 'primary' | 'secondary' }
-
-function ParityPicker({
-  title, loading, options, onCancel, helper,
-}: {
-  title: string
-  loading: boolean
-  options: ParityOption[]
-  onCancel: () => void
-  helper?: string | null
-}) {
-  return (
-    <div className="flex flex-col gap-2 animate-fade-in">
-      <p className="font-mono text-[10px] uppercase tracking-widest text-ink/45 text-center py-1 font-semibold">
-        {title}
-      </p>
-      {helper && (
-        <p className="text-center text-[11px] font-mono text-amber-700 bg-amber-50 rounded-xl px-3 py-2 border border-amber-100">
-          {helper}
-        </p>
-      )}
-      {options.map((opt, i) => (
-        <button key={i} onClick={opt.onClick} disabled={loading}
-          className={opt.variant === 'primary' ? 'btn-primary' : 'btn-secondary'}>
-          {loading ? '…' : opt.label}
-        </button>
-      ))}
-      <button onClick={onCancel}
-        className="text-center font-mono text-[11px] text-ink/35 py-2 uppercase tracking-widest hover:text-ink/55 transition-colors">
-        ← Cancelar
-      </button>
     </div>
   )
 }

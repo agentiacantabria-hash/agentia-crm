@@ -3,7 +3,6 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { assertAdmin } from '@/lib/auth/admin-guard'
 import { createNotifications } from '@/lib/notifications'
-import { parityActive } from '@/lib/parity'
 import { broadcastScheduleChange } from '@/lib/schedule-events'
 
 export async function POST(req: NextRequest) {
@@ -55,11 +54,9 @@ async function notifyAffected(
   let admin: ReturnType<typeof createAdminClient>
   try { admin = createAdminClient() } catch { return }
 
-  const targetDate = new Date(classDate + 'T12:00:00')
-
   const [{ data: slot }, { data: regulars }, { data: recoveries }] = await Promise.all([
     admin.from('schedule_slots').select('start_time, class_types(name)').eq('id', slotId).single(),
-    admin.from('regular_slots').select('user_id, week_parity').eq('slot_id', slotId),
+    admin.from('regular_slots').select('user_id').eq('slot_id', slotId),
     admin.from('recovery_bookings').select('user_id').eq('slot_id', slotId).eq('class_date', classDate).eq('status', 'cancelled'),
   ])
 
@@ -67,11 +64,8 @@ async function notifyAffected(
   const time = slot?.start_time?.slice(0, 5) ?? ''
   const dateLabel = new Date(classDate + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
 
-  type RegRow = { user_id: string; week_parity: string }
-  const activeRegulars = ((regulars ?? []) as RegRow[])
-    .filter(r => parityActive(r.week_parity, targetDate))
-    .map(r => r.user_id)
-  const recoveryUsers = ((recoveries ?? []) as { user_id: string }[]).map(r => r.user_id)
+  const activeRegulars = ((regulars ?? []) as { user_id: string }[]).map(r => r.user_id)
+  const recoveryUsers  = ((recoveries ?? []) as { user_id: string }[]).map(r => r.user_id)
 
   // Dedup por user_id (alguien podría tener regular + recovery — improbable pero curarse en salud)
   const userIds = Array.from(new Set([...activeRegulars, ...recoveryUsers]))

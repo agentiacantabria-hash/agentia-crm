@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { format, addDays, startOfWeek, startOfMonth, getISOWeek } from 'date-fns'
+import { format, addDays, startOfWeek, startOfMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import type { ScheduleSlot, Plan, InviteCode, ClassType, Announcement } from '@/lib/types'
@@ -44,7 +44,7 @@ type HistorialEntry = {
   schedule_slots: { start_time: string; class_types: { name: string; color: string } } | null
 }
 
-type RegularRow  = { slot_id: string; user_id: string; week_parity: string; profiles: { full_name: string; username: string | null } }
+type RegularRow  = { slot_id: string; user_id: string; profiles: { full_name: string; username: string | null } }
 type RecoveryRow = { slot_id: string; class_date: string; user_id: string; profiles: { full_name: string; username: string | null } }
 
 type ClientRow = {
@@ -253,7 +253,6 @@ export default function AdminPage() {
     setIsWeekend(false)
     const sb = createClient()
     const todayDate  = format(new Date(), 'yyyy-MM-dd')
-    const weekIsEven = getISOWeek(new Date()) % 2 === 0
 
     const { data: rawSlots } = await sb.from('schedule_slots').select('*, class_types(*)')
       .eq('day_of_week', jsDow).eq('is_active', true)
@@ -266,7 +265,7 @@ export default function AdminPage() {
       { data: recoveriesTotal },
       { data: cancelledToday },
     ] = await Promise.all([
-      sb.from('regular_slots').select('slot_id, user_id, week_parity, profiles(full_name, username)').in('slot_id', slotIds),
+      sb.from('regular_slots').select('slot_id, user_id, profiles(full_name, username)').in('slot_id', slotIds),
       sb.from('absences').select('slot_id, user_id').eq('class_date', todayDate).in('slot_id', slotIds),
       sb.from('recovery_bookings').select('slot_id, user_id, profiles(full_name, username)').eq('class_date', todayDate).eq('status', 'confirmed').in('slot_id', slotIds),
       sb.from('cancelled_classes').select('slot_id').eq('class_date', todayDate).in('slot_id', slotIds),
@@ -278,10 +277,9 @@ export default function AdminPage() {
     const typedRec     = ((recoveriesTotal ?? []) as unknown as RecoveryRow[])
 
     const classes: ClassView[] = (rawSlots ?? []).map((slot: ScheduleSlot) => {
-      const regulars = typedReg.filter(r => {
-        if (r.slot_id !== slot.id || absentSet.has(`${slot.id}|${r.user_id}`)) return false
-        return r.week_parity === 'all' || (r.week_parity === 'even') === weekIsEven
-      }).map(r => ({ user_id: r.user_id, full_name: r.profiles.full_name, username: r.profiles.username, type: 'regular' as const }))
+      const regulars = typedReg.filter(r =>
+        r.slot_id === slot.id && !absentSet.has(`${slot.id}|${r.user_id}`)
+      ).map(r => ({ user_id: r.user_id, full_name: r.profiles.full_name, username: r.profiles.username, type: 'regular' as const }))
 
       const recoveries = typedRec.filter(r => r.slot_id === slot.id)
         .map(r => ({ user_id: r.user_id, full_name: r.profiles.full_name, username: r.profiles.username, type: 'recovery' as const }))
@@ -304,14 +302,13 @@ export default function AdminPage() {
     const sb        = createClient()
     const dateFrom   = format(weekStart, 'yyyy-MM-dd')
     const dateTo     = format(addDays(weekStart, 4), 'yyyy-MM-dd')
-    const weekIsEven = getISOWeek(weekStart) % 2 === 0
 
     const [
       { data: rawSlots }, { data: regularAll }, { data: absencesAll },
       { data: recoveriesAll }, { data: cancelledAll },
     ] = await Promise.all([
       sb.from('schedule_slots').select('*, class_types(*)').eq('is_active', true),
-      sb.from('regular_slots').select('slot_id, user_id, week_parity, profiles(full_name, username)'),
+      sb.from('regular_slots').select('slot_id, user_id, profiles(full_name, username)'),
       sb.from('absences').select('slot_id, class_date, user_id').gte('class_date', dateFrom).lte('class_date', dateTo),
       sb.from('recovery_bookings').select('slot_id, class_date, user_id, profiles(full_name, username)').eq('status', 'confirmed').gte('class_date', dateFrom).lte('class_date', dateTo),
       sb.from('cancelled_classes').select('slot_id, class_date').gte('class_date', dateFrom).lte('class_date', dateTo),
@@ -332,10 +329,9 @@ export default function AdminPage() {
       if (!daySlots.length) continue
 
       const classes: ClassView[] = daySlots.map((slot: ScheduleSlot) => {
-        const regulars = typedReg.filter(r => {
-          if (r.slot_id !== slot.id || absentSet.has(`${slot.id}|${dateStr}|${r.user_id}`)) return false
-          return r.week_parity === 'all' || (r.week_parity === 'even') === weekIsEven
-        }).map(r => ({ user_id: r.user_id, full_name: r.profiles.full_name, username: r.profiles.username, type: 'regular' as const }))
+        const regulars = typedReg.filter(r =>
+          r.slot_id === slot.id && !absentSet.has(`${slot.id}|${dateStr}|${r.user_id}`)
+        ).map(r => ({ user_id: r.user_id, full_name: r.profiles.full_name, username: r.profiles.username, type: 'regular' as const }))
 
         const recoveries = typedRec.filter(r => r.slot_id === slot.id && r.class_date === dateStr)
           .map(r => ({ user_id: r.user_id, full_name: r.profiles.full_name, username: r.profiles.username, type: 'recovery' as const }))
@@ -538,14 +534,13 @@ export default function AdminPage() {
     const ws        = startOfWeek(new Date(), { weekStartsOn: 1 })
     const dateFrom   = format(ws, 'yyyy-MM-dd')
     const dateTo     = format(addDays(ws, 4), 'yyyy-MM-dd')
-    const weekIsEven = getISOWeek(ws) % 2 === 0
 
     const [
       { data: rawSlots }, { data: regularAll }, { data: absencesAll },
       { data: recoveriesAll }, { data: cancelledAll },
     ] = await Promise.all([
       sb.from('schedule_slots').select('*, class_types(*)').eq('is_active', true),
-      sb.from('regular_slots').select('slot_id, user_id, week_parity'),
+      sb.from('regular_slots').select('slot_id, user_id'),
       sb.from('absences').select('slot_id, class_date, user_id').gte('class_date', dateFrom).lte('class_date', dateTo),
       sb.from('recovery_bookings').select('slot_id, class_date, user_id').eq('status', 'confirmed').gte('class_date', dateFrom).lte('class_date', dateTo),
       sb.from('cancelled_classes').select('slot_id, class_date').gte('class_date', dateFrom).lte('class_date', dateTo),
@@ -561,10 +556,9 @@ export default function AdminPage() {
       for (const slot of daySlots) {
         const isCancelled = (cancelledAll ?? []).some((c: { slot_id: string; class_date: string }) => c.slot_id === slot.id && c.class_date === dateStr)
         const absentIds   = new Set((absencesAll ?? []).filter((a: { slot_id: string; class_date: string; user_id: string }) => a.slot_id === slot.id && a.class_date === dateStr).map((a: { user_id: string }) => a.user_id))
-        const regularCount = (regularAll ?? []).filter((r: { slot_id: string; user_id: string; week_parity: string }) => {
-          if (r.slot_id !== slot.id || absentIds.has(r.user_id)) return false
-          return r.week_parity === 'all' || (r.week_parity === 'even') === weekIsEven
-        }).length
+        const regularCount = (regularAll ?? []).filter((r: { slot_id: string; user_id: string }) =>
+          r.slot_id === slot.id && !absentIds.has(r.user_id)
+        ).length
         const recoveryCount = (recoveriesAll ?? []).filter((r: { slot_id: string; class_date: string }) => r.slot_id === slot.id && r.class_date === dateStr).length
         stats.push({ slot, date: dateStr, dayLabel, count: regularCount + recoveryCount, isCancelled })
       }

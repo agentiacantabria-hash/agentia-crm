@@ -32,7 +32,7 @@ export async function PATCH(req: NextRequest) {
   // sesión actual NO ve las regulars de otra alumna por RLS)
   const [{ data: profile }, { data: regulars }] = await Promise.all([
     admin.from('profiles').select('plan_id, schedule_type, plans(classes_per_week)').eq('id', user_id).single(),
-    admin.from('regular_slots').select('id, week_parity').eq('user_id', user_id),
+    admin.from('regular_slots').select('id').eq('user_id', user_id),
   ])
 
   const currentPlan = (profile?.plans as unknown as { classes_per_week: number } | null) ?? null
@@ -43,11 +43,10 @@ export async function PATCH(req: NextRequest) {
     const { data: newPlan } = await admin.from('plans').select('classes_per_week, name').eq('id', plan_id).single()
     if (newPlan && regulars && regulars.length) {
       const cpw = (newPlan as { classes_per_week: number }).classes_per_week
-      const counts = countParities((regulars as { week_parity: string }[]).map(r => r.week_parity))
-      const max   = Math.max(counts.odd, counts.even)
-      if (max > cpw) {
+      const total = regulars.length
+      if (total > cpw) {
         return NextResponse.json({
-          error: `Esta clienta tiene ${max} clase${max !== 1 ? 's' : ''} fija${max !== 1 ? 's' : ''} a la semana, pero el plan "${(newPlan as { name: string }).name}" solo permite ${cpw}. Retira ${max - cpw} clase${max - cpw !== 1 ? 's' : ''} primero.`,
+          error: `Esta clienta tiene ${total} clase${total !== 1 ? 's' : ''} fija${total !== 1 ? 's' : ''} a la semana, pero el plan "${(newPlan as { name: string }).name}" solo permite ${cpw}. Retira ${total - cpw} clase${total - cpw !== 1 ? 's' : ''} primero.`,
           code: 'plan_conflict',
         }, { status: 409 })
       }
@@ -102,12 +101,3 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ ok: true, cleanedRegulars: cleanedCount })
 }
 
-function countParities(parities: string[]): { odd: number; even: number } {
-  let odd = 0, even = 0
-  for (const p of parities) {
-    if (p === 'all')  { odd++; even++ }
-    if (p === 'odd')  odd++
-    if (p === 'even') even++
-  }
-  return { odd, even }
-}

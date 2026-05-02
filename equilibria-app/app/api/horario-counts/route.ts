@@ -29,16 +29,17 @@ export async function POST(req: NextRequest) {
     { data: waitlistAll },
     { data: cancelledAll },
   ] = await Promise.all([
-    admin.from('regular_slots').select('slot_id, week_parity'),
+    admin.from('regular_slots').select('slot_id'),
     admin.from('absences').select('slot_id, class_date').gte('class_date', dateFrom).lte('class_date', dateTo),
     admin.from('recovery_bookings').select('slot_id, class_date').eq('status', 'confirmed').gte('class_date', dateFrom).lte('class_date', dateTo),
     admin.from('waitlist').select('slot_id, class_date').gte('class_date', dateFrom).lte('class_date', dateTo),
     admin.from('cancelled_classes').select('slot_id, class_date').gte('class_date', dateFrom).lte('class_date', dateTo),
   ])
 
-  const regularParities: Record<string, string[]> = {}
-  for (const r of (regularAll ?? []) as { slot_id: string; week_parity: string }[]) {
-    (regularParities[r.slot_id] ??= []).push(r.week_parity)
+  // slot_id → cantidad de alumnas con esta clase como fija
+  const regularCounts: Record<string, number> = {}
+  for (const r of (regularAll ?? []) as { slot_id: string }[]) {
+    regularCounts[r.slot_id] = (regularCounts[r.slot_id] ?? 0) + 1
   }
 
   const absentCounts:   Record<string, Record<string, number>> = {}
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
     .map(c => `${c.slot_id}|${c.class_date}`)
 
   return NextResponse.json({
-    regularParities,
+    regularCounts,
     absentCounts,
     recoveryCounts,
     waitlistCounts,

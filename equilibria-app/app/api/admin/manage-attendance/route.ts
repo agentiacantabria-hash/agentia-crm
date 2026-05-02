@@ -31,11 +31,11 @@ export async function POST(req: NextRequest) {
   if (!guard.ok) return guard.response
   const { sb } = guard
 
-  const { type, user_id, slot_id, class_date, week_parity } = await req.json()
+  const { type, user_id, slot_id, class_date } = await req.json()
 
   if (type === 'regular') {
     const { error } = await sb.from('regular_slots').insert({
-      user_id, slot_id, week_parity: week_parity || 'all',
+      user_id, slot_id, week_parity: 'all',
     })
     if (error) {
       if (error.code === '23505') return NextResponse.json({ error: 'Ya tiene esta clase fija' }, { status: 409 })

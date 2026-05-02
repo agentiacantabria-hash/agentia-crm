@@ -64,7 +64,8 @@ export interface RegularSlot {
   id: string
   user_id: string
   slot_id: string
-  week_parity: 'all' | 'even' | 'odd'
+  /** Histórico — la app solo escribe 'all'. Se mantiene por compatibilidad con datos antiguos. */
+  week_parity: string
   created_at: string
 }
 

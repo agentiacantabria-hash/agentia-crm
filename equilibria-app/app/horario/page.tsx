@@ -5,7 +5,6 @@ import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import type { ScheduleSlot, Announcement } from '@/lib/types'
 import { DAY_SHORT } from '@/lib/types'
-import { parityActive } from '@/lib/parity'
 import { SCHEDULE_REALTIME_TOPIC } from '@/lib/schedule-events'
 import SlotModal from '@/components/SlotModal'
 
@@ -15,7 +14,6 @@ export type SlotInfo = {
   capacity: number
   regularCount: number
   isUserRegular: boolean
-  userRegularParity: string | null
   isUserAbsent: boolean
   isUserRecovery: boolean
   isUserWaitlist: boolean
@@ -37,13 +35,13 @@ export default function HorarioPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [dismissed, setDismissed]     = useState<Set<string>>(new Set())
 
-  const [regularParities,  setRegularParities]  = useState<Record<string, string[]>>({})
+  const [regularCountsBySlot, setRegularCountsBySlot] = useState<Record<string, number>>({})
   const [absentCounts,     setAbsentCounts]     = useState<Record<string, Record<string, number>>>({})
   const [recoveryCounts,   setRecoveryCounts]   = useState<Record<string, Record<string, number>>>({})
   const [waitlistCounts,   setWaitlistCounts]   = useState<Record<string, Record<string, number>>>({})
   const [cancelledSet,     setCancelledSet]     = useState<Set<string>>(new Set())
 
-  const [userRegularMap,  setUserRegularMap]  = useState<Map<string, string>>(new Map())
+  const [userRegularSet,  setUserRegularSet]  = useState<Set<string>>(new Set())
   const [userAbsentMap,   setUserAbsentMap]   = useState<Record<string, Set<string>>>({})
   const [userRecoveryMap, setUserRecoveryMap] = useState<Record<string, Set<string>>>({})
   const [userWaitlistMap, setUserWaitlistMap] = useState<Record<string, Set<string>>>({})
@@ -83,23 +81,21 @@ export default function HorarioPage() {
     ] = await Promise.all([
       sb.from('schedule_slots').select('*, class_types(*)').eq('is_active', true),
       countsPromise,
-      user ? sb.from('regular_slots').select('slot_id, week_parity').eq('user_id', user.id) : Promise.resolve({ data: [] }),
+      user ? sb.from('regular_slots').select('slot_id').eq('user_id', user.id) : Promise.resolve({ data: [] }),
       user ? sb.from('absences').select('slot_id, class_date').eq('user_id', user.id).gte('class_date', dateFrom).lte('class_date', dateTo) : Promise.resolve({ data: [] }),
       user ? sb.from('recovery_bookings').select('slot_id, class_date').eq('user_id', user.id).eq('status','confirmed').gte('class_date', dateFrom).lte('class_date', dateTo) : Promise.resolve({ data: [] }),
       user ? sb.from('waitlist').select('slot_id, class_date').eq('user_id', user.id).gte('class_date', dateFrom).lte('class_date', dateTo) : Promise.resolve({ data: [] }),
     ])
 
-    setRegularParities(counts?.regularParities ?? {})
+    setRegularCountsBySlot(counts?.regularCounts ?? {})
     setAbsentCounts(counts?.absentCounts ?? {})
     setRecoveryCounts(counts?.recoveryCounts ?? {})
     setWaitlistCounts(counts?.waitlistCounts ?? {})
     setCancelledSet(new Set<string>(counts?.cancelledKeys ?? []))
 
-    const urm = new Map<string, string>()
-    ;(userRegular ?? []).forEach((r: { slot_id: string; week_parity: string }) => {
-      urm.set(r.slot_id, r.week_parity)
-    })
-    setUserRegularMap(urm)
+    const urs = new Set<string>()
+    ;(userRegular ?? []).forEach((r: { slot_id: string }) => urs.add(r.slot_id))
+    setUserRegularSet(urs)
 
     const uam: Record<string, Set<string>> = {}
     ;(userAbsences ?? []).forEach((a: { slot_id: string; class_date: string }) => {
@@ -168,9 +164,8 @@ export default function HorarioPage() {
 
   const visibleAnnouncements = announcements.filter(a => a.pinned || !dismissed.has(a.id))
 
-  function getCapacity(slotId: string, dateStr: string, date: Date) {
-    const parities = regularParities[slotId] ?? []
-    const regularCount = parities.filter(p => parityActive(p, date)).length
+  function getCapacity(slotId: string, dateStr: string) {
+    const regularCount = regularCountsBySlot[slotId] ?? 0
     return regularCount
       - (absentCounts[slotId]?.[dateStr] ?? 0)
       + (recoveryCounts[slotId]?.[dateStr] ?? 0)
@@ -181,17 +176,15 @@ export default function HorarioPage() {
 
   function handleCell(slot: ScheduleSlot, date: Date) {
     const dateStr         = format(date, 'yyyy-MM-dd')
-    const userParity      = userRegularMap.get(slot.id) ?? null
-    const isUserRegular   = userParity !== null && parityActive(userParity, date)
-    const regularCount    = (regularParities[slot.id] ?? []).filter(p => parityActive(p, date)).length
+    const isUserRegular   = userRegularSet.has(slot.id)
+    const regularCount    = regularCountsBySlot[slot.id] ?? 0
 
     setSelected({
       slot,
       date,
-      capacity:           getCapacity(slot.id, dateStr, date),
+      capacity:           getCapacity(slot.id, dateStr),
       regularCount,
       isUserRegular,
-      userRegularParity:  userParity,
       isUserAbsent:       userAbsentMap[slot.id]?.has(dateStr)   ?? false,
       isUserRecovery:     userRecoveryMap[slot.id]?.has(dateStr) ?? false,
       isUserWaitlist:     userWaitlistMap[slot.id]?.has(dateStr) ?? false,
@@ -357,17 +350,16 @@ export default function HorarioPage() {
                     return (
                       <div key={dow} className="flex flex-col gap-1.5">
                         {daySlots.map(slot => {
-                          const cap          = getCapacity(slot.id, dateStr, date)
+                          const cap          = getCapacity(slot.id, dateStr)
                           const cancelled    = cancelledSet.has(`${slot.id}|${dateStr}`)
-                          const userParity   = userRegularMap.get(slot.id)
-                          const isRegular    = userParity !== undefined && parityActive(userParity, date)
+                          const isRegular    = userRegularSet.has(slot.id)
                           const isAbsent     = userAbsentMap[slot.id]?.has(dateStr) ?? false
                           const isRecovery   = userRecoveryMap[slot.id]?.has(dateStr) ?? false
                           const capNum       = Math.max(0, cap)
                           const slotMax      = slot.max_capacity ?? 7
                           const spotsLeft    = Math.max(0, slotMax - capNum)
                           const isFull       = capNum >= slotMax
-                          const activeRegs   = (regularParities[slot.id] ?? []).filter(p => parityActive(p, date)).length
+                          const activeRegs   = regularCountsBySlot[slot.id] ?? 0
                           const isEnFormacion= slot.min_regulars > 0 && activeRegs < slot.min_regulars
                           const color        = slot.class_types.color
                           const isNow        = !cancelled && isHappeningNow(slot, date)

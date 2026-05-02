@@ -35,13 +35,12 @@ export async function PATCH(req: NextRequest) {
   // Si se intenta bajar max_capacity, comprobar que no quedan inscripciones por encima
   if (typeof max_capacity === 'number' && !force) {
     const admin = createAdminClient()
-    const { data: regulars } = await admin
-      .from('regular_slots').select('week_parity').eq('slot_id', slot_id)
-    const counts = countParities((regulars ?? []).map((r: { week_parity: string }) => r.week_parity))
-    const worstRegular = Math.max(counts.odd, counts.even)
-    if (worstRegular > max_capacity) {
+    const { count: regularCount } = await admin
+      .from('regular_slots').select('*', { count: 'exact', head: true }).eq('slot_id', slot_id)
+    const total = regularCount ?? 0
+    if (total > max_capacity) {
       return NextResponse.json({
-        error: `No puedes bajar el aforo a ${max_capacity}: hay ${worstRegular} alumna${worstRegular !== 1 ? 's' : ''} con esta clase como fija. Quita las regulares sobrantes primero.`,
+        error: `No puedes bajar el aforo a ${max_capacity}: hay ${total} alumna${total !== 1 ? 's' : ''} con esta clase como fija. Quita las regulares sobrantes primero.`,
         code: 'capacity_conflict',
       }, { status: 409 })
     }
@@ -76,12 +75,3 @@ export async function DELETE(req: NextRequest) {
   return NextResponse.json({ ok: true })
 }
 
-function countParities(parities: string[]): { odd: number; even: number } {
-  let odd = 0, even = 0
-  for (const p of parities) {
-    if (p === 'all')  { odd++; even++ }
-    if (p === 'odd')  odd++
-    if (p === 'even') even++
-  }
-  return { odd, even }
-}
