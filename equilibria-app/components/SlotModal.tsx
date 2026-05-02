@@ -4,6 +4,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { SlotInfo } from '@/app/horario/page'
 import { toast } from '@/lib/toast'
+import { createClient } from '@/lib/supabase/client'
 
 const SUCCESS_MESSAGES: Record<string, string> = {
   'POST /api/regular-slot':    'Te has apuntado a esta clase fija',
@@ -17,6 +18,7 @@ const SUCCESS_MESSAGES: Record<string, string> = {
 }
 
 type Attendee = { user_id: string; full_name: string; type: 'regular' | 'recovery' | 'absent' | 'waitlist' }
+type SimpleClient = { id: string; full_name: string; username: string | null }
 
 interface Props { info: SlotInfo; isAdmin?: boolean; onClose: () => void; onSuccess: () => void }
 
@@ -28,6 +30,14 @@ export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) 
   const [waitlistPeople, setWaitlistPeople] = useState<Attendee[]>([])
   const [loadingAttendees, setLoadingAttendees] = useState(false)
 
+  // Admin: gestión de asistentes
+  const [allClients, setAllClients]     = useState<SimpleClient[]>([])
+  const [adminBusyUser, setAdminBusyUser] = useState<string | null>(null)
+  const [showAddPicker, setShowAddPicker] = useState(false)
+  const [addUserId, setAddUserId]       = useState('')
+  const [addType, setAddType]           = useState<'recovery' | 'regular'>('recovery')
+  const [addLoading, setAddLoading]     = useState(false)
+
   useEffect(() => {
     if (!isAdmin) return
     setLoadingAttendees(true)
@@ -36,6 +46,79 @@ export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) 
       .then(d => { setAttendees(d.attendees ?? []); setWaitlistPeople(d.waitlist ?? []) })
       .finally(() => setLoadingAttendees(false))
   }, [isAdmin, slot.id, date])
+
+  // Cargar clientes una vez (para añadir asistentes)
+  useEffect(() => {
+    if (!isAdmin) return
+    const sb = createClient()
+    sb.from('profiles').select('id, full_name, username').eq('is_admin', false).order('full_name')
+      .then(({ data }) => setAllClients((data ?? []) as SimpleClient[]))
+  }, [isAdmin])
+
+  async function refreshAttendees() {
+    const r = await fetch(`/api/admin/attendees?slot_id=${slot.id}&class_date=${format(date, 'yyyy-MM-dd')}`)
+    const d = await r.json()
+    setAttendees(d.attendees ?? [])
+    setWaitlistPeople(d.waitlist ?? [])
+  }
+
+  async function adminMarkAbsent(a: Attendee) {
+    setAdminBusyUser(a.user_id); setError('')
+    const res = await fetch('/api/admin/mark-absence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: a.user_id, slot_id: slot.id, class_date: dateStr }),
+    })
+    setAdminBusyUser(null)
+    if (!res.ok) { const j = await res.json(); setError(j.error ?? 'Error'); return }
+    toast.success('Falta marcada')
+    refreshAttendees()
+    onSuccess()
+  }
+
+  async function adminRemove(a: Attendee, force = false) {
+    setAdminBusyUser(a.user_id); setError('')
+    const res = await fetch('/api/admin/manage-attendance', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: a.type === 'regular' ? 'regular' : 'recovery', user_id: a.user_id, slot_id: slot.id, class_date: dateStr, force }),
+    })
+    setAdminBusyUser(null)
+    if (!res.ok) { const j = await res.json(); setError(j.error ?? 'Error'); return }
+    toast.success(a.type === 'regular' ? 'Has quitado la clase fija' : 'Reserva cancelada')
+    refreshAttendees()
+    onSuccess()
+  }
+
+  async function adminAddAttendee(force = false) {
+    if (!addUserId) return
+    setAddLoading(true); setError('')
+    const res = await fetch('/api/admin/manage-attendance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: addType, user_id: addUserId, slot_id: slot.id,
+        class_date: addType === 'recovery' ? dateStr : null,
+        force,
+      }),
+    })
+    setAddLoading(false)
+    if (!res.ok) {
+      const j = await res.json()
+      // Si es conflict de aforo/cupo/plan, ofrecer forzar
+      if (res.status === 409 && j.code && (j.code === 'capacity_conflict' || j.code === 'cupo_conflict' || j.code === 'plan_conflict')) {
+        if (typeof window !== 'undefined' && window.confirm(`${j.error}\n\n¿Forzarlo de todas formas?`)) {
+          return adminAddAttendee(true)
+        }
+      }
+      setError(j.error ?? 'Error')
+      return
+    }
+    toast.success(addType === 'regular' ? 'Apuntada como fija' : 'Reserva añadida')
+    setAddUserId(''); setShowAddPicker(false)
+    refreshAttendees()
+    onSuccess()
+  }
 
   const dateStr       = format(date, 'yyyy-MM-dd')
   const dayName       = format(date, "EEEE", { locale: es })
@@ -266,26 +349,97 @@ export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) 
                   Asistentes
                 </p>
                 <span className="flex-1 h-px bg-gradient-to-r from-ink/10 to-transparent"/>
+                <span className="font-mono text-[10px] text-ink/45 tabular-nums">{attendees.filter(a => a.type !== 'absent').length}/{slotMax}</span>
               </div>
               {loadingAttendees ? (
                 <div className="flex justify-center py-3">
                   <div className="w-4 h-4 rounded-full border-2 border-brand/30 border-t-brand animate-spin"/>
                 </div>
               ) : attendees.length === 0 ? (
-                <p className="text-xs text-ink/35 font-mono text-center py-3">Sin asistentes</p>
+                <p className="text-xs text-ink/35 font-mono text-center py-3 italic">Sin asistentes confirmados</p>
               ) : (
                 <div className="flex flex-col gap-1.5">
                   {attendees.map(a => (
-                    <div key={a.user_id} className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-paper">
-                      <span className={`text-sm font-display ${a.type === 'absent' ? 'text-ink/30 line-through' : 'text-ink'}`}>
-                        {a.full_name}
-                      </span>
-                      {a.type === 'recovery' && <span className="badge badge-brand">Recup.</span>}
-                      {a.type === 'absent'   && <span className="badge badge-danger">Falta</span>}
+                    <div key={a.user_id} className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-paper">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {a.type === 'recovery' && <span className="badge badge-brand">Recup.</span>}
+                        {a.type === 'absent'   && <span className="badge badge-danger">Falta</span>}
+                        {a.type === 'regular'  && <span className="badge badge-neutral">Fija</span>}
+                        <span className={`text-sm font-display truncate ${a.type === 'absent' ? 'text-ink/35 line-through' : 'text-ink'}`}>
+                          {a.full_name}
+                        </span>
+                      </div>
+                      {!isCancelled && !isPast && (
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {a.type === 'regular' && (
+                            <button onClick={() => adminMarkAbsent(a)} disabled={adminBusyUser === a.user_id}
+                              className="font-mono text-[10px] uppercase tracking-wider text-amber-700 hover:text-amber-900 disabled:opacity-40 px-1.5 py-1">
+                              {adminBusyUser === a.user_id ? '…' : 'Falta'}
+                            </button>
+                          )}
+                          {a.type !== 'absent' && (
+                            <button
+                              onClick={() => {
+                                const msg = a.type === 'regular'
+                                  ? `¿Quitar a ${a.full_name} de esta clase fija? Le retirarás la inscripción permanente.`
+                                  : `¿Cancelar la reserva de ${a.full_name}?`
+                                if (typeof window !== 'undefined' && !window.confirm(msg)) return
+                                adminRemove(a)
+                              }}
+                              disabled={adminBusyUser === a.user_id}
+                              className="font-mono text-[10px] uppercase tracking-wider text-red-500 hover:text-red-700 disabled:opacity-40 px-1.5 py-1">
+                              {adminBusyUser === a.user_id ? '…' : 'Quitar'}
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               )}
+
+              {/* Botón añadir / picker */}
+              {!isCancelled && !isPast && (
+                <div className="mt-3">
+                  {!showAddPicker ? (
+                    <button onClick={() => setShowAddPicker(true)}
+                      className="w-full font-mono text-[11px] uppercase tracking-widest font-bold text-brand-deep bg-brand/10 hover:bg-brand/15 py-2.5 rounded-xl transition-colors">
+                      + Añadir asistente
+                    </button>
+                  ) : (
+                    <div className="space-y-2 px-1 pt-2">
+                      <select value={addUserId} onChange={e => setAddUserId(e.target.value)}
+                        className="w-full font-mono text-sm px-3 py-2.5 rounded-xl bg-paper-2 text-navy border-none outline-none">
+                        <option value="">Seleccionar cliente…</option>
+                        {allClients
+                          .filter(c => !attendees.some(a => a.user_id === c.id))
+                          .map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.full_name}{c.username ? ` (${c.username})` : ''}
+                            </option>
+                          ))}
+                      </select>
+                      <div className="flex gap-2">
+                        <select value={addType} onChange={e => setAddType(e.target.value as 'recovery' | 'regular')}
+                          className="flex-1 font-mono text-sm px-3 py-2.5 rounded-xl bg-paper-2 text-navy border-none outline-none">
+                          <option value="recovery">Solo este día</option>
+                          <option value="regular">Fija (todas las semanas)</option>
+                        </select>
+                        <button onClick={() => adminAddAttendee()}
+                          disabled={!addUserId || addLoading}
+                          className="px-4 py-2.5 bg-brand text-paper font-mono text-sm font-bold rounded-xl disabled:opacity-40 active:scale-95 transition-transform">
+                          {addLoading ? '…' : 'Añadir'}
+                        </button>
+                      </div>
+                      <button onClick={() => { setShowAddPicker(false); setAddUserId('') }}
+                        className="w-full text-center font-mono text-[10px] text-ink/40 py-1 uppercase tracking-widest">
+                        Cancelar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {waitlistPeople.length > 0 && (
                 <>
                   <div className="flex items-center gap-2 mt-5 mb-3">
@@ -297,7 +451,7 @@ export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) 
                   <div className="flex flex-col gap-1.5">
                     {waitlistPeople.map(a => (
                       <div key={a.user_id} className="flex items-center px-4 py-2.5 rounded-xl bg-paper/60">
-                        <span className="text-sm font-display text-ink/55">{a.full_name}</span>
+                        <span className="text-sm font-display text-ink/65">{a.full_name}</span>
                       </div>
                     ))}
                   </div>
