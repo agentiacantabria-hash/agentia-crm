@@ -97,24 +97,24 @@ export default function NavBar() {
           const active = path === href || (href !== '/login' && href !== '/' && path.startsWith(href))
           return (
             <Link key={href} href={href}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 rounded-2xl text-[9px] font-mono uppercase tracking-wider transition-all relative
-                ${active ? 'text-navy' : 'text-ink/30'}`}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 rounded-2xl text-[9px] font-mono uppercase tracking-wider transition-all duration-300 relative
+                ${active ? 'text-navy' : 'text-ink/35 hover:text-ink/55'}`}
             >
               {active && (
-                <span className="absolute inset-0 rounded-2xl bg-navy/8"/>
+                <span className="absolute inset-0 rounded-2xl bg-navy/8 animate-fade-in"/>
               )}
-              <span className="relative z-10">
+              <span className={`relative z-10 transition-transform duration-300 ease-spring ${active ? 'scale-110' : 'scale-100'}`}>
                 <Icon active={active} />
                 {badge !== undefined && badge > 0 && (
                   <span
-                    className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-paper text-[9px] font-bold flex items-center justify-center font-mono"
+                    className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-paper text-[9px] font-bold flex items-center justify-center font-mono animate-pop"
                     aria-label={`${badge} sin leer`}
                   >
                     {badge > 9 ? '9+' : badge}
                   </span>
                 )}
               </span>
-              <span className="relative z-10 font-semibold">{label}</span>
+              <span className={`relative z-10 transition-all duration-300 ${active ? 'font-bold' : 'font-semibold'}`}>{label}</span>
             </Link>
           )
         })}

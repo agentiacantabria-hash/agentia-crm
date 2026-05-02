@@ -255,9 +255,9 @@ export default function MisClasesPage() {
               </button>
             </div>
           ) : (
-            <div className="space-y-2.5 animate-slide-up">
+            <div className="space-y-2.5">
               {[...slots].sort((a,b) => a.day_of_week - b.day_of_week || a.start_time.localeCompare(b.start_time))
-                .map(slot => {
+                .map((slot, i) => {
                   const dayDate   = weekDayDate(slot.day_of_week)
                   const dayLabel  = format(dayDate, "EEEE d", { locale: es })
                   const isPast    = isBefore(dayDate, today)
@@ -265,8 +265,8 @@ export default function MisClasesPage() {
 
                   return (
                     <div key={slot.id}
-                      className={`card-tint overflow-hidden flex transition-all ${slot.isAbsent ? 'opacity-55' : ''}`}
-                      style={{ ['--tint' as string]: color }}>
+                      className={`card-tint overflow-hidden flex stagger ${slot.isAbsent ? 'opacity-55' : ''}`}
+                      style={{ ['--tint' as string]: color, ['--i' as string]: i }}>
                       <div className="w-1.5 flex-shrink-0" style={{ backgroundColor: color }}/>
                       <div className="flex-1 px-4 py-4 flex items-center justify-between gap-3">
                         <div className="min-w-0">

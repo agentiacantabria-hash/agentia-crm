@@ -2,9 +2,10 @@
 import { useEffect, useState } from 'react'
 import type { ToastDetail, ToastKind } from '@/lib/toast'
 
-type ToastItem = ToastDetail & { id: number }
+type ToastItem = ToastDetail & { id: number; removing?: boolean }
 
 let nextId = 1
+const EXIT_MS = 250
 
 const ICONS: Record<ToastKind, string> = {
   success: '✓',
@@ -31,10 +32,16 @@ export default function ToastContainer() {
         durationMs: e.detail.durationMs ?? 2600,
       }
       setItems(prev => [...prev, item])
-      const t = window.setTimeout(() => {
-        setItems(prev => prev.filter(x => x.id !== item.id))
+
+      // Marcar para salida antes del unmount
+      const exitTimer = window.setTimeout(() => {
+        setItems(prev => prev.map(x => x.id === item.id ? { ...x, removing: true } : x))
       }, item.durationMs)
-      return () => window.clearTimeout(t)
+      // Unmount real cuando termine la animación de salida
+      const removeTimer = window.setTimeout(() => {
+        setItems(prev => prev.filter(x => x.id !== item.id))
+      }, (item.durationMs ?? 2600) + EXIT_MS)
+      return () => { window.clearTimeout(exitTimer); window.clearTimeout(removeTimer) }
     }
     window.addEventListener('eq-toast', handler as EventListener)
     return () => window.removeEventListener('eq-toast', handler as EventListener)
@@ -52,7 +59,7 @@ export default function ToastContainer() {
         const s = STYLES[kind]
         return (
           <div key={item.id}
-            className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-card-hover ring-4 animate-spring-in min-w-[260px] max-w-[340px] ${s.bg} ${s.tint}`}>
+            className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-card-hover ring-4 min-w-[260px] max-w-[340px] ${s.bg} ${s.tint} ${item.removing ? 'animate-fade-out' : 'animate-spring-in'}`}>
             <span className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center font-display font-bold ${s.iconBg} ${s.iconText}`}>
               {ICONS[kind]}
             </span>

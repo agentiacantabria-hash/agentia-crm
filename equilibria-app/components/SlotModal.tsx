@@ -159,13 +159,19 @@ export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) 
 
   const fillPct = Math.min(100, (capNum / slotMax) * 100)
 
+  const [closing, setClosing] = useState(false)
+  function handleClose() {
+    setClosing(true)
+    window.setTimeout(onClose, 240)
+  }
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end animate-fade-in"
+      className={`fixed inset-0 z-50 flex items-end ${closing ? 'animate-fade-out' : 'animate-fade-in'}`}
       style={{ background: 'rgba(7, 21, 58, 0.45)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
-      onClick={onClose}
+      onClick={handleClose}
     >
-      <div className="w-full max-w-lg mx-auto rounded-t-[2rem] overflow-hidden flex flex-col animate-spring-in"
+      <div className={`w-full max-w-lg mx-auto rounded-t-[2rem] overflow-hidden flex flex-col ${closing ? 'animate-slide-down' : 'animate-spring-in'}`}
         style={{ boxShadow: '0 -16px 60px rgba(7, 21, 58, 0.35)', maxHeight: '92dvh' }}
         onClick={e => e.stopPropagation()}>
 
@@ -336,7 +342,7 @@ export default function SlotModal({ info, isAdmin, onClose, onSuccess }: Props) 
               )
             )}
 
-            <button onClick={onClose} className="text-center text-[11px] text-ink/35 py-3 font-mono uppercase tracking-widest hover:text-ink/55 transition-colors">
+            <button onClick={handleClose} className="text-center text-[11px] text-ink/35 py-3 font-mono uppercase tracking-widest hover:text-ink/55 transition-colors">
               Cerrar
             </button>
           </div>

@@ -99,13 +99,13 @@ export default function AvisosPage() {
             <p className="text-ink/45 text-sm max-w-xs mx-auto">Cuando haya novedades te avisaremos aquí en tiempo real</p>
           </div>
         ) : (
-          <div className="space-y-2.5 animate-slide-up">
-            {items.map(n => {
+          <div className="space-y-2.5">
+            {items.map((n, i) => {
               const meta = TYPE_META[n.type] ?? { emoji: '🔔', tint: '#1E4DB7', label: 'Aviso' }
               const ago = formatDistanceToNow(new Date(n.created_at), { locale: es, addSuffix: true })
               const content = (
-                <div className={`card-tint relative overflow-hidden flex gap-3 px-5 py-4 transition-all ${n.is_read ? 'opacity-65' : ''}`}
-                  style={{ ['--tint' as string]: meta.tint }}>
+                <div className={`card-tint relative overflow-hidden flex gap-3 px-5 py-4 stagger ${n.is_read ? 'opacity-65' : ''}`}
+                  style={{ ['--tint' as string]: meta.tint, ['--i' as string]: i }}>
                   {!n.is_read && (
                     <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-brand animate-pulse-soft" aria-label="sin leer"/>
                   )}

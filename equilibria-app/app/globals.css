@@ -25,6 +25,22 @@
     --paper:      #F4EFE6;
     --ink:        #0A1430;
   }
+
+  /* Transiciones nativas entre rutas (Chromium / Edge / Safari 18+).
+     Crossfade automático cero-JS entre /horario, /mis-clases, etc. */
+  @view-transition {
+    navigation: auto;
+  }
+
+  /* Respetar preferencia de reducir movimiento */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer utilities {
@@ -41,6 +57,30 @@
     font-style: italic;
     font-weight: 500;
     font-feature-settings: 'liga', 'dlig', 'kern';
+  }
+
+  /* Stagger: aplica animación con delay incremental según --i (índice del item).
+     Uso: <div className="stagger" style={{ '--i': i }}> */
+  .stagger {
+    animation: slide-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(var(--i, 0) * 50ms);
+  }
+
+  /* Card con micro-elevación al hover (solo desktop) */
+  @media (hover: hover) and (pointer: fine) {
+    .card-hoverable {
+      transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.18s ease;
+    }
+    .card-hoverable:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 36px rgba(11, 31, 77, 0.12);
+    }
+  }
+
+  /* Tipografía con números tabulares (consistencia en counters) */
+  .tabular-tight {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
   }
 }
 
